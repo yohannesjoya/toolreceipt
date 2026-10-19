@@ -34,6 +34,10 @@ dev = ["pytest>=8", "ruff>=0.6", "mypy>=1.10", "langchain-core>=1.0", "langgraph
 packages = ["toolreceipt"]
 include = ["toolreceipt/lexicon.json"]
 
+[tool.hatch.build.targets.sdist]
+# The tests need the repository's fixtures/ and README, so they stay out of the sdist.
+exclude = ["/tests", "/uv.lock"]
+
 [tool.ruff]
 line-length = 100
 target-version = "py310"

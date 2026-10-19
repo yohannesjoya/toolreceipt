@@ -1,4 +1,4 @@
-"""python/README.md must be the generated copy of the root README."""
+"""python/README.md and python/LICENSE must be the generated copies of the root files."""
 
 from __future__ import annotations
 
@@ -17,3 +17,4 @@ def test_package_readme_is_in_sync() -> None:
     )
     assert result.returncode == 0, result.stdout
     assert not (ROOT / "python" / "README.md").is_symlink()
+    assert not (ROOT / "python" / "LICENSE").is_symlink()
