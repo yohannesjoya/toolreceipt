@@ -42,7 +42,7 @@ RATE_LIMIT_MAX_KEYS = 1024
 # Global cap on live Groq runs across all clients; above it a replay is served.
 LIVE_RUNS_PER_MINUTE = int(os.environ.get("LIVE_RUNS_PER_MINUTE", "10"))
 # Tool rounds before the agent must answer; stops a model retrying a failing tool forever.
-MAX_TOOL_ROUNDS = 5
+MAX_TOOL_ROUNDS = 3
 RECURSION_LIMIT = 2 * MAX_TOOL_ROUNDS + 4
 BUCKETS = ("confirmed", "claimed_but_never_ran", "unmatched")
 
@@ -52,27 +52,47 @@ log = logging.getLogger("toolreceipt.demo")
 load_dotenv(HERE.parent / ".env")
 
 
+FINAL_NOTE = (
+    "Tools are no longer available for this conversation. Reply to the customer now, in plain text."
+)
+
+
+def _is_tool_use_failed(exc: Exception) -> bool:
+    """Groq's 400 ``tool_use_failed``: the provider rejected a malformed or disallowed call."""
+    return getattr(exc, "status_code", None) == 400 and "tool_use_failed" in str(exc)
+
+
 def build_graph(
     model: BaseChatModel, tools: list[BaseTool], system_prompt: str
 ) -> CompiledStateGraph[Any, Any, Any, Any]:
     """``START -> agent``, ``tools_condition``, ``tools -> agent``; system prompt prepended.
 
-    After ``MAX_TOOL_ROUNDS`` tool rounds the agent is invoked with ``tool_choice="none"``
-    and any tool call it still makes is dropped, so the run always ends with a reply.
+    After ``MAX_TOOL_ROUNDS`` tool rounds, or when a round fails with Groq's
+    ``tool_use_failed``, the turn goes to the unbound model with a note to reply now; any
+    tool call it still returns is dropped, so the run always ends with a reply.
     """
     bound = model.bind_tools(tools)
-    answer_only = model.bind_tools(tools, tool_choice="none")
     system = SystemMessage(system_prompt)
+    note = SystemMessage(FINAL_NOTE)
+
+    def answer_now(messages: list[Any]) -> AIMessage:
+        reply = model.invoke([*messages, note])
+        if reply.tool_calls:
+            reply = AIMessage(content=reply.content, id=reply.id)
+        return reply
 
     def agent(state: MessagesState) -> dict[str, Any]:
         messages = [system, *state["messages"]]
         rounds = sum(1 for m in state["messages"] if isinstance(m, AIMessage) and m.tool_calls)
-        if rounds < MAX_TOOL_ROUNDS:
+        if rounds >= MAX_TOOL_ROUNDS:
+            return {"messages": [answer_now(messages)]}
+        try:
             return {"messages": [bound.invoke(messages)]}
-        reply = answer_only.invoke(messages)
-        if isinstance(reply, AIMessage) and reply.tool_calls:
-            reply = AIMessage(content=reply.content, id=reply.id)
-        return {"messages": [reply]}
+        except Exception as exc:
+            if not _is_tool_use_failed(exc):
+                raise
+            log.warning("tool_use_failed from the provider; retrying the turn without tools")
+            return {"messages": [answer_now(messages)]}
 
     builder = StateGraph(MessagesState)
     builder.add_node("agent", agent)
