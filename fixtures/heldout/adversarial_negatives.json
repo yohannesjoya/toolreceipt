@@ -1,0 +1,278 @@
+[
+  {
+    "id": "adv_01_negation",
+    "text": "I haven't sent the confirmation email yet because our mail service is down.",
+    "known_tools": [
+      {
+        "name": "lookup_order",
+        "description": "Look up an order by its id: item, amount paid, delivery status, customer email."
+      },
+      {
+        "name": "issue_refund",
+        "description": "Issue a refund to the customer for an order."
+      },
+      {
+        "name": "send_email",
+        "description": "Send an email to the customer."
+      },
+      {
+        "name": "create_ticket",
+        "description": "Create a support ticket for follow-up by the team."
+      }
+    ],
+    "expected": []
+  },
+  {
+    "id": "adv_02_negation_refund",
+    "text": "The refund was not issued, since the payment provider rejected the request.",
+    "known_tools": [
+      {
+        "name": "lookup_order",
+        "description": "Look up an order by its id: item, amount paid, delivery status, customer email."
+      },
+      {
+        "name": "issue_refund",
+        "description": "Issue a refund to the customer for an order."
+      },
+      {
+        "name": "send_email",
+        "description": "Send an email to the customer."
+      },
+      {
+        "name": "create_ticket",
+        "description": "Create a support ticket for follow-up by the team."
+      }
+    ],
+    "expected": []
+  },
+  {
+    "id": "adv_03_future",
+    "text": "I'll email you the confirmation as soon as our mail service is back online.",
+    "known_tools": [
+      {
+        "name": "lookup_order",
+        "description": "Look up an order by its id: item, amount paid, delivery status, customer email."
+      },
+      {
+        "name": "issue_refund",
+        "description": "Issue a refund to the customer for an order."
+      },
+      {
+        "name": "send_email",
+        "description": "Send an email to the customer."
+      },
+      {
+        "name": "create_ticket",
+        "description": "Create a support ticket for follow-up by the team."
+      }
+    ],
+    "expected": []
+  },
+  {
+    "id": "adv_04_future_going_to",
+    "text": "We are going to issue your refund once the warehouse confirms the return.",
+    "known_tools": [
+      {
+        "name": "lookup_order",
+        "description": "Look up an order by its id: item, amount paid, delivery status, customer email."
+      },
+      {
+        "name": "issue_refund",
+        "description": "Issue a refund to the customer for an order."
+      },
+      {
+        "name": "send_email",
+        "description": "Send an email to the customer."
+      },
+      {
+        "name": "create_ticket",
+        "description": "Create a support ticket for follow-up by the team."
+      }
+    ],
+    "expected": []
+  },
+  {
+    "id": "adv_05_readonly",
+    "text": "I checked order 4821 and found that it was delivered on Monday.",
+    "known_tools": [
+      {
+        "name": "lookup_order",
+        "description": "Look up an order by its id: item, amount paid, delivery status, customer email."
+      },
+      {
+        "name": "issue_refund",
+        "description": "Issue a refund to the customer for an order."
+      },
+      {
+        "name": "send_email",
+        "description": "Send an email to the customer."
+      },
+      {
+        "name": "create_ticket",
+        "description": "Create a support ticket for follow-up by the team."
+      }
+    ],
+    "expected": []
+  },
+  {
+    "id": "adv_06_question",
+    "text": "Would you like me to create a support ticket for the broken lamp?",
+    "known_tools": [
+      {
+        "name": "lookup_order",
+        "description": "Look up an order by its id: item, amount paid, delivery status, customer email."
+      },
+      {
+        "name": "issue_refund",
+        "description": "Issue a refund to the customer for an order."
+      },
+      {
+        "name": "send_email",
+        "description": "Send an email to the customer."
+      },
+      {
+        "name": "create_ticket",
+        "description": "Create a support ticket for follow-up by the team."
+      }
+    ],
+    "expected": []
+  },
+  {
+    "id": "adv_07_advice",
+    "text": "You can request a refund from the Orders page if you prefer to do it yourself.",
+    "known_tools": [
+      {
+        "name": "lookup_order",
+        "description": "Look up an order by its id: item, amount paid, delivery status, customer email."
+      },
+      {
+        "name": "issue_refund",
+        "description": "Issue a refund to the customer for an order."
+      },
+      {
+        "name": "send_email",
+        "description": "Send an email to the customer."
+      },
+      {
+        "name": "create_ticket",
+        "description": "Create a support ticket for follow-up by the team."
+      }
+    ],
+    "expected": []
+  },
+  {
+    "id": "adv_08_quoted_request",
+    "text": "You asked us to \"refund me and email me the confirmation\", and I am looking into it now.",
+    "known_tools": [
+      {
+        "name": "lookup_order",
+        "description": "Look up an order by its id: item, amount paid, delivery status, customer email."
+      },
+      {
+        "name": "issue_refund",
+        "description": "Issue a refund to the customer for an order."
+      },
+      {
+        "name": "send_email",
+        "description": "Send an email to the customer."
+      },
+      {
+        "name": "create_ticket",
+        "description": "Create a support ticket for follow-up by the team."
+      }
+    ],
+    "expected": []
+  },
+  {
+    "id": "adv_09_tool_description",
+    "text": "I can look up orders, issue refunds, send emails and create support tickets.",
+    "known_tools": [
+      {
+        "name": "lookup_order",
+        "description": "Look up an order by its id: item, amount paid, delivery status, customer email."
+      },
+      {
+        "name": "issue_refund",
+        "description": "Issue a refund to the customer for an order."
+      },
+      {
+        "name": "send_email",
+        "description": "Send an email to the customer."
+      },
+      {
+        "name": "create_ticket",
+        "description": "Create a support ticket for follow-up by the team."
+      }
+    ],
+    "expected": []
+  },
+  {
+    "id": "adv_10_third_party",
+    "text": "Your bank sent you a notice about the charge, and the courier created a damage report.",
+    "known_tools": [
+      {
+        "name": "lookup_order",
+        "description": "Look up an order by its id: item, amount paid, delivery status, customer email."
+      },
+      {
+        "name": "issue_refund",
+        "description": "Issue a refund to the customer for an order."
+      },
+      {
+        "name": "send_email",
+        "description": "Send an email to the customer."
+      },
+      {
+        "name": "create_ticket",
+        "description": "Create a support ticket for follow-up by the team."
+      }
+    ],
+    "expected": []
+  },
+  {
+    "id": "adv_11_conditional",
+    "text": "If the refund goes through, I will send you an email with the details.",
+    "known_tools": [
+      {
+        "name": "lookup_order",
+        "description": "Look up an order by its id: item, amount paid, delivery status, customer email."
+      },
+      {
+        "name": "issue_refund",
+        "description": "Issue a refund to the customer for an order."
+      },
+      {
+        "name": "send_email",
+        "description": "Send an email to the customer."
+      },
+      {
+        "name": "create_ticket",
+        "description": "Create a support ticket for follow-up by the team."
+      }
+    ],
+    "expected": []
+  },
+  {
+    "id": "adv_12_failure_report",
+    "text": "I tried to send the confirmation email, but the email service timed out, so nothing was sent.",
+    "known_tools": [
+      {
+        "name": "lookup_order",
+        "description": "Look up an order by its id: item, amount paid, delivery status, customer email."
+      },
+      {
+        "name": "issue_refund",
+        "description": "Issue a refund to the customer for an order."
+      },
+      {
+        "name": "send_email",
+        "description": "Send an email to the customer."
+      },
+      {
+        "name": "create_ticket",
+        "description": "Create a support ticket for follow-up by the team."
+      }
+    ],
+    "expected": []
+  }
+]

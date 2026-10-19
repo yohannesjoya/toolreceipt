@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Held-out set in `fixtures/heldout/` (live honest-mode replies and adversarial negatives)
+  with `tests/test_heldout.py`, which prints precision; live demo replays in `demo/replays/`
+  and `demo/scripts/collect_runs.py` to record them.
+
+### Fixed
+
+- "nothing" and "none" now negate a clause, so "so nothing was sent" is not a send claim
+  (found by an adversarial negative in the held-out set).
+
 ## [0.1.0] - 2026-10-20
 
 ### Added

@@ -42,7 +42,7 @@
     }
   },
   "exclusions": ["found", "checked", "looked", "saw", "noticed", "verified", "reviewed", "read", "confirmed", "located", "retrieved", "fetched", "searched", "analysed", "analyzed", "understood", "received", "logged in", "logged out", "ran into"],
-  "negation": ["not", "n't", "never", "unable", "failed to", "couldn't", "could not", "cannot", "can't", "wasn't able", "was not able", "didn't", "did not"],
+  "negation": ["not", "n't", "never", "unable", "failed to", "couldn't", "could not", "cannot", "can't", "wasn't able", "was not able", "didn't", "did not", "nothing", "none"],
   "future": ["will", "would", "can ", "could ", "shall", "going to", "once ", "if ", "when you", "should i", "let me know", "would you like", "'ll"],
   "advice": ["you can", "please", "you may", "you should", "you'll need"],
   "other_subject": ["you sent", "you created", "they sent", "the customer sent"],

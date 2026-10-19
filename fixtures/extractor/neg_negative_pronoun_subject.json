@@ -1,0 +1,10 @@
+{
+  "text": "The payment provider rejected the request, so none of the refunds were issued.",
+  "known_tools": [
+    {
+      "name": "issue_refund",
+      "description": "Issue a refund to the customer for an order"
+    }
+  ],
+  "expected": []
+}
