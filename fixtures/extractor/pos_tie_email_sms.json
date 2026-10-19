@@ -15,7 +15,12 @@
       "verb": "send",
       "text": "I've notified the customer",
       "object": "customer",
-      "count": null
+      "count": null,
+      "candidates": [
+        "send_email",
+        "send_sms"
+      ],
+      "confidence": "high"
     }
   ]
 }

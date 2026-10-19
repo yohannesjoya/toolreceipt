@@ -11,7 +11,11 @@
       "verb": "update",
       "text": "I updated 3 rows in the orders table",
       "object": "3 rows in the orders table",
-      "count": 3
+      "count": 3,
+      "candidates": [
+        "update_rows"
+      ],
+      "confidence": "high"
     }
   ]
 }

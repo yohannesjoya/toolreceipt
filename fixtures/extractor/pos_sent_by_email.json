@@ -11,7 +11,11 @@
       "verb": "send",
       "text": "The receipt was sent by email",
       "object": "by email",
-      "count": null
+      "count": null,
+      "candidates": [
+        "send_email"
+      ],
+      "confidence": "high"
     }
   ]
 }

@@ -11,7 +11,11 @@
       "verb": "send",
       "text": "I sent the confirmation email to you",
       "object": "confirmation email to you",
-      "count": null
+      "count": null,
+      "candidates": [
+        "send_email"
+      ],
+      "confidence": "high"
     }
   ]
 }

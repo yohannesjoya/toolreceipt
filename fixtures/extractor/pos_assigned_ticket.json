@@ -1,0 +1,25 @@
+{
+  "text": "I assigned the ticket to the billing team.",
+  "known_tools": [
+    {
+      "name": "update_ticket",
+      "description": "Change a ticket's fields"
+    },
+    {
+      "name": "create_ticket",
+      "description": "Open a support ticket"
+    }
+  ],
+  "expected": [
+    {
+      "verb": "update",
+      "text": "I assigned the ticket to the billing team",
+      "object": "ticket to the billing team",
+      "count": null,
+      "candidates": [
+        "update_ticket"
+      ],
+      "confidence": "high"
+    }
+  ]
+}

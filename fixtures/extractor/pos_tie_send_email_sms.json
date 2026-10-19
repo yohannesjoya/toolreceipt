@@ -1,0 +1,26 @@
+{
+  "text": "I've sent it to you.",
+  "known_tools": [
+    {
+      "name": "send_email",
+      "description": ""
+    },
+    {
+      "name": "send_sms",
+      "description": ""
+    }
+  ],
+  "expected": [
+    {
+      "verb": "send",
+      "text": "I've sent it to you",
+      "object": "it to you",
+      "count": null,
+      "candidates": [
+        "send_email",
+        "send_sms"
+      ],
+      "confidence": "medium"
+    }
+  ]
+}

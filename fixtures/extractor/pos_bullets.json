@@ -19,19 +19,31 @@
       "verb": "send",
       "text": "Sent the confirmation email",
       "object": "confirmation email",
-      "count": null
+      "count": null,
+      "candidates": [
+        "send_email"
+      ],
+      "confidence": "high"
     },
     {
       "verb": "create",
       "text": "Created ticket #42",
       "object": "ticket #42",
-      "count": null
+      "count": null,
+      "candidates": [
+        "create_ticket"
+      ],
+      "confidence": "high"
     },
     {
       "verb": "update",
       "text": "Updated your shipping address",
       "object": "shipping address",
-      "count": null
+      "count": null,
+      "candidates": [
+        "update_address"
+      ],
+      "confidence": "high"
     }
   ]
 }

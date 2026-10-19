@@ -11,7 +11,11 @@
       "verb": "refund",
       "text": "I can confirm that I have refunded order 4821",
       "object": "order 4821",
-      "count": null
+      "count": null,
+      "candidates": [
+        "issue_refund"
+      ],
+      "confidence": "high"
     }
   ]
 }

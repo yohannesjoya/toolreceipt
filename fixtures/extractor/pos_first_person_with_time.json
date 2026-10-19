@@ -11,7 +11,11 @@
       "verb": "send",
       "text": "I sent the invoice yesterday",
       "object": "invoice yesterday",
-      "count": null
+      "count": null,
+      "candidates": [
+        "send_email"
+      ],
+      "confidence": "high"
     }
   ]
 }

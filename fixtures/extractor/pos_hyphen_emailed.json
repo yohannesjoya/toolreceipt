@@ -1,0 +1,21 @@
+{
+  "text": "I e-mailed the receipt to you.",
+  "known_tools": [
+    {
+      "name": "send_email",
+      "description": "Send an email to the customer"
+    }
+  ],
+  "expected": [
+    {
+      "verb": "send",
+      "text": "I e-mailed the receipt to you",
+      "object": "receipt to you",
+      "count": null,
+      "candidates": [
+        "send_email"
+      ],
+      "confidence": "high"
+    }
+  ]
+}

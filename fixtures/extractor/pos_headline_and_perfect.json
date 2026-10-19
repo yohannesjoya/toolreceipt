@@ -14,14 +14,22 @@
     {
       "verb": "refund",
       "text": "Refund issued",
-      "object": null,
-      "count": null
+      "object": "refund",
+      "count": null,
+      "candidates": [
+        "issue_refund"
+      ],
+      "confidence": "high"
     },
     {
       "verb": "send",
       "text": "I have emailed you the confirmation",
       "object": "confirmation",
-      "count": null
+      "count": null,
+      "candidates": [
+        "send_email"
+      ],
+      "confidence": "high"
     }
   ]
 }

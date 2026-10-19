@@ -10,8 +10,12 @@
     {
       "verb": "delete",
       "text": "your order is now cancelled",
-      "object": null,
-      "count": null
+      "object": "order",
+      "count": null,
+      "candidates": [
+        "cancel_order"
+      ],
+      "confidence": "high"
     }
   ]
 }

@@ -4,12 +4,16 @@ import pytest
 
 from toolreceipt.claims import (
     RuleExtractor,
+    ToolSpec,
     extract_object,
     find_action,
     is_filtered,
     load_lexicon,
+    match_tools,
+    score_tool,
     split_clauses,
     split_sentences,
+    tokenize_tool_name,
 )
 
 LEX = load_lexicon()
@@ -214,3 +218,117 @@ def test_extract_accepts_custom_lexicon():
     lex["families"]["send"]["forms"].append("pinged")
     claims = RuleExtractor(lex).extract("I pinged the team.", [])
     assert [(c.verb, c.object) for c in claims] == [("send", "team")]
+
+
+# --- Tool matching and dedupe (PRD §9.2 steps 6-7) --------------------------
+
+def test_tokenize_tool_name():
+    assert tokenize_tool_name("sendEmail") == ["send", "email"]
+    assert tokenize_tool_name("send-email") == ["send", "email"]
+    assert tokenize_tool_name("create_tickets") == ["create", "ticket"]
+
+
+def test_tokenize_tool_name_edge_cases():
+    assert tokenize_tool_name("HTTPRequest") == ["http", "request"]
+    assert tokenize_tool_name("send_sms") == ["send", "sms"]
+    assert tokenize_tool_name("update_address") == ["update", "address"]
+    assert tokenize_tool_name("get.v2 Orders") == ["get", "v2", "order"]
+
+
+def test_match_high_medium_none():
+    tools = [
+        ToolSpec("send_email", "Send an email to the customer"),
+        ToolSpec("issue_refund", "Refund an order"),
+    ]
+    assert match_tools("send", "you the confirmation", tools, LEX) == (["send_email"], "high")
+    assert match_tools("send", "the summary", [ToolSpec("notify_customer", "")], LEX) == (
+        ["notify_customer"], "medium"
+    )
+    # open~create, case~ticket
+    assert match_tools("create", "a ticket", [ToolSpec("open_case", "")], LEX) == (
+        ["open_case"], "high"
+    )
+    assert match_tools("send", "the summary", [ToolSpec("issue_refund", "")], LEX) == ([], None)
+
+
+def test_match_keeps_ties():
+    tools = [ToolSpec("send_email", ""), ToolSpec("send_fax", "")]
+    cands, conf = match_tools("send", "it", tools, LEX)
+    assert cands == ["send_email", "send_fax"] and conf == "medium"
+
+
+def test_score_components():
+    spec = ToolSpec("send_email", "Send an email to the customer")
+    assert score_tool("send", [], spec, LEX) == 3  # family +2, description +1
+    assert score_tool("send", ["email"], spec, LEX) == 5
+    assert score_tool("delete", ["customer"], spec, LEX) == 1  # description only, once
+    assert score_tool("refund", ["money", "back"], ToolSpec("refund_order", ""), LEX) == 2
+
+
+def test_one_word_does_not_count_twice():
+    # "email" is a send-family token and the object: one tool token, one +2.
+    assert score_tool("send", ["email"], ToolSpec("email_report", ""), LEX) == 2
+    # Distinct tool tokens may each be hit.
+    assert score_tool("send", ["email"], ToolSpec("send_email", ""), LEX) == 4
+    assert score_tool("refund", ["refund"], ToolSpec("issue_refund", ""), LEX) == 4
+
+
+def test_dual_sense_tokens_do_not_cross_senses():
+    # "issue" is a refund verb and a ticket synonym; "record" a save verb and a row synonym.
+    assert match_tools("create", "a ticket", [ToolSpec("issue_refund", "")], LEX) == ([], None)
+    assert match_tools("refund", "order 4821", [ToolSpec("create_ticket", "")], LEX) == ([], None)
+    assert match_tools("save", "the notes", [ToolSpec("update_row", "")], LEX) == ([], None)
+    assert match_tools("update", "the row", [ToolSpec("edit_record", "")], LEX) == (
+        ["edit_record"], "medium"
+    )
+    # Literal uses still match.
+    assert match_tools("create", "an issue", [ToolSpec("create_issue", "")], LEX) == (
+        ["create_issue"], "high"
+    )
+
+
+def test_stopwords_do_not_score_against_description():
+    tools = [ToolSpec("send_email", "Send it to you")]
+    assert match_tools("delete", "it to you", tools, LEX) == ([], None)
+
+
+def test_extract_wires_matching():
+    tools = [ToolSpec("send_email", "Send an email"), ToolSpec("send_sms", "")]
+    claims = RuleExtractor().extract("I sent the email.", tools)
+    assert [(c.candidates, c.confidence, c.tool, c.reason) for c in claims] == [
+        (["send_email"], "high", None, None)
+    ]
+
+
+def test_passive_and_headline_object_is_the_subject():
+    tools = [ToolSpec("issue_refund", ""), ToolSpec("create_ticket", "")]
+    text = "Your refund has been issued. Ticket #42 has been created."
+    claims = RuleExtractor().extract(text, tools)
+    assert [(c.object, c.candidates) for c in claims] == [
+        ("refund", ["issue_refund"]), ("ticket #42", ["create_ticket"]),
+    ]
+
+
+def test_dedupe_same_candidates_keeps_first():
+    tools = [ToolSpec("send_email", "")]
+    text = "I emailed you. The email has been sent. I sent it again."
+    claims = RuleExtractor().extract(text, tools)
+    assert [c.text for c in claims] == ["I emailed you"]
+
+
+def test_dedupe_unmatched_on_verb_and_object():
+    ex = RuleExtractor()
+    claims = ex.extract("I created the notes. I created the notes. I created the plan.", [])
+    assert [c.text for c in claims] == ["I created the notes", "I created the plan"]
+
+
+def test_dedupe_ties_are_a_set():
+    tools = [ToolSpec("send_email", ""), ToolSpec("send_sms", "")]
+    claims = RuleExtractor().extract("I sent it. I sent the email.", tools)
+    assert [c.candidates for c in claims] == [["send_email", "send_sms"], ["send_email"]]
+
+
+def test_lexicon_review_forms():
+    assert find_action("I assigned the ticket to billing", LEX)[0] == "update"
+    assert find_action("I e-mailed you the receipt", LEX)[0] == "send"
+    assert find_action("I have summarised the issue", LEX)[0] == "create"

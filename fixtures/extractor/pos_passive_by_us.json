@@ -11,7 +11,11 @@
       "verb": "create",
       "text": "The ticket was created by us",
       "object": "by us",
-      "count": null
+      "count": null,
+      "candidates": [
+        "create_ticket"
+      ],
+      "confidence": "high"
     }
   ]
 }

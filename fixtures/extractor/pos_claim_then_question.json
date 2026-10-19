@@ -11,7 +11,11 @@
       "verb": "delete",
       "text": "I've cancelled your subscription",
       "object": "subscription",
-      "count": null
+      "count": null,
+      "candidates": [
+        "cancel_order"
+      ],
+      "confidence": "high"
     }
   ]
 }

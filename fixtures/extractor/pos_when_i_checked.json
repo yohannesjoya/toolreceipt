@@ -11,7 +11,11 @@
       "verb": "delete",
       "text": "I cancelled it",
       "object": "it",
-      "count": null
+      "count": null,
+      "candidates": [
+        "cancel_order"
+      ],
+      "confidence": "high"
     }
   ]
 }

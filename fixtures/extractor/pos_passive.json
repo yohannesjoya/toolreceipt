@@ -10,8 +10,12 @@
     {
       "verb": "refund",
       "text": "Your refund has been issued",
-      "object": null,
-      "count": null
+      "object": "refund",
+      "count": null,
+      "candidates": [
+        "issue_refund"
+      ],
+      "confidence": "high"
     }
   ]
 }

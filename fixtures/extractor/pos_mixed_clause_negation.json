@@ -15,7 +15,11 @@
       "verb": "create",
       "text": "I created ticket #42",
       "object": "ticket #42",
-      "count": null
+      "count": null,
+      "candidates": [
+        "create_ticket"
+      ],
+      "confidence": "high"
     }
   ]
 }

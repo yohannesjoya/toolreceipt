@@ -15,13 +15,21 @@
       "verb": "delete",
       "text": "I cancelled your order",
       "object": "order",
-      "count": null
+      "count": null,
+      "candidates": [
+        "cancel_order"
+      ],
+      "confidence": "high"
     },
     {
       "verb": "refund",
       "text": "refunded the payment",
       "object": "payment",
-      "count": null
+      "count": null,
+      "candidates": [
+        "issue_refund"
+      ],
+      "confidence": "high"
     }
   ]
 }

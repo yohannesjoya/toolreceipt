@@ -11,7 +11,11 @@
       "verb": "send",
       "text": "Our team has sent the email",
       "object": "email",
-      "count": null
+      "count": null,
+      "candidates": [
+        "send_email"
+      ],
+      "confidence": "high"
     }
   ]
 }

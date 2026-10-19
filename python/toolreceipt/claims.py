@@ -100,7 +100,8 @@ def load_lexicon(path: Path | None = None) -> dict[str, Any]:
 
 # ---------------------------------------------------------------------------
 # Rule extractor (PRD §9.2). Steps 1-5: sentence split, clause split, action
-# detection, filters, object extraction. Tool matching and dedupe come later.
+# detection, filters, object extraction. Steps 6-7 (tool matching, dedupe) follow
+# the extraction helpers below.
 # ---------------------------------------------------------------------------
 
 _BULLET = re.compile(r"^\s*(?:[-*•+]|\d+[.)])\s+")
@@ -351,6 +352,157 @@ def extract_object(
     return " ".join(words), count
 
 
+# ---------------------------------------------------------------------------
+# Tool matching (PRD §9.2 step 6)
+# ---------------------------------------------------------------------------
+
+_NAME_PART = re.compile(r"[A-Z]+(?=[A-Z][a-z])|[A-Z]?[a-z0-9]+|[A-Z]+[0-9]*")
+_NAME_SPLIT = re.compile(r"[^A-Za-z0-9]+")
+_WORD = re.compile(r"[a-z0-9]+")
+# Words that never identify a tool (object filler, pronouns, prepositions).
+_MATCH_STOP = frozenset({
+    "a", "an", "the", "to", "for", "of", "in", "on", "at", "by", "with", "from", "into",
+    "and", "or", "it", "its", "this", "that", "these", "those", "you", "your", "me", "my",
+    "i", "we", "us", "our", "they", "them", "their", "he", "she", "him", "her", "is", "are",
+    "was", "were", "be", "been", "has", "have", "had", "all", "any", "some", "up", "out",
+    "now", "again", "just", "already", "also", "as", "so", "here", "there",
+})
+_SUBJECT_BOUNDARY = _SUBJECT_DETERMINERS | _OBJECT_STRIP | _FIRST_PERSON | {"that", "which", "who"}
+
+_Term = tuple[str, ...]
+
+
+def _stem(word: str) -> str:
+    """Lowercase and strip one plural ``s`` ("tickets" -> "ticket"; keeps "address", "sms")."""
+    w = word.lower()
+    return w[:-1] if len(w) > 3 and w.endswith("s") and not w.endswith("ss") else w
+
+
+def _words(text: str) -> list[str]:
+    return [_stem(w) for w in _WORD.findall(_normalize(text).lower())]
+
+
+def tokenize_tool_name(name: str) -> list[str]:
+    """Split a tool name on ``_``, ``-``, other separators and camelCase; lowercase, singular."""
+    return [_stem(part) for chunk in _NAME_SPLIT.split(name) for part in _NAME_PART.findall(chunk)]
+
+
+def _occurs(term: _Term, words: Sequence[str]) -> set[int]:
+    """Indices of ``words`` covered by contiguous occurrences of ``term``."""
+    n = len(term)
+    hits: set[int] = set()
+    for i in range(len(words) - n + 1):
+        if tuple(words[i:i + n]) == term:
+            hits.update(range(i, i + n))
+    return hits
+
+
+def _synonym_groups(lexicon: Mapping[str, Any]) -> list[set[_Term]]:
+    return [
+        {tuple(_words(w)) for w in (key, *values)}
+        for key, values in lexicon.get("synonyms", {}).items()
+    ]
+
+
+def _family_terms(family: str, lexicon: Mapping[str, Any]) -> set[_Term]:
+    """Family tokens, each expanded through every synonym group containing it.
+
+    Dual-sense tokens ("issue": refund verb / ticket noun) stay literal so the verb
+    never picks up the noun's synonyms.
+    """
+    dual = set(lexicon.get("dual_sense_tokens", ()))
+    fam = lexicon["families"].get(family, {})
+    terms: set[_Term] = {(_stem(family),)} | {tuple(_words(t)) for t in fam.get("tokens", ())}
+    groups = _synonym_groups(lexicon)
+    for term in list(terms):
+        if " ".join(term) in dual:
+            continue
+        for group in groups:
+            if term in group:
+                terms |= group
+    return {t for t in terms if t}
+
+
+def _object_terms(words: Sequence[str], lexicon: Mapping[str, Any]) -> set[_Term]:
+    """Content words of the object plus synonyms of any group they (or a phrase) hit.
+
+    Synonym expansion never yields a dual-sense token: "ticket" does not reach the
+    "issue" of ``issue_refund``. A literal "issue" still matches.
+    """
+    dual = set(lexicon.get("dual_sense_tokens", ()))
+    content = [w for w in words if w not in _MATCH_STOP]
+    terms: set[_Term] = {(w,) for w in content}
+    for group in _synonym_groups(lexicon):
+        if any(_occurs(member, content) for member in group if member):
+            terms |= {m for m in group if m and " ".join(m) not in dual}
+    return terms
+
+
+def score_tool(
+    family: str, object_words: list[str], spec: ToolSpec, lexicon: Mapping[str, Any]
+) -> int:
+    """Score a claim against one tool (PRD §9.2 step 6).
+
+    +2 when a family token (synonym-expanded) is a tool-name token, +2 when an object
+    word (synonym-expanded) is a tool-name token, +1 once when either appears in the
+    description. One tool-name token cannot earn both +2s ("sent the email" scores the
+    ``email`` of ``email_report`` once).
+    """
+    name = tokenize_tool_name(spec.name)
+    fam_terms = _family_terms(family, lexicon)
+    obj_terms = _object_terms([_stem(w) for w in object_words], lexicon)
+    fam_hits: set[int] = set().union(*(_occurs(t, name) for t in fam_terms))
+    obj_hits: set[int] = set().union(*(_occurs(t, name) for t in obj_terms))
+    score = 0
+    if fam_hits:
+        score += 2
+    if obj_hits and (not fam_hits or len(fam_hits | obj_hits) > 1):
+        score += 2
+    desc = _words(spec.description)
+    if any(_occurs(t, desc) for t in fam_terms | obj_terms):
+        score += 1
+    return score
+
+
+def match_tools(
+    family: str, obj: str | None, known_tools: Sequence[ToolSpec], lexicon: Mapping[str, Any]
+) -> tuple[list[str], Confidence | None]:
+    """All tools at the maximum score (ties kept, in ``known_tools`` order) when it is
+    at least 2; ``high`` confidence from 3."""
+    words = _words(obj) if obj else []
+    scored = [(spec.name, score_tool(family, words, spec, lexicon)) for spec in known_tools]
+    best = max((score for _, score in scored), default=0)
+    if best < 2:
+        return [], None
+    candidates = list(dict.fromkeys(name for name, score in scored if score == best))
+    return candidates, "high" if best >= 3 else "medium"
+
+
+def _subject_phrase(subject: Sequence[str]) -> str | None:
+    """The noun phrase ending the subject tokens ("your refund" -> "refund")."""
+    phrase: list[str] = []
+    for tok in reversed(subject):
+        if tok in _SUBJECT_BOUNDARY or len(phrase) == 4:
+            break
+        phrase.insert(0, tok)
+    return " ".join(phrase) or None
+
+
+def _dedupe(claims: list[Claim]) -> list[Claim]:
+    """One claim per candidate set; unmatched claims collapse on ``(verb, object)``."""
+    seen: set[tuple[str | None, ...]] = set()
+    out: list[Claim] = []
+    for claim in claims:
+        key: tuple[str | None, ...] = (
+            ("tools", *sorted(claim.candidates)) if claim.candidates
+            else ("verb", claim.verb, claim.object)
+        )
+        if key not in seen:
+            seen.add(key)
+            out.append(claim)
+    return out
+
+
 def _clean(clause: str) -> str:
     return clause.strip().rstrip(_TRAILING_PUNCT).strip()
 
@@ -390,7 +542,15 @@ class RuleExtractor:
                 if inherited or kind in {"other", "state"} or _lexically_filtered(clause, lex):
                     continue
                 obj, count = extract_object(clause, action.end, lex)
+                match_text = obj
+                if kind == "passive":
+                    # "Your refund has been issued": the subject names the object.
+                    subject = _subject_phrase(action.subject)
+                    obj = obj or subject
+                    match_text = " ".join(p for p in (subject, match_text) if p) or None
+                candidates, confidence = match_tools(action.family, match_text, known_tools, lex)
                 claims.append(Claim(
                     text=_clean(clause), verb=action.family, object=obj, count=count,
+                    candidates=candidates, confidence=confidence,
                 ))
-        return claims
+        return _dedupe(claims)

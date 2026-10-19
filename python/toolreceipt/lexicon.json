@@ -1,15 +1,15 @@
 {
   "families": {
     "send": {
-      "forms": ["sent", "emailed", "mailed", "notified", "messaged", "forwarded", "dispatched"],
+      "forms": ["sent", "emailed", "e-mailed", "mailed", "notified", "messaged", "forwarded", "dispatched"],
       "tokens": ["send", "email", "mail", "notify", "message", "forward", "dispatch"]
     },
     "create": {
-      "forms": ["created", "opened", "filed", "raised", "logged", "added", "generated", "set up"],
+      "forms": ["created", "opened", "filed", "raised", "logged", "added", "generated", "set up", "summarised", "summarized"],
       "tokens": ["create", "open", "file", "raise", "log", "make", "add", "new", "generate"]
     },
     "update": {
-      "forms": ["updated", "modified", "changed", "edited", "amended", "revised", "patched"],
+      "forms": ["updated", "modified", "changed", "edited", "amended", "revised", "patched", "assigned"],
       "tokens": ["update", "modify", "change", "edit", "amend", "revise", "patch", "set"]
     },
     "delete": {
@@ -61,5 +61,6 @@
     "order": ["purchase"],
     "row": ["record", "entry"]
   },
+  "dual_sense_tokens": ["issue", "record"],
   "number_words": {"one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10, "a": 1, "an": 1}
 }

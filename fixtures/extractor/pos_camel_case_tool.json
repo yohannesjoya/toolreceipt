@@ -1,0 +1,25 @@
+{
+  "text": "I sent you the email.",
+  "known_tools": [
+    {
+      "name": "sendEmail",
+      "description": ""
+    },
+    {
+      "name": "createTicket",
+      "description": ""
+    }
+  ],
+  "expected": [
+    {
+      "verb": "send",
+      "text": "I sent you the email",
+      "object": "email",
+      "count": null,
+      "candidates": [
+        "sendEmail"
+      ],
+      "confidence": "high"
+    }
+  ]
+}

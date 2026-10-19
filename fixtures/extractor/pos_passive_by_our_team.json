@@ -11,7 +11,11 @@
       "verb": "refund",
       "text": "Your refund has been processed by our team",
       "object": "by our team",
-      "count": null
+      "count": null,
+      "candidates": [
+        "issue_refund"
+      ],
+      "confidence": "high"
     }
   ]
 }

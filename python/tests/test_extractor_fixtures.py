@@ -4,8 +4,8 @@ from tests.helpers import load_cases
 from toolreceipt.claims import RuleExtractor, normalize_tool_specs
 
 CASES = load_cases("extractor")
-# Tool matching (candidates, confidence) lands in Task 5; until then compare only these keys.
-COMPARED = ("verb", "object", "count", "text")
+# Keys compared when present in a fixture's expected claim.
+COMPARED = ("verb", "object", "count", "text", "candidates", "confidence")
 
 
 def test_fixture_count():
@@ -32,8 +32,8 @@ def test_negative_fixtures_are_negative(stem, case):
     assert case["expected"] == []
 
 
-def test_extract_leaves_matching_fields_empty():
+def test_extract_fills_candidates_but_leaves_diff_fields_empty():
     claims = RuleExtractor().extract("I sent the email.", normalize_tool_specs(["send_email"]))
     assert [(c.candidates, c.confidence, c.tool, c.reason) for c in claims] == [
-        ([], None, None, None)
+        (["send_email"], "high", None, None)
     ]
