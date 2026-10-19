@@ -406,3 +406,16 @@ def test_subject_phrase_stops_at_prepositions():
     assert [(c.object, c.candidates, c.confidence) for c in claims] == [
         ("email", ["send_email"], "high")
     ]
+
+
+@pytest.mark.parametrize(
+    "text,names",
+    [
+        ("I paid the invoice.", ["payment_history"]),
+        ("I emailed you.", ["email_customer"]),
+        ("I sent the report.", ["email_report"]),
+        ("I issued a refund.", ["issue_tracker"]),
+    ],
+)
+def test_noun_tokens_alone_never_make_a_candidate(text, names):
+    assert _cands(text, names) == [([], None)]

@@ -1,0 +1,21 @@
+{
+  "text": "I refunded your order.",
+  "known_tools": [
+    {
+      "name": "create_refund",
+      "description": ""
+    }
+  ],
+  "expected": [
+    {
+      "verb": "refund",
+      "text": "I refunded your order",
+      "object": "order",
+      "count": null,
+      "candidates": [
+        "create_refund"
+      ],
+      "confidence": "medium"
+    }
+  ]
+}

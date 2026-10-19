@@ -1,0 +1,19 @@
+{
+  "text": "I emailed you.",
+  "known_tools": [
+    {
+      "name": "email_customer",
+      "description": ""
+    }
+  ],
+  "expected": [
+    {
+      "verb": "send",
+      "text": "I emailed you",
+      "object": null,
+      "count": null,
+      "candidates": [],
+      "confidence": null
+    }
+  ]
+}

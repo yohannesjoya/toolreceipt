@@ -504,16 +504,17 @@ def match_tools(
     """All tools at the maximum score (ties kept, in ``known_tools`` order) when it is
     at least 2; ``high`` confidence from 3.
 
-    Only tools whose name carries a verb-family token are eligible: an object or
-    description match alone ("deleted two tickets" vs ``create_ticket``) never makes
-    a candidate, nor does a tool whose name conflicts (``_conflicts``).
+    Only tools whose name carries one of the family's verb tokens are eligible. An
+    object, description or noun-token match alone ("deleted two tickets" vs
+    ``create_ticket``, "emailed" vs ``email_customer``) never makes a candidate, nor
+    does a tool whose name conflicts (``_conflicts``).
     """
     words = _words(obj) if obj else []
-    fam_terms = _family_terms(family, lexicon)
+    verbs = _verb_tokens(family, lexicon)
     eligible = []
     for spec in known_tools:
         name = tokenize_tool_name(spec.name)
-        if any(_occurs(t, name) for t in fam_terms) and not _conflicts(family, name, lexicon):
+        if verbs & set(name) and not _conflicts(family, name, lexicon):
             eligible.append(spec)
     scored = [(spec.name, score_tool(family, words, spec, lexicon)) for spec in eligible]
     best = max((score for _, score in scored), default=0)

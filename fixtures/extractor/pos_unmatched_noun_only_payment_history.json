@@ -1,0 +1,19 @@
+{
+  "text": "I paid the invoice.",
+  "known_tools": [
+    {
+      "name": "payment_history",
+      "description": ""
+    }
+  ],
+  "expected": [
+    {
+      "verb": "charge",
+      "text": "I paid the invoice",
+      "object": "invoice",
+      "count": null,
+      "candidates": [],
+      "confidence": null
+    }
+  ]
+}
