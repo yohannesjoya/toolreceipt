@@ -1,0 +1,10 @@
+{
+  "text": "Your order was processed by the warehouse team.",
+  "known_tools": [
+    {
+      "name": "issue_refund",
+      "description": "Refund an order"
+    }
+  ],
+  "expected": []
+}

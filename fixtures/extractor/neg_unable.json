@@ -1,0 +1,10 @@
+{
+  "text": "I was unable to get the ticket created.",
+  "known_tools": [
+    {
+      "name": "create_ticket",
+      "description": "Open a support ticket"
+    }
+  ],
+  "expected": []
+}

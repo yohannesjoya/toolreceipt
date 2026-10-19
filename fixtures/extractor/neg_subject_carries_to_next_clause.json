@@ -1,0 +1,14 @@
+{
+  "text": "The customer sent the form and then cancelled the order.",
+  "known_tools": [
+    {
+      "name": "send_email",
+      "description": "Send an email to the customer"
+    },
+    {
+      "name": "cancel_order",
+      "description": "Cancel an order"
+    }
+  ],
+  "expected": []
+}

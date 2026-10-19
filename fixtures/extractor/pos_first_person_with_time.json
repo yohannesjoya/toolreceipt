@@ -1,0 +1,17 @@
+{
+  "text": "I sent the invoice yesterday.",
+  "known_tools": [
+    {
+      "name": "send_email",
+      "description": "Send an email to the customer"
+    }
+  ],
+  "expected": [
+    {
+      "verb": "send",
+      "text": "I sent the invoice yesterday",
+      "object": "invoice yesterday",
+      "count": null
+    }
+  ]
+}

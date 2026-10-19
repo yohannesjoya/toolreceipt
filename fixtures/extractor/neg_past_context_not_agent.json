@@ -1,0 +1,10 @@
+{
+  "text": "The order was created last week by the customer",
+  "known_tools": [
+    {
+      "name": "create_ticket",
+      "description": "Open a support ticket"
+    }
+  ],
+  "expected": []
+}

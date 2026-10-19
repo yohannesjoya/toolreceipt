@@ -1,0 +1,27 @@
+{
+  "text": "Refund issued and I have emailed you the confirmation.",
+  "known_tools": [
+    {
+      "name": "send_email",
+      "description": "Send an email to the customer"
+    },
+    {
+      "name": "issue_refund",
+      "description": "Refund an order"
+    }
+  ],
+  "expected": [
+    {
+      "verb": "refund",
+      "text": "Refund issued",
+      "object": null,
+      "count": null
+    },
+    {
+      "verb": "send",
+      "text": "I have emailed you the confirmation",
+      "object": "confirmation",
+      "count": null
+    }
+  ]
+}

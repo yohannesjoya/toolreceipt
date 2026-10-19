@@ -1,0 +1,10 @@
+{
+  "text": "I can see you logged in yesterday.",
+  "known_tools": [
+    {
+      "name": "create_ticket",
+      "description": "Open a support ticket"
+    }
+  ],
+  "expected": []
+}

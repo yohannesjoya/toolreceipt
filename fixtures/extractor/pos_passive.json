@@ -1,0 +1,17 @@
+{
+  "text": "Your refund has been issued.",
+  "known_tools": [
+    {
+      "name": "issue_refund",
+      "description": "Refund an order"
+    }
+  ],
+  "expected": [
+    {
+      "verb": "refund",
+      "text": "Your refund has been issued",
+      "object": null,
+      "count": null
+    }
+  ]
+}

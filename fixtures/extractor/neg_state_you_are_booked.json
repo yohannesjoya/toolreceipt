@@ -1,0 +1,10 @@
+{
+  "text": "You're booked for 3pm on Friday.",
+  "known_tools": [
+    {
+      "name": "book_appointment",
+      "description": "Book a calendar appointment"
+    }
+  ],
+  "expected": []
+}

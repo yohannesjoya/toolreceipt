@@ -1,0 +1,10 @@
+{
+  "text": "Hi there! How can I help you today?",
+  "known_tools": [
+    {
+      "name": "send_email",
+      "description": "Send an email to the customer"
+    }
+  ],
+  "expected": []
+}

@@ -1,0 +1,37 @@
+{
+  "text": "Done! Here's what I did:\n- Sent the confirmation email.\n- Created ticket #42.\n* Updated your shipping address.",
+  "known_tools": [
+    {
+      "name": "send_email",
+      "description": "Send an email to the customer"
+    },
+    {
+      "name": "create_ticket",
+      "description": "Open a support ticket"
+    },
+    {
+      "name": "update_address",
+      "description": "Change the shipping address"
+    }
+  ],
+  "expected": [
+    {
+      "verb": "send",
+      "text": "Sent the confirmation email",
+      "object": "confirmation email",
+      "count": null
+    },
+    {
+      "verb": "create",
+      "text": "Created ticket #42",
+      "object": "ticket #42",
+      "count": null
+    },
+    {
+      "verb": "update",
+      "text": "Updated your shipping address",
+      "object": "shipping address",
+      "count": null
+    }
+  ]
+}

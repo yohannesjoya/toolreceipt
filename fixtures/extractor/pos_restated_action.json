@@ -1,0 +1,23 @@
+{
+  "text": "I sent the confirmation email. The email has been sent to your inbox.",
+  "known_tools": [
+    {
+      "name": "send_email",
+      "description": "Send an email to the customer"
+    }
+  ],
+  "expected": [
+    {
+      "verb": "send",
+      "text": "I sent the confirmation email",
+      "object": "confirmation email",
+      "count": null
+    },
+    {
+      "verb": "send",
+      "text": "The email has been sent to your inbox",
+      "object": "to your inbox",
+      "count": null
+    }
+  ]
+}

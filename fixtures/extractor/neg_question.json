@@ -1,0 +1,10 @@
+{
+  "text": "Did the email I sent arrive?",
+  "known_tools": [
+    {
+      "name": "send_email",
+      "description": "Send an email to the customer"
+    }
+  ],
+  "expected": []
+}

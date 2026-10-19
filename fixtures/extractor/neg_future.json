@@ -1,0 +1,10 @@
+{
+  "text": "I'll have the confirmation email sent shortly.",
+  "known_tools": [
+    {
+      "name": "send_email",
+      "description": "Send an email to the customer"
+    }
+  ],
+  "expected": []
+}

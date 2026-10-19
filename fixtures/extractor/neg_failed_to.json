@@ -1,0 +1,10 @@
+{
+  "text": "The refund I processed failed to go through.",
+  "known_tools": [
+    {
+      "name": "issue_refund",
+      "description": "Refund an order"
+    }
+  ],
+  "expected": []
+}

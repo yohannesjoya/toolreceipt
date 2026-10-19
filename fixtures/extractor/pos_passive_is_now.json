@@ -1,0 +1,17 @@
+{
+  "text": "Good news: your order is now cancelled.",
+  "known_tools": [
+    {
+      "name": "cancel_order",
+      "description": "Cancel an order"
+    }
+  ],
+  "expected": [
+    {
+      "verb": "delete",
+      "text": "Good news: your order is now cancelled",
+      "object": null,
+      "count": null
+    }
+  ]
+}

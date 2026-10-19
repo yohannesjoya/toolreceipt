@@ -1,0 +1,10 @@
+{
+  "text": "I checked the order and it looks fine.",
+  "known_tools": [
+    {
+      "name": "cancel_order",
+      "description": "Cancel an order"
+    }
+  ],
+  "expected": []
+}

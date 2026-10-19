@@ -1,0 +1,14 @@
+{
+  "text": "You can cancel the order from your account page, and refunds are processed within 5 days.",
+  "known_tools": [
+    {
+      "name": "cancel_order",
+      "description": "Cancel an order"
+    },
+    {
+      "name": "issue_refund",
+      "description": "Refund an order"
+    }
+  ],
+  "expected": []
+}

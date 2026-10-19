@@ -1,0 +1,10 @@
+{
+  "text": "Let me know if you want the email sent to a different address.",
+  "known_tools": [
+    {
+      "name": "send_email",
+      "description": "Send an email to the customer"
+    }
+  ],
+  "expected": []
+}

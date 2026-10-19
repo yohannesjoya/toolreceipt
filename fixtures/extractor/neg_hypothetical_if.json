@@ -1,0 +1,14 @@
+{
+  "text": "If the payment went through, your order was created and a receipt emailed.",
+  "known_tools": [
+    {
+      "name": "send_email",
+      "description": "Send an email to the customer"
+    },
+    {
+      "name": "create_ticket",
+      "description": "Open a support ticket"
+    }
+  ],
+  "expected": []
+}

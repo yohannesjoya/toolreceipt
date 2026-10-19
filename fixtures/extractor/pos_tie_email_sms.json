@@ -1,0 +1,21 @@
+{
+  "text": "I've notified the customer.",
+  "known_tools": [
+    {
+      "name": "send_email",
+      "description": "Send an email to the customer"
+    },
+    {
+      "name": "send_sms",
+      "description": "Send a text message to the customer"
+    }
+  ],
+  "expected": [
+    {
+      "verb": "send",
+      "text": "I've notified the customer",
+      "object": "customer",
+      "count": null
+    }
+  ]
+}

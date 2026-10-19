@@ -1,0 +1,14 @@
+{
+  "text": "You sent me the invoice yesterday and the customer created a duplicate ticket.",
+  "known_tools": [
+    {
+      "name": "send_email",
+      "description": "Send an email to the customer"
+    },
+    {
+      "name": "create_ticket",
+      "description": "Open a support ticket"
+    }
+  ],
+  "expected": []
+}

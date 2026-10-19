@@ -1,0 +1,17 @@
+{
+  "text": "I updated 3 rows in the orders table.",
+  "known_tools": [
+    {
+      "name": "update_rows",
+      "description": "Update rows in a database table"
+    }
+  ],
+  "expected": [
+    {
+      "verb": "update",
+      "text": "I updated 3 rows in the orders table",
+      "object": "3 rows in the orders table",
+      "count": 3
+    }
+  ]
+}

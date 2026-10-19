@@ -1,0 +1,14 @@
+{
+  "text": "You asked me to \"send the email\" and said the order was \"already cancelled\".",
+  "known_tools": [
+    {
+      "name": "send_email",
+      "description": "Send an email to the customer"
+    },
+    {
+      "name": "cancel_order",
+      "description": "Cancel an order"
+    }
+  ],
+  "expected": []
+}

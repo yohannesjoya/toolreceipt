@@ -1,0 +1,27 @@
+{
+  "text": "I cancelled your order and refunded the payment.",
+  "known_tools": [
+    {
+      "name": "cancel_order",
+      "description": "Cancel an order"
+    },
+    {
+      "name": "issue_refund",
+      "description": "Refund an order"
+    }
+  ],
+  "expected": [
+    {
+      "verb": "delete",
+      "text": "I cancelled your order",
+      "object": "order",
+      "count": null
+    },
+    {
+      "verb": "refund",
+      "text": "refunded the payment",
+      "object": "payment",
+      "count": null
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "text": "I have not sent the email yet.",
+  "known_tools": [
+    {
+      "name": "send_email",
+      "description": "Send an email to the customer"
+    }
+  ],
+  "expected": []
+}

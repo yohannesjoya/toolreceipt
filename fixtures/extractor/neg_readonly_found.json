@@ -1,0 +1,10 @@
+{
+  "text": "I found the email that was sent to you on Monday.",
+  "known_tools": [
+    {
+      "name": "send_email",
+      "description": "Send an email to the customer"
+    }
+  ],
+  "expected": []
+}

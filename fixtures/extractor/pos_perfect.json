@@ -1,0 +1,17 @@
+{
+  "text": "I've created ticket #42 for the billing issue.",
+  "known_tools": [
+    {
+      "name": "create_ticket",
+      "description": "Open a support ticket"
+    }
+  ],
+  "expected": [
+    {
+      "verb": "create",
+      "text": "I've created ticket #42 for the billing issue",
+      "object": "ticket #42 for the billing issue",
+      "count": null
+    }
+  ]
+}

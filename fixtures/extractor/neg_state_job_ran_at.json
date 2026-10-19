@@ -1,0 +1,10 @@
+{
+  "text": "The nightly sync ran at 3am.",
+  "known_tools": [
+    {
+      "name": "run_sync",
+      "description": "Run the nightly data sync"
+    }
+  ],
+  "expected": []
+}

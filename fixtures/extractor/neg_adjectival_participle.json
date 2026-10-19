@@ -1,0 +1,10 @@
+{
+  "text": "Your scheduled maintenance window starts at 9am.",
+  "known_tools": [
+    {
+      "name": "book_appointment",
+      "description": "Book a calendar appointment"
+    }
+  ],
+  "expected": []
+}

@@ -1,0 +1,21 @@
+{
+  "text": "I couldn't send the email, but I created ticket #42",
+  "known_tools": [
+    {
+      "name": "send_email",
+      "description": "Send an email to the customer"
+    },
+    {
+      "name": "create_ticket",
+      "description": "Open a support ticket"
+    }
+  ],
+  "expected": [
+    {
+      "verb": "create",
+      "text": "I created ticket #42",
+      "object": "ticket #42",
+      "count": null
+    }
+  ]
+}

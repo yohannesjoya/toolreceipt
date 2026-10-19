@@ -1,0 +1,10 @@
+{
+  "text": "Your card was charged $20 on the 3rd.",
+  "known_tools": [
+    {
+      "name": "issue_refund",
+      "description": "Refund an order"
+    }
+  ],
+  "expected": []
+}

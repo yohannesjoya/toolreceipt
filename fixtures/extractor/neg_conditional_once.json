@@ -1,0 +1,10 @@
+{
+  "text": "Once you confirm, the ticket is created automatically.",
+  "known_tools": [
+    {
+      "name": "create_ticket",
+      "description": "Open a support ticket"
+    }
+  ],
+  "expected": []
+}

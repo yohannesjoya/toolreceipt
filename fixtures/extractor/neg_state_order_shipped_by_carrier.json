@@ -1,0 +1,10 @@
+{
+  "text": "Your order was shipped by the warehouse on Monday.",
+  "known_tools": [
+    {
+      "name": "cancel_order",
+      "description": "Cancel an order"
+    }
+  ],
+  "expected": []
+}
