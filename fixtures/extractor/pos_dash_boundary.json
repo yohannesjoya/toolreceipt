@@ -1,0 +1,17 @@
+{
+  "text": "Done - sent the email.",
+  "known_tools": [
+    {
+      "name": "send_email",
+      "description": "Send an email to the customer"
+    }
+  ],
+  "expected": [
+    {
+      "verb": "send",
+      "text": "sent the email",
+      "object": "email",
+      "count": null
+    }
+  ]
+}

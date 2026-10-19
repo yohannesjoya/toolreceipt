@@ -9,7 +9,7 @@
   "expected": [
     {
       "verb": "delete",
-      "text": "Good news: your order is now cancelled",
+      "text": "your order is now cancelled",
       "object": null,
       "count": null
     }

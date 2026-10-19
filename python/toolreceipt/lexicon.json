@@ -43,6 +43,7 @@
   "advice": ["you can", "please", "you may", "you should", "you'll need"],
   "other_subject": ["you sent", "you created", "they sent", "the customer sent"],
   "conditional_lead": ["if", "once", "unless", "as soon as", "in case", "should you"],
+  "non_agent_nouns": ["customer", "customers", "client", "clients", "user", "users", "buyer", "buyers", "member", "members", "subscriber", "subscribers"],
   "filter_exempt": ["can confirm", "please note", "please be advised", "happy to confirm"],
   "time_markers": [
     "\\byesterday\\b", "\\blast (?:night|week|month|year|time|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\\b",

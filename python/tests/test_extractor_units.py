@@ -33,6 +33,21 @@ def test_split_clauses():
     ]
 
 
+def test_split_clauses_on_dashes_and_colons():
+    assert split_clauses("Done - sent the email") == ["Done", "sent the email"]
+    assert split_clauses("Done\u2014sent it: all good") == ["Done", "sent it", "all good"]
+    assert split_clauses("I e-mailed it at 3:00 today") == ["I e-mailed it at 3:00 today"]
+
+
+def test_our_customer_is_not_the_agent():
+    assert is_filtered("Our customer cancelled the order", LEX)
+    assert is_filtered("Our users created duplicates", LEX)
+    assert RuleExtractor().extract("Our customer called and then cancelled the order.", []) == []
+    assert [c.verb for c in RuleExtractor().extract("Our team called and cancelled it.", [])] == [
+        "delete"
+    ]
+
+
 def test_split_clauses_conjunctions_and_numbers():
     assert split_clauses("I refunded 1,000 orders; then I emailed you and so it's done") == [
         "I refunded 1,000 orders", "I emailed you", "it's done",
@@ -167,6 +182,8 @@ def test_third_party_active_subjects_are_filtered(clause):
         "Our billing team refunded the order",
         "Refund issued",
         "Ticket #42 created.",
+        "Refund already issued",
+        "Email successfully sent.",
         "Your refund has been processed by our team",
         "The ticket was created by us",
     ],
