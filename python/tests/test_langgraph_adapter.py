@@ -183,3 +183,18 @@ def test_handler_thread_safety_and_flush():
     h.flush()
     assert len(ledger) == 50
     assert sum(1 for e in ledger if e.status == "error" and e.error == "no result") == 25
+
+
+def test_on_tool_end_command_output_uses_matching_tool_message():
+    from langgraph.types import Command
+
+    ledger = Ledger()
+    h = ReceiptCallbackHandler(ledger)
+    rid = uuid.uuid4()
+    h.on_tool_start({"name": "send_email"}, "", run_id=rid, inputs={}, tool_call_id="c2")
+    other = ToolMessage(content="fine", tool_call_id="c9", status="success")
+    failed = ToolMessage(content="SMTP gateway timeout", tool_call_id="c2", status="error")
+    h.on_tool_end(Command(update={"messages": [other, failed]}), run_id=rid)
+    entry = ledger.entries[0]
+    assert entry.status == "error" and entry.error == "SMTP gateway timeout"
+    assert entry.call_id == "c2"

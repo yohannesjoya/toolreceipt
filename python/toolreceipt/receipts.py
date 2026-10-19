@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib
 from collections.abc import Collection, Iterable, Mapping
+from dataclasses import replace
 from typing import Any, Protocol
 
 from toolreceipt.claims import ClaimExtractor, RuleExtractor, ToolSpec, normalize_tool_specs
@@ -111,4 +112,6 @@ class Receipts:
             known = _merge_tools(
                 known, (ToolSpec(n, d) for n, d in self._handler.known_tools.items())
             )
+        if not self._capture_results:
+            ledger = Ledger(replace(e, args={}, result=None) for e in ledger.entries)
         return _check(reply, ledger, known, self._ignore_tools, self._extractor)

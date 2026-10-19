@@ -67,7 +67,8 @@ def test_config_without_langgraph_raises_helpful_import_error(monkeypatch):
 
     # Simulate the extra not being installed: langchain_core cannot be imported.
     monkeypatch.delitem(sys.modules, "toolreceipt.langgraph", raising=False)
-    for name in [m for m in sys.modules if m.split(".")[0] == "langchain_core"]:
+    blocked = {"langchain_core", "langgraph"}
+    for name in [m for m in sys.modules if m.split(".")[0] in blocked] + sorted(blocked):
         monkeypatch.setitem(sys.modules, name, None)
     with pytest.raises(ImportError, match=r"toolreceipt\[langgraph\] is required"):
         Receipts().config()
@@ -99,3 +100,11 @@ def test_check_uses_stored_handler(monkeypatch):
     assert handler.flushed
     assert r.claimed_but_never_ran[0].reason == "not_called"
     assert rc.ledger is handler.ledger
+
+
+def test_capture_results_false_redacts_caller_ledger():
+    entry = LedgerEntry(tool="issue_refund", args={"order_id": "1"}, result="refunded")
+    ledger = Ledger([entry])
+    r = Receipts(capture_results=False).check("I issued the refund.", ledger=ledger)
+    assert [(e.tool, e.args, e.result) for e in r.ledger] == [("issue_refund", {}, None)]
+    assert entry.args == {"order_id": "1"} and entry.result == "refunded"

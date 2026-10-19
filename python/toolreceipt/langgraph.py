@@ -51,6 +51,29 @@ def tool_specs_from_invocation_params(params: Mapping[str, Any]) -> list[ToolSpe
     return specs
 
 
+def _tool_message_from(output: Any, call_id: str | None) -> Any:
+    """Unwrap a tool output to its ``ToolMessage`` when it carries one.
+
+    A list (content_and_artifact tools) yields its first ``ToolMessage``. A LangGraph
+    ``Command`` (duck-typed: an ``update`` mapping with ``messages``) yields the
+    ``ToolMessage`` whose ``tool_call_id`` matches ``call_id``, else its first one.
+    Anything else is returned unchanged.
+    """
+    candidates: Any = None
+    if isinstance(output, list):
+        candidates = output
+    else:
+        update = getattr(output, "update", None)
+        if isinstance(update, Mapping):
+            candidates = update.get("messages")
+    if not isinstance(candidates, Sequence) or isinstance(candidates, str):
+        return output
+    messages = [m for m in candidates if isinstance(m, ToolMessage)]
+    if not messages:
+        return output
+    return next((m for m in messages if m.tool_call_id == call_id), messages[0])
+
+
 class ReceiptCallbackHandler(BaseCallbackHandler):
     """Records every tool call of a run into ``ledger``; thread-safe.
 
@@ -137,8 +160,10 @@ class ReceiptCallbackHandler(BaseCallbackHandler):
         parent_run_id: UUID | None = None,
         **kwargs: Any,
     ) -> None:
-        if isinstance(output, list) and output and isinstance(output[0], ToolMessage):
-            output = output[0]
+        with self._lock:
+            pending = self._in_flight.get(run_id)
+            expected_id = pending.call_id if pending is not None else None
+        output = _tool_message_from(output, expected_id)
         if isinstance(output, ToolMessage):
             failed = output.status == "error"
             text = str(output.text)
