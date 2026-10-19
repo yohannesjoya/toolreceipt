@@ -10,7 +10,7 @@ two, and returns a receipt you can use to block, annotate or log the reply.
 
 ![toolreceipt demo: the agent claims it emailed the customer, the receipt shows send_email failed](https://raw.githubusercontent.com/yohannesjoya/toolreceipt/main/docs/demo.gif)
 
-Live demo: coming soon
+**Live demo:** https://toolreceipt-demo.onrender.com (free tier, the first request after idle can take about a minute)
 
 An agent finishes with "Refund issued and I have emailed you the confirmation." The refund
 tool ran. The email tool timed out. Nothing in your stack notices, and the customer waits for
