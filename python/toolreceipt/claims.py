@@ -480,8 +480,21 @@ def _object_terms(
     return terms
 
 
+def _names_object(verb_stem: str | None, name: Sequence[str], family_tokens: set[str]) -> bool:
+    """True when the claim's verb stem is the object of the tool name: its last token, after
+    another token of the family ("refunded" -> the ``refund`` of ``issue_refund``)."""
+    return (
+        verb_stem is not None and len(name) > 1 and name[-1] == verb_stem
+        and any(t in family_tokens for t in name[:-1])
+    )
+
+
 def _score(
-    family: str, object_words: list[str], spec: ToolSpec, lexicon: Mapping[str, Any]
+    family: str,
+    object_words: list[str],
+    spec: ToolSpec,
+    lexicon: Mapping[str, Any],
+    verb_stem: str | None = None,
 ) -> tuple[int, bool]:
     """``(score, object component earned)``; see ``score_tool``."""
     name = tokenize_tool_name(spec.name)
@@ -490,6 +503,8 @@ def _score(
     fam_hits: set[int] = set().union(*(_occurs(t, name) for t in fam_terms))
     obj_hits: set[int] = set().union(*(_occurs(t, name) for t in obj_terms))
     object_matched = bool(obj_hits) and (not fam_hits or len(fam_hits | obj_hits) > 1)
+    family_tokens = {_stem(t) for t in lexicon["families"].get(family, {}).get("tokens", ())}
+    object_matched = object_matched or _names_object(verb_stem, name, family_tokens)
     score = (2 if fam_hits else 0) + (2 if object_matched else 0)
     desc = _words(spec.description)
     if any(_occurs(t, desc) and not _occurs(t, name) for t in obj_terms):
@@ -511,7 +526,11 @@ def score_tool(
 
 
 def _match(
-    family: str, obj: str | None, known_tools: Sequence[ToolSpec], lexicon: Mapping[str, Any]
+    family: str,
+    obj: str | None,
+    known_tools: Sequence[ToolSpec],
+    lexicon: Mapping[str, Any],
+    verb_stem: str | None = None,
 ) -> tuple[list[str], Confidence | None, bool]:
     """``match_tools`` plus whether the candidates earned the object component."""
     words = _words(obj) if obj else []
@@ -520,7 +539,7 @@ def _match(
     for spec in known_tools:
         name = tokenize_tool_name(spec.name)
         if verbs & set(name) and not _conflicts(family, name, lexicon):
-            scored.append((spec.name, *_score(family, words, spec, lexicon)))
+            scored.append((spec.name, *_score(family, words, spec, lexicon, verb_stem)))
     best = max((score for _, score, _ in scored), default=0)
     if best < 2:
         return [], None, False
@@ -558,6 +577,13 @@ def _subject_phrase(subject: Sequence[str]) -> str | None:
             break
         phrase.insert(0, tok)
     return " ".join(phrase) or None
+
+
+def _verb_stem(form: str, family: str, lexicon: Mapping[str, Any]) -> str | None:
+    """The family verb token a matched form is built on ("refunded" -> "refund")."""
+    compact = re.sub(r"[^a-z]", "", form.lower())
+    found = [v for v in _verb_tokens(family, lexicon) if compact.startswith(v)]
+    return max(found, key=len) if found else None
 
 
 def _surface_stem(form: str, family: str, lexicon: Mapping[str, Any]) -> str | None:
@@ -638,8 +664,10 @@ class RuleExtractor:
                 # "I emailed you": the verb itself names the channel.
                 stem = _surface_stem(clause[action.start:action.end], action.family, lex)
                 match_text = " ".join(p for p in (match_text, stem) if p) or None
+                form = clause[action.start:action.end]
                 candidates, confidence, matched = _match(
-                    action.family, match_text, known_tools, lex
+                    action.family, match_text, known_tools, lex,
+                    _verb_stem(form, action.family, lex),
                 )
                 claim = Claim(
                     text=_clean(clause), verb=action.family, object=obj, count=count,

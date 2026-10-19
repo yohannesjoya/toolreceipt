@@ -53,7 +53,12 @@ The extractor records this evidence on each claim as a private attribute, outsid
 `Claim` field set and never emitted by `to_dict()`. A claim built by hand or by
 `Claim.from_dict` carries no evidence, and the diff treats its candidates as fully matched.
 
-Precision comes before recall here: "I refunded your order" against `issue_refund` (no object
-word in common) is no longer flagged when `issue_refund` never ran. Related lexicon choices:
+The claim's verb stem also counts as object evidence when it is the last token of a
+multi-token tool name after another token of the same family: "I refunded your order" names
+the `refund` of `issue_refund`, so it is still `not_called` when `issue_refund` never ran.
+"I've processed your return" does not (`process` is not a token of `issue_refund`).
+
+Precision comes before recall here: "I've sent it" (a `send_email`/`send_sms` tie) and "I've
+updated your address" against `update_customer` are no longer flagged when the tool never ran. Related lexicon choices:
 "summarised" and "closed" belong to no verb family (closing a ticket is usually an update), and
 "issue" is not a ticket synonym ("I've logged the issue" means the problem, not a ticket).

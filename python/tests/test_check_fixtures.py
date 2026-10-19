@@ -77,3 +77,12 @@ def test_dedupe_keeps_object_evidence_of_any_duplicate():
     assert [(c.text, c.tool, c.reason) for c in r.claimed_but_never_ran] == [
         ("I sent it", "send_email", "not_called")
     ]
+
+
+def test_verb_stem_naming_the_tool_object_is_not_called():
+    for stem in ("verb_stem_refunded_order", "verb_stem_refunded_you"):
+        case = dict(CASES)[stem]
+        r = check(case["text"], Ledger.from_dict(case["ledger"]), known_tools=case["known_tools"])
+        assert [(c.tool, c.reason) for c in r.claimed_but_never_ran] == [
+            ("issue_refund", "not_called")
+        ], stem
