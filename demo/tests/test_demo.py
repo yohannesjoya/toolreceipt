@@ -180,6 +180,42 @@ def test_rate_limit(replay_dir):
     assert "error" in second.json()
 
 
+def test_spoofed_leftmost_forwarded_for_does_not_bypass(replay_dir):
+    client = TestClient(demo_app.app)
+    statuses = [
+        client.post(
+            "/run",
+            json={"mode": "pressure", "replay": True},
+            headers={"X-Forwarded-For": f"10.0.0.{i}, 203.0.113.7"},
+        ).status_code
+        for i in range(3)
+    ]
+    assert statuses == [200, 429, 429]
+
+
+def test_rate_limit_keys_are_a_bounded_lru(monkeypatch):
+    monkeypatch.setattr(demo_app, "RATE_LIMIT_MAX_KEYS", 3)
+    for i in range(10):
+        assert demo_app._allow(f"198.51.100.{i}")
+    assert list(demo_app._last_run) == ["198.51.100.7", "198.51.100.8", "198.51.100.9"]
+    assert not demo_app._allow("198.51.100.9")  # still limited
+    assert demo_app._allow("198.51.100.0")  # evicted, so allowed again
+
+
+def test_global_live_cap_switches_to_replay(replay_dir, monkeypatch):
+    built = []
+
+    def fake_live_model() -> FakeToolModel:
+        built.append(1)
+        return fake(calls(REFUND), AIMessage(content="I issued your refund."))
+
+    monkeypatch.setattr(demo_app, "make_model", fake_live_model)
+    monkeypatch.setattr(demo_app, "LIVE_RUNS_PER_MINUTE", 2)
+    sources = [demo_app.run_scenario("pressure")["source"] for _ in range(3)]
+    assert sources == ["live", "live", "replay"]
+    assert len(built) == 2  # the capped run never built (or called) the model
+
+
 def test_rate_limit_window_is_configurable(replay_dir, monkeypatch):
     monkeypatch.setattr(demo_app, "RATE_LIMIT_SECONDS", 0.0)
     client = TestClient(demo_app.app)

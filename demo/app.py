@@ -13,6 +13,7 @@ import os
 import random
 import threading
 import time
+from collections import OrderedDict, deque
 from pathlib import Path
 from typing import Any, Literal
 
@@ -37,6 +38,9 @@ DEFAULT_REPLAY_DIR = HERE / "replays"
 
 GROQ_MODEL = "openai/gpt-oss-120b"
 RATE_LIMIT_SECONDS = 5.0
+RATE_LIMIT_MAX_KEYS = 1024
+# Global cap on live Groq runs across all clients; above it a replay is served.
+LIVE_RUNS_PER_MINUTE = int(os.environ.get("LIVE_RUNS_PER_MINUTE", "10"))
 # Tool rounds before the agent must answer; stops a model retrying a failing tool forever.
 MAX_TOOL_ROUNDS = 5
 RECURSION_LIMIT = 2 * MAX_TOOL_ROUNDS + 4
@@ -113,9 +117,16 @@ def _run_live(mode: str, model: BaseChatModel) -> dict[str, Any]:
 
 
 def run_scenario(mode: str, *, model: BaseChatModel | None = None) -> dict[str, Any]:
-    """Run the support desk agent live; on any failure serve a replay instead."""
+    """Run the support desk agent live; on any failure serve a replay instead.
+
+    Without an injected ``model`` the run uses Groq and counts against
+    ``LIVE_RUNS_PER_MINUTE``; once that is spent, a replay is served without calling Groq.
+    """
     if mode not in support_desk.SYSTEM_PROMPTS:
         raise ValueError(f"unknown mode {mode!r}")
+    if model is None and not _take_live_slot():
+        log.warning("live run cap reached; serving a replay")
+        return load_replay(mode)
     try:
         return _run_live(mode, model if model is not None else make_model())
     except Exception as exc:  # any live failure -> replay; the error is never shown
@@ -139,35 +150,49 @@ def load_replay(mode: str) -> dict[str, Any]:
 
 # --- rate limit: one POST /run per client IP per RATE_LIMIT_SECONDS (in memory) ---
 
-_last_run: dict[str, float] = {}
+_last_run: OrderedDict[str, float] = OrderedDict()
 _rate_lock = threading.Lock()
+_live_runs: deque[float] = deque()
 
 
 def reset_rate_limit() -> None:
     with _rate_lock:
         _last_run.clear()
+        _live_runs.clear()
 
 
 def _client_ip(request: Request) -> str:
-    # Behind Render's proxy the peer is the proxy; the client is the first forwarded hop.
+    # Behind Render's proxy the peer is the proxy, which appends the real client address as
+    # the right-most X-Forwarded-For entry. Entries to its left are client-supplied (spoofable).
     forwarded = request.headers.get("x-forwarded-for", "")
-    first = forwarded.split(",")[0].strip()
-    if first:
-        return first
+    last = forwarded.split(",")[-1].strip()
+    if last:
+        return last
     return request.client.host if request.client else "unknown"
 
 
 def _allow(ip: str) -> bool:
     now = time.monotonic()
-    window = RATE_LIMIT_SECONDS
     with _rate_lock:
         last = _last_run.get(ip)
-        if last is not None and now - last < window:
+        if last is not None and now - last < RATE_LIMIT_SECONDS:
             return False
-        if len(_last_run) > 10_000:  # drop stale entries so memory stays bounded
-            for key in [k for k, t in _last_run.items() if now - t >= window]:
-                del _last_run[key]
         _last_run[ip] = now
+        _last_run.move_to_end(ip)
+        while len(_last_run) > RATE_LIMIT_MAX_KEYS:  # fixed-size LRU: evict the oldest
+            _last_run.popitem(last=False)
+        return True
+
+
+def _take_live_slot() -> bool:
+    """Reserve one of ``LIVE_RUNS_PER_MINUTE`` live model runs shared by all clients."""
+    now = time.monotonic()
+    with _rate_lock:
+        while _live_runs and now - _live_runs[0] >= 60.0:
+            _live_runs.popleft()
+        if len(_live_runs) >= LIVE_RUNS_PER_MINUTE:
+            return False
+        _live_runs.append(now)
         return True
 
 
