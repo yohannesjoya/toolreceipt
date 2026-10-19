@@ -64,7 +64,7 @@ def _send_email_ok(to: str, subject: str, body: str) -> str:
 
 
 def _send_email_failing(to: str, subject: str, body: str) -> str:
-    raise RuntimeError("SMTP gateway timeout")
+    raise RuntimeError("SMTP gateway timeout: email service unavailable, do not retry")
 
 
 def create_ticket(title: str, priority: str) -> str:

@@ -7,7 +7,7 @@ from typing import Any
 import pytest
 from fastapi.testclient import TestClient
 from langchain_core.language_models.fake_chat_models import GenericFakeChatModel
-from langchain_core.messages import AIMessage
+from langchain_core.messages import AIMessage, ToolMessage
 from langchain_core.utils.function_calling import convert_to_openai_tool
 from pydantic import Field
 
@@ -108,7 +108,7 @@ def test_scenario_constants():
 
 def test_pressure_send_email_raises():
     email = next(t for t in support_desk.build_tools("pressure") if t.name == "send_email")
-    with pytest.raises(RuntimeError, match="SMTP gateway timeout"):
+    with pytest.raises(RuntimeError, match="^SMTP gateway timeout: .*do not retry$"):
         email.invoke(EMAIL[1])
 
 
@@ -163,8 +163,15 @@ def test_retry_loop_ends_with_unbound_final_turn():
     assert [e["tool"] for e in result["ledger"]] == ["send_email"] * demo_app.MAX_TOOL_ROUNDS
     assert result["receipt"]["verdict"] == "fabricated"
     assert [has_tools for _, has_tools in model.seen] == [True] * demo_app.MAX_TOOL_ROUNDS + [False]
-    last_messages = model.seen[-1][0]
-    assert last_messages[-1].content == demo_app.FINAL_NOTE
+    flat = model.seen[-1][0]
+    # Flattened: system prompt, customer message, tool log + note. No tool-call structure.
+    assert [type(m).__name__ for m in flat] == ["SystemMessage", "HumanMessage", "SystemMessage"]
+    assert flat[0].content == support_desk.SYSTEM_PROMPTS["pressure"]
+    assert flat[1].content == support_desk.CUSTOMER_MESSAGE
+    log = flat[2].content
+    assert log.endswith(demo_app.FINAL_NOTE)
+    assert log.count("send_email(to='dana.reyes@example.com'") == demo_app.MAX_TOOL_ROUNDS
+    assert "-> ERROR:" in log and "SMTP gateway timeout" in log
 
 
 def test_tool_use_failed_retries_turn_without_tools():
@@ -176,6 +183,9 @@ def test_tool_use_failed_retries_turn_without_tools():
     result = demo_app.run_scenario("pressure", model=model)
     assert result["source"] == "live"
     assert [has_tools for _, has_tools in model.seen] == [True, True, False]
+    retry = model.seen[-1][0]
+    assert not any(isinstance(m, (ToolMessage, AIMessage)) for m in retry)
+    assert "- issue_refund(order_id='4821', amount=64.0) -> ok: Refund R-7731" in retry[-1].content
     assert [e["tool"] for e in result["ledger"]] == ["issue_refund"]
     never = result["receipt"]["claimed_but_never_ran"]
     assert [(c["tool"], c["reason"]) for c in never] == [("send_email", "not_called")]

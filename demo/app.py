@@ -21,7 +21,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, JSONResponse
 from langchain_core.language_models import BaseChatModel
-from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 from langchain_core.tools import BaseTool
 from langgraph.graph import START, MessagesState, StateGraph
 from langgraph.graph.state import CompiledStateGraph
@@ -62,21 +62,51 @@ def _is_tool_use_failed(exc: Exception) -> bool:
     return getattr(exc, "status_code", None) == 400 and "tool_use_failed" in str(exc)
 
 
+def _flatten_tool_log(messages: list[Any]) -> str:
+    """Plain-text log of every tool call and its outcome, e.g. ``f(a='x') -> ERROR: ...``."""
+    results = {m.tool_call_id: m for m in messages if isinstance(m, ToolMessage)}
+    lines = []
+    for message in messages:
+        if not isinstance(message, AIMessage):
+            continue
+        for call in message.tool_calls:
+            args = ", ".join(f"{k}={v!r}" for k, v in (call.get("args") or {}).items())
+            result = results.get(call.get("id") or "")
+            if result is None:
+                outcome = "ERROR: no result"
+            else:
+                text = " ".join(str(result.text).split())[:300]
+                outcome = f"ERROR: {text}" if result.status == "error" else f"ok: {text}"
+            lines.append(f"- {call['name']}({args}) -> {outcome}")
+    return "\n".join(lines) or "- (no tools were called)"
+
+
 def build_graph(
     model: BaseChatModel, tools: list[BaseTool], system_prompt: str
 ) -> CompiledStateGraph[Any, Any, Any, Any]:
     """``START -> agent``, ``tools_condition``, ``tools -> agent``; system prompt prepended.
 
     After ``MAX_TOOL_ROUNDS`` tool rounds, or when a round fails with Groq's
-    ``tool_use_failed``, the turn goes to the unbound model with a note to reply now; any
-    tool call it still returns is dropped, so the run always ends with a reply.
+    ``tool_use_failed``, the turn goes to the unbound model with a flattened history (system
+    prompt, customer message, plain-text tool log, reply-now note) and no tool-call
+    messages; any tool call it still returns is dropped, so the run always ends with a reply.
     """
     bound = model.bind_tools(tools)
     system = SystemMessage(system_prompt)
-    note = SystemMessage(FINAL_NOTE)
 
-    def answer_now(messages: list[Any]) -> AIMessage:
-        reply = model.invoke([*messages, note])
+    def answer_now(history: list[Any]) -> AIMessage:
+        customer = next((m for m in history if isinstance(m, HumanMessage)), None)
+        flat = [
+            system,
+            *([HumanMessage(customer.content)] if customer is not None else []),
+            SystemMessage(
+                "Actions taken so far (from the tool log):\n"
+                + _flatten_tool_log(history)
+                + "\n\n"
+                + FINAL_NOTE
+            ),
+        ]
+        reply = model.invoke(flat)
         if reply.tool_calls:
             reply = AIMessage(content=reply.content, id=reply.id)
         return reply
@@ -85,14 +115,14 @@ def build_graph(
         messages = [system, *state["messages"]]
         rounds = sum(1 for m in state["messages"] if isinstance(m, AIMessage) and m.tool_calls)
         if rounds >= MAX_TOOL_ROUNDS:
-            return {"messages": [answer_now(messages)]}
+            return {"messages": [answer_now(state["messages"])]}
         try:
             return {"messages": [bound.invoke(messages)]}
         except Exception as exc:
             if not _is_tool_use_failed(exc):
                 raise
             log.warning("tool_use_failed from the provider; retrying the turn without tools")
-            return {"messages": [answer_now(messages)]}
+            return {"messages": [answer_now(state["messages"])]}
 
     builder = StateGraph(MessagesState)
     builder.add_node("agent", agent)
