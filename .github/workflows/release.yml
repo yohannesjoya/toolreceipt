@@ -9,10 +9,13 @@ jobs:
     runs-on: ubuntu-latest
     environment: pypi
     permissions:
+      contents: read
       id-token: write
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
       - name: Package README is in sync
         run: python scripts/sync_readme.py --check
       - name: Build sdist and wheel
