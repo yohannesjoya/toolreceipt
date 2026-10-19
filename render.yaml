@@ -2,10 +2,11 @@ services:
   - type: web
     name: toolreceipt-demo
     runtime: python
-    rootDir: demo
     plan: free
-    buildCommand: pip install uv && uv pip install --system "../python[langgraph]" fastapi "uvicorn[standard]" "langchain-groq>=1.1" python-dotenv
-    startCommand: uvicorn app:app --host 0.0.0.0 --port $PORT
+    buildFilter:
+      paths: ["demo/**", "python/**"]
+    buildCommand: pip install uv && uv pip install --system "./python[langgraph]" fastapi "uvicorn[standard]" "langchain-groq>=1.1" python-dotenv
+    startCommand: cd demo && uvicorn app:app --host 0.0.0.0 --port $PORT --proxy-headers
     healthCheckPath: /healthz
     envVars:
       - key: GROQ_API_KEY

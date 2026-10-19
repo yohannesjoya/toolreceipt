@@ -9,11 +9,13 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 import os
 import random
 import threading
 import time
 from collections import OrderedDict, deque
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any, Literal
 
@@ -36,20 +38,42 @@ HERE = Path(__file__).resolve().parent
 INDEX_HTML = HERE / "static" / "index.html"
 DEFAULT_REPLAY_DIR = HERE / "replays"
 
-GROQ_MODEL = "openai/gpt-oss-120b"
-RATE_LIMIT_SECONDS = 5.0
-RATE_LIMIT_MAX_KEYS = 1024
-# Global cap on live Groq runs across all clients; above it a replay is served.
-LIVE_RUNS_PER_MINUTE = int(os.environ.get("LIVE_RUNS_PER_MINUTE", "10"))
-# Tool rounds before the agent must answer; stops a model retrying a failing tool forever.
-MAX_TOOL_ROUNDS = 3
-RECURSION_LIMIT = 2 * MAX_TOOL_ROUNDS + 4
-BUCKETS = ("confirmed", "claimed_but_never_ran", "unmatched")
-
 log = logging.getLogger("toolreceipt.demo")
 
 # Local runs read the repo-root .env; existing environment variables win.
 load_dotenv(HERE.parent / ".env")
+
+
+def _env_number(name: str, default: float) -> float:
+    """Non-negative number from the environment; a bad value logs a warning and uses default."""
+    raw = os.environ.get(name)
+    if raw is None or not raw.strip():
+        return default
+    try:
+        value = float(raw)
+    except ValueError:
+        value = -1.0
+    if not math.isfinite(value) or value < 0:
+        log.warning("ignoring invalid %s; using the default %g", name, default)
+        return default
+    return value
+
+
+GROQ_MODEL = "openai/gpt-oss-120b"
+GROQ_TIMEOUT_SECONDS = 15.0
+RUN_DEADLINE_SECONDS = 45.0  # whole live run; past it the request falls back to a replay
+RATE_LIMIT_SECONDS = _env_number("RATE_LIMIT_SECONDS", 5.0)
+RATE_LIMIT_MAX_KEYS = 1024
+# Global cap on live Groq runs across all clients; above it a replay is served.
+LIVE_RUNS_PER_MINUTE = int(_env_number("LIVE_RUNS_PER_MINUTE", 10))
+# The agent must answer after this many consecutive rounds in which every tool call failed
+# (stops a model retrying a failing tool), or after MAX_TOOL_ROUNDS rounds in total.
+MAX_FAILED_ROUNDS = 2
+MAX_TOOL_ROUNDS = 6
+RECURSION_LIMIT = 2 * MAX_TOOL_ROUNDS + 4
+BUCKETS = ("confirmed", "claimed_but_never_ran", "unmatched")
+
+_executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="live-run")
 
 
 FINAL_NOTE = (
@@ -81,12 +105,36 @@ def _flatten_tool_log(messages: list[Any]) -> str:
     return "\n".join(lines) or "- (no tools were called)"
 
 
+def _tool_rounds(messages: list[Any]) -> tuple[int, int]:
+    """(total tool rounds, trailing consecutive rounds in which every call failed).
+
+    A round is an ``AIMessage`` with tool calls plus the ``ToolMessage``s that follow it; a
+    call without a successful ``ToolMessage`` in its round counts as failed.
+    """
+    rounds: list[tuple[set[str], set[str]]] = []  # (call ids, ids that succeeded)
+    for message in messages:
+        if isinstance(message, AIMessage) and message.tool_calls:
+            rounds.append(({c.get("id") or "" for c in message.tool_calls}, set()))
+        elif isinstance(message, ToolMessage) and rounds and message.status != "error":
+            rounds[-1][1].add(message.tool_call_id)
+    failed_streak = 0
+    for ids, succeeded in rounds:
+        failed_streak = failed_streak + 1 if not (ids & succeeded) else 0
+    return len(rounds), failed_streak
+
+
 def build_graph(
-    model: BaseChatModel, tools: list[BaseTool], system_prompt: str
+    model: BaseChatModel,
+    tools: list[BaseTool],
+    system_prompt: str,
+    *,
+    deadline: float | None = None,
 ) -> CompiledStateGraph[Any, Any, Any, Any]:
     """``START -> agent``, ``tools_condition``, ``tools -> agent``; system prompt prepended.
 
-    After ``MAX_TOOL_ROUNDS`` tool rounds, or when a round fails with Groq's
+    ``deadline`` (a ``time.monotonic()`` value) stops the run before any later model call.
+    After ``MAX_FAILED_ROUNDS`` consecutive all-failed tool rounds or ``MAX_TOOL_ROUNDS``
+    rounds in total, or when a round fails with Groq's
     ``tool_use_failed``, the turn goes to the unbound model with a flattened history (system
     prompt, customer message, plain-text tool log, reply-now note) and no tool-call
     messages; any tool call it still returns is dropped, so the run always ends with a reply.
@@ -112,9 +160,11 @@ def build_graph(
         return reply
 
     def agent(state: MessagesState) -> dict[str, Any]:
+        if deadline is not None and time.monotonic() > deadline:
+            raise TimeoutError("live run deadline exceeded")
         messages = [system, *state["messages"]]
-        rounds = sum(1 for m in state["messages"] if isinstance(m, AIMessage) and m.tool_calls)
-        if rounds >= MAX_TOOL_ROUNDS:
+        total, failed_streak = _tool_rounds(state["messages"])
+        if total >= MAX_TOOL_ROUNDS or failed_streak >= MAX_FAILED_ROUNDS:
             return {"messages": [answer_now(state["messages"])]}
         try:
             return {"messages": [bound.invoke(messages)]}
@@ -139,12 +189,18 @@ def make_model() -> BaseChatModel:
         raise RuntimeError("GROQ_API_KEY is not set")
     from langchain_groq import ChatGroq
 
-    return ChatGroq(model=GROQ_MODEL, temperature=0.7, max_tokens=400, max_retries=1, timeout=30)
+    return ChatGroq(
+        model=GROQ_MODEL,
+        temperature=0.7,
+        max_tokens=400,
+        max_retries=1,
+        timeout=GROQ_TIMEOUT_SECONDS,
+    )
 
 
-def _run_live(mode: str, model: BaseChatModel) -> dict[str, Any]:
+def _run_live(mode: str, model: BaseChatModel, deadline: float) -> dict[str, Any]:
     tools = support_desk.build_tools(mode)
-    graph = build_graph(model, tools, support_desk.SYSTEM_PROMPTS[mode])
+    graph = build_graph(model, tools, support_desk.SYSTEM_PROMPTS[mode], deadline=deadline)
     receipts = Receipts()
     result = graph.invoke(
         {"messages": [HumanMessage(support_desk.CUSTOMER_MESSAGE)]},
@@ -169,16 +225,25 @@ def _run_live(mode: str, model: BaseChatModel) -> dict[str, Any]:
 def run_scenario(mode: str, *, model: BaseChatModel | None = None) -> dict[str, Any]:
     """Run the support desk agent live; on any failure serve a replay instead.
 
-    Without an injected ``model`` the run uses Groq and counts against
-    ``LIVE_RUNS_PER_MINUTE``; once that is spent, a replay is served without calling Groq.
+    Without an injected ``model`` the run uses Groq: a missing ``GROQ_API_KEY`` serves a
+    replay without using a live slot, and once ``LIVE_RUNS_PER_MINUTE`` is spent a replay is
+    served without calling Groq. The whole run is bounded by ``RUN_DEADLINE_SECONDS``.
     """
     if mode not in support_desk.SYSTEM_PROMPTS:
         raise ValueError(f"unknown mode {mode!r}")
-    if model is None and not _take_live_slot():
-        log.warning("live run cap reached; serving a replay")
-        return load_replay(mode)
+    if model is None:
+        if not os.environ.get("GROQ_API_KEY"):
+            log.warning("GROQ_API_KEY is not set; serving a replay")
+            return load_replay(mode)
+        if not _take_live_slot():
+            log.warning("live run cap reached; serving a replay")
+            return load_replay(mode)
+    deadline = time.monotonic() + RUN_DEADLINE_SECONDS
     try:
-        return _run_live(mode, model if model is not None else make_model())
+        live_model = model if model is not None else make_model()
+        future = _executor.submit(_run_live, mode, live_model, deadline)
+        # The worker stops at its next model call once the deadline has passed.
+        return future.result(timeout=RUN_DEADLINE_SECONDS)
     except Exception as exc:  # any live failure -> replay; the error is never shown
         log.warning("live run failed (%s); serving a replay", type(exc).__name__)
         return load_replay(mode)

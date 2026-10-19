@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import time
 from collections.abc import Sequence
 from typing import Any
 
@@ -148,10 +149,11 @@ def test_honest_mode_unreported_with_fake_model():
     assert [e["status"] for e in result["ledger"]] == ["ok", "ok", "ok"]
 
 
-def test_retry_loop_ends_with_unbound_final_turn():
+def test_failing_send_email_twice_triggers_flattened_turn():
     # A model that keeps retrying the failing send_email must still end with a reply:
-    # after MAX_TOOL_ROUNDS the unbound model is asked to answer; a late call is dropped.
-    rounds = [calls(EMAIL) for _ in range(demo_app.MAX_TOOL_ROUNDS)]
+    # after MAX_FAILED_ROUNDS all-failed rounds the unbound model is asked to answer,
+    # and a late tool call is dropped.
+    rounds = [calls(EMAIL) for _ in range(demo_app.MAX_FAILED_ROUNDS)]
     final = AIMessage(
         content="I have emailed you the confirmation.",
         tool_calls=[{"name": "send_email", "args": EMAIL[1], "id": "late"}],
@@ -160,9 +162,10 @@ def test_retry_loop_ends_with_unbound_final_turn():
     result = demo_app.run_scenario("pressure", model=model)
     assert result["source"] == "live"
     assert result["reply"] == "I have emailed you the confirmation."
-    assert [e["tool"] for e in result["ledger"]] == ["send_email"] * demo_app.MAX_TOOL_ROUNDS
+    assert [e["tool"] for e in result["ledger"]] == ["send_email"] * demo_app.MAX_FAILED_ROUNDS
     assert result["receipt"]["verdict"] == "fabricated"
-    assert [has_tools for _, has_tools in model.seen] == [True] * demo_app.MAX_TOOL_ROUNDS + [False]
+    expected = [True] * demo_app.MAX_FAILED_ROUNDS + [False]
+    assert [has_tools for _, has_tools in model.seen] == expected
     flat = model.seen[-1][0]
     # Flattened: system prompt, customer message, tool log + note. No tool-call structure.
     assert [type(m).__name__ for m in flat] == ["SystemMessage", "HumanMessage", "SystemMessage"]
@@ -170,8 +173,86 @@ def test_retry_loop_ends_with_unbound_final_turn():
     assert flat[1].content == support_desk.CUSTOMER_MESSAGE
     log = flat[2].content
     assert log.endswith(demo_app.FINAL_NOTE)
-    assert log.count("send_email(to='dana.reyes@example.com'") == demo_app.MAX_TOOL_ROUNDS
+    assert log.count("send_email(to='dana.reyes@example.com'") == demo_app.MAX_FAILED_ROUNDS
     assert "-> ERROR:" in log and "SMTP gateway timeout" in log
+
+
+def test_honest_four_tool_sequence_is_not_cut_off():
+    TICKET = ("create_ticket", {"title": "Broken lamp, order 4821", "priority": "low"})
+    model = fake(
+        calls(LOOKUP),
+        calls(REFUND),
+        calls(EMAIL),
+        calls(TICKET),
+        AIMessage(content="I issued your refund and emailed you the confirmation."),
+    )
+    result = demo_app.run_scenario("honest", model=model)
+    assert [has_tools for _, has_tools in model.seen] == [True] * 5  # no flattened turn
+    assert [(e["tool"], e["status"]) for e in result["ledger"]] == [
+        ("lookup_order", "ok"),
+        ("issue_refund", "ok"),
+        ("send_email", "ok"),
+        ("create_ticket", "ok"),
+    ]
+    assert result["reply"] == "I issued your refund and emailed you the confirmation."
+
+
+def test_hard_ceiling_on_total_rounds():
+    rounds = [calls(LOOKUP) for _ in range(demo_app.MAX_TOOL_ROUNDS)]
+    model = fake(*rounds, AIMessage(content="Your order is on file."))
+    result = demo_app.run_scenario("honest", model=model)
+    expected = [True] * demo_app.MAX_TOOL_ROUNDS + [False]
+    assert [has_tools for _, has_tools in model.seen] == expected
+    assert result["reply"] == "Your order is on file."
+
+
+def test_mixed_round_does_not_count_as_failed():
+    # refund ok + email failed in one round, then email failed alone: streak is 1, not 2.
+    model = fake(
+        calls(REFUND, EMAIL),
+        calls(EMAIL),
+        AIMessage(content="I issued your refund."),
+    )
+    demo_app.run_scenario("pressure", model=model)
+    assert [has_tools for _, has_tools in model.seen] == [True, True, True]
+
+
+def test_run_deadline_falls_back_to_replay(replay_dir, monkeypatch):
+    class Slow(FakeToolModel):
+        def _generate(self, *args: Any, **kwargs: Any):
+            time.sleep(0.3)
+            return super()._generate(*args, **kwargs)
+
+    monkeypatch.setattr(demo_app, "RUN_DEADLINE_SECONDS", 0.1)
+    model = Slow(messages=iter([calls(LOOKUP), calls(LOOKUP), AIMessage(content="Done.")]))
+    started = time.monotonic()
+    result = demo_app.run_scenario("pressure", model=model)
+    assert result["source"] == "replay"
+    assert time.monotonic() - started < 0.29  # did not wait for the slow model
+    time.sleep(0.4)  # the abandoned worker stops at its next model call
+    assert len(model.seen) == 1
+
+
+@pytest.mark.parametrize("raw", ["abc", "-3", "nan", "inf"])
+def test_env_numbers_parsed_defensively(monkeypatch, caplog, raw):
+    monkeypatch.setenv("RATE_LIMIT_SECONDS", raw)
+    with caplog.at_level("WARNING", logger="toolreceipt.demo"):
+        assert demo_app._env_number("RATE_LIMIT_SECONDS", 5.0) == 5.0
+    assert "RATE_LIMIT_SECONDS" in caplog.text and raw not in caplog.text
+
+
+def test_env_numbers_read_valid_values(monkeypatch):
+    monkeypatch.setenv("LIVE_RUNS_PER_MINUTE", "3")
+    assert demo_app._env_number("LIVE_RUNS_PER_MINUTE", 10) == 3.0
+    monkeypatch.delenv("LIVE_RUNS_PER_MINUTE")
+    assert demo_app._env_number("LIVE_RUNS_PER_MINUTE", 10) == 10
+
+
+def test_missing_key_serves_replay_without_using_a_live_slot(replay_dir, monkeypatch):
+    monkeypatch.delenv("GROQ_API_KEY", raising=False)
+    monkeypatch.setattr(demo_app, "LIVE_RUNS_PER_MINUTE", 1)
+    assert demo_app.run_scenario("pressure")["source"] == "replay"
+    assert len(demo_app._live_runs) == 0
 
 
 def test_tool_use_failed_retries_turn_without_tools():
@@ -261,6 +342,7 @@ def test_rate_limit_keys_are_a_bounded_lru(monkeypatch):
 
 
 def test_global_live_cap_switches_to_replay(replay_dir, monkeypatch):
+    monkeypatch.setenv("GROQ_API_KEY", "test-key-not-real")
     built = []
 
     def fake_live_model() -> FakeToolModel:
