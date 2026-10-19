@@ -234,6 +234,28 @@ def test_run_deadline_falls_back_to_replay(replay_dir, monkeypatch):
     assert len(model.seen) == 1
 
 
+def test_run_deadline_cancels_a_queued_run(replay_dir, monkeypatch):
+    from concurrent.futures import ThreadPoolExecutor
+
+    class Recording(ThreadPoolExecutor):
+        futures: list[Any] = []
+
+        def submit(self, *args: Any, **kwargs: Any):
+            future = super().submit(*args, **kwargs)
+            self.futures.append(future)
+            return future
+
+    executor = Recording(max_workers=1)
+    executor.submit(time.sleep, 0.3)  # occupy the only worker
+    monkeypatch.setattr(demo_app, "_executor", executor)
+    monkeypatch.setattr(demo_app, "RUN_DEADLINE_SECONDS", 0.05)
+    model = FakeToolModel(messages=iter([AIMessage(content="Done.")]))
+    result = demo_app.run_scenario("pressure", model=model)
+    assert result["source"] == "replay"
+    assert executor.futures[1].cancelled()  # the queued run never starts
+    executor.shutdown(wait=True)
+
+
 @pytest.mark.parametrize("raw", ["abc", "-3", "nan", "inf"])
 def test_env_numbers_parsed_defensively(monkeypatch, caplog, raw):
     monkeypatch.setenv("RATE_LIMIT_SECONDS", raw)

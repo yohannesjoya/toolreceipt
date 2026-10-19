@@ -1,4 +1,4 @@
-"""Held-out set (PRD §16): live honest-mode replies and hand-written adversarial negatives.
+"""Held-out set (README, Demo): live honest-mode replies and hand-written adversarial negatives.
 
 Labelled before any rule tuning and never used to tune. The only assertion is zero claims on
 the adversarial negatives; precision on the honest replies is printed, not gated.

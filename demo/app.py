@@ -16,6 +16,7 @@ import threading
 import time
 from collections import OrderedDict, deque
 from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import TimeoutError as FutureTimeout
 from pathlib import Path
 from typing import Any, Literal
 
@@ -242,8 +243,13 @@ def run_scenario(mode: str, *, model: BaseChatModel | None = None) -> dict[str, 
     try:
         live_model = model if model is not None else make_model()
         future = _executor.submit(_run_live, mode, live_model, deadline)
-        # The worker stops at its next model call once the deadline has passed.
-        return future.result(timeout=RUN_DEADLINE_SECONDS)
+        try:
+            return future.result(timeout=RUN_DEADLINE_SECONDS)
+        except FutureTimeout:
+            # Drop the run if it has not started; a running worker stops at its next
+            # model call once the deadline has passed.
+            future.cancel()
+            raise
     except Exception as exc:  # any live failure -> replay; the error is never shown
         log.warning("live run failed (%s); serving a replay", type(exc).__name__)
         return load_replay(mode)

@@ -6,12 +6,4 @@ dist/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
-
-# private planning files
-agent-receipts-handoff.md
-docs/PRD.md
-docs/PRD.review.md
-docs/superpowers/
-.claude/
-.superpowers/
 demo/.venv/

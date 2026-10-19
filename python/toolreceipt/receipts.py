@@ -1,4 +1,4 @@
-"""``check()`` and the ``Receipts`` facade (PRD §6)."""
+"""``check()`` and the ``Receipts`` facade."""
 
 from __future__ import annotations
 

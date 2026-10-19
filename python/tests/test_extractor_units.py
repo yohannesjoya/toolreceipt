@@ -220,7 +220,7 @@ def test_extract_accepts_custom_lexicon():
     assert [(c.verb, c.object) for c in claims] == [("send", "team")]
 
 
-# --- Tool matching and dedupe (PRD §9.2 steps 6-7) --------------------------
+# --- Tool matching and dedupe -----------------------------------------------
 
 def test_tokenize_tool_name():
     assert tokenize_tool_name("sendEmail") == ["send", "email"]

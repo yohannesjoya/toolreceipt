@@ -31,7 +31,7 @@
 
     <!-- known tools -->
     <text x="400" y="162" font-size="12" text-anchor="middle">known tool names</text>
-    <line x1="520" y1="170" x2="280" y2="170" stroke="#1f2937" stroke-width="1.5" stroke-dasharray="5,4" marker-end="url(#arrow)"/>
+    <line x1="280" y1="170" x2="520" y2="170" stroke="#1f2937" stroke-width="1.5" stroke-dasharray="5,4" marker-end="url(#arrow)"/>
 
     <!-- arrows to diff -->
     <line x1="170" y1="194" x2="350" y2="236" stroke="#1f2937" stroke-width="2" marker-end="url(#arrow)"/>

@@ -46,7 +46,7 @@ def render_summary(
     claimed_but_never_ran: Sequence[Claim],
     ran_but_unreported: Sequence[LedgerEntry],
 ) -> str:
-    """One-line, specific summary (PRD §10 step 6)."""
+    """One-line, specific summary."""
     if verdict == "fabricated":
         first = claimed_but_never_ran[0]
         n = len(claimed_but_never_ran)

@@ -107,7 +107,7 @@ def load_lexicon(path: Path | None = None) -> dict[str, Any]:
 
 
 # ---------------------------------------------------------------------------
-# Rule extractor (PRD §9.2). Steps 1-5: sentence split, clause split, action
+# Rule extractor. Steps 1-5: sentence split, clause split, action
 # detection, filters, object extraction. Steps 6-7 (tool matching, dedupe) follow
 # the extraction helpers below.
 # ---------------------------------------------------------------------------
@@ -361,7 +361,7 @@ def extract_object(
 
 
 # ---------------------------------------------------------------------------
-# Tool matching (PRD §9.2 step 6)
+# Tool matching (step 6; see docs/decisions.md)
 # ---------------------------------------------------------------------------
 
 _NAME_PART = re.compile(r"[A-Z]+(?=[A-Z][a-z])|[A-Z]?[a-z0-9]+|[A-Z]+[0-9]*")

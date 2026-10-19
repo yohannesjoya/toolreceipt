@@ -1,4 +1,4 @@
-"""Set-semantics diff between claims and the ledger (PRD §10)."""
+"""Set-semantics diff between claims and the ledger."""
 
 from __future__ import annotations
 

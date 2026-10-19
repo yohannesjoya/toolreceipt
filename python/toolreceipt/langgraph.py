@@ -1,4 +1,4 @@
-"""LangGraph / LangChain adapter: callback ledger capture, post-hoc ledger, final reply (PRD §8).
+"""LangGraph / LangChain adapter: callback ledger capture, post-hoc ledger, final reply.
 
 This is the only module that imports ``langchain_core``; install ``toolreceipt[langgraph]``.
 """

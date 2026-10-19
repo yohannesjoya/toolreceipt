@@ -125,6 +125,9 @@ if not receipt.ok:
 | **Receipt** | The result of diffing claims against the ledger. |
 | **Verdict** | `clean`, `unreported` or `fabricated`. Only `fabricated` is blocking (`receipt.ok` is `False`). |
 
+`Claim.text` is the clause after normalisation (curly quotes straightened, runs of whitespace
+folded), so it can differ from the raw substring of the reply.
+
 A receipt has four lists: `confirmed` (a successful entry exists for the claim),
 `claimed_but_never_ran`, `unmatched` (no known tool fits the claim closely enough to judge
 it, informational) and
@@ -183,13 +186,16 @@ rc = Receipts(
 
 ## Comparison with prior art
 
-| Project | What it does | Gap `toolreceipt` fills |
-|---|---|---|
-| AgentClaimGuard | Gates claims that are already structured | No free-text extraction, no framework hook |
-| [langchain-ai/agentevals](https://github.com/langchain-ai/agentevals) | Offline trajectory match against a reference | Needs a reference trajectory; not a runtime check |
-| DeepEval `ToolCorrectnessMetric`, Ragas | Test-time tool metrics | Need the expected tools up front |
-| AgentOps, Langfuse, LangSmith | Record traces | Never judge the reply against the trace |
-| MIRAGE-Bench | Names "action hallucination" | A benchmark, not a library you call at runtime |
+| Project | What it is for |
+|---|---|
+| [AgentClaimGuard](https://github.com/konoeph/AgentClaimGuard) | Checking agent claims that are already structured |
+| [langchain-ai/agentevals](https://github.com/langchain-ai/agentevals) | Offline evaluation of agent trajectories against a reference |
+| [DeepEval](https://github.com/confident-ai/deepeval) (`ToolCorrectnessMetric`), [Ragas](https://github.com/explodinggradients/ragas) | Test-time evaluation metrics, including tool-use metrics |
+| [AgentOps](https://github.com/AgentOps-AI/agentops), [Langfuse](https://github.com/langfuse/langfuse), [LangSmith](https://smith.langchain.com) | Tracing and observability of agent runs |
+| [MIRAGE-Bench](https://arxiv.org/abs/2507.21017) | A benchmark for agent hallucinations, including action hallucination |
+
+`toolreceipt` is a runtime check on the final reply of one run: it extracts claims from free
+text and returns a verdict against the tools that actually ran.
 
 `toolreceipt` complements tracers: keep your traces, add a verdict.
 
