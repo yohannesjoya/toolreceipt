@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="360" viewBox="0 0 800 360" role="img" aria-labelledby="t d">
+  <title id="t">toolreceipt architecture</title>
+  <desc id="d">A LangGraph run feeds tool calls into a Ledger and the final reply into an Extractor that produces Claims. The Diff compares both and produces a Receipt.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#1f2937"/>
+    </marker>
+  </defs>
+  <rect x="0" y="0" width="800" height="360" fill="#f8fafc"/>
+  <g font-family="Helvetica, Arial, sans-serif" fill="#111827">
+    <!-- LangGraph run -->
+    <rect x="200" y="16" width="400" height="56" rx="8" fill="#e0e7ff" stroke="#1f2937" stroke-width="2"/>
+    <text x="400" y="40" font-size="16" font-weight="bold" text-anchor="middle">LangGraph run</text>
+    <text x="400" y="60" font-size="12" text-anchor="middle">graph.invoke(inputs, config=rc.config())</text>
+
+    <!-- arrows from run -->
+    <line x1="290" y1="72" x2="170" y2="130" stroke="#1f2937" stroke-width="2" marker-end="url(#arrow)"/>
+    <line x1="510" y1="72" x2="630" y2="130" stroke="#1f2937" stroke-width="2" marker-end="url(#arrow)"/>
+    <text x="150" y="98" font-size="12" text-anchor="middle">tool start / end / error</text>
+    <text x="660" y="98" font-size="12" text-anchor="middle">final AIMessage text</text>
+
+    <!-- Ledger -->
+    <rect x="60" y="130" width="220" height="64" rx="8" fill="#dcfce7" stroke="#1f2937" stroke-width="2"/>
+    <text x="170" y="156" font-size="16" font-weight="bold" text-anchor="middle">Ledger</text>
+    <text x="170" y="176" font-size="12" text-anchor="middle">one entry per tool call</text>
+
+    <!-- Extractor -->
+    <rect x="520" y="130" width="220" height="64" rx="8" fill="#fef9c3" stroke="#1f2937" stroke-width="2"/>
+    <text x="630" y="156" font-size="16" font-weight="bold" text-anchor="middle">Extractor → Claims</text>
+    <text x="630" y="176" font-size="12" text-anchor="middle">RuleExtractor (default)</text>
+
+    <!-- known tools -->
+    <text x="400" y="162" font-size="12" text-anchor="middle">known tool names</text>
+    <line x1="520" y1="170" x2="280" y2="170" stroke="#1f2937" stroke-width="1.5" stroke-dasharray="5,4" marker-end="url(#arrow)"/>
+
+    <!-- arrows to diff -->
+    <line x1="170" y1="194" x2="350" y2="236" stroke="#1f2937" stroke-width="2" marker-end="url(#arrow)"/>
+    <line x1="630" y1="194" x2="450" y2="236" stroke="#1f2937" stroke-width="2" marker-end="url(#arrow)"/>
+
+    <!-- Diff -->
+    <rect x="320" y="236" width="160" height="44" rx="8" fill="#fce7f3" stroke="#1f2937" stroke-width="2"/>
+    <text x="400" y="264" font-size="16" font-weight="bold" text-anchor="middle">Diff</text>
+
+    <!-- arrow to receipt -->
+    <line x1="400" y1="280" x2="400" y2="296" stroke="#1f2937" stroke-width="2" marker-end="url(#arrow)"/>
+
+    <!-- Receipt -->
+    <rect x="110" y="298" width="580" height="54" rx="8" fill="#ffedd5" stroke="#1f2937" stroke-width="2"/>
+    <text x="400" y="318" font-size="14" font-weight="bold" text-anchor="middle">Receipt  (verdict, ok, summary)</text>
+    <text x="400" y="338" font-size="12" text-anchor="middle">confirmed · claimed_but_never_ran · unmatched · ran_but_unreported</text>
+  </g>
+</svg>

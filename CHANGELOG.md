@@ -6,3 +6,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [0.1.0] - 2026-10-20
+
+### Added
+
+- `Ledger` and `LedgerEntry`: JSON-safe record of tool calls, with truncation of results and errors.
+- `Claim` and `ClaimExtractor` protocol, with `RuleExtractor`, a deterministic, key-free,
+  stdlib-only extractor driven by a packaged lexicon of verb families and exclusion rules.
+- Diff and `Receipt`: `confirmed`, `claimed_but_never_ran` (reasons `not_called` and
+  `tool_failed`), `unmatched` and `ran_but_unreported`, a verdict (`clean`, `unreported`,
+  `fabricated`) and a one-line summary.
+- `check()` for framework-free use and the `Receipts` facade (`config()`, `check()`, `ledger`)
+  with `known_tools`, `ignore_tools`, `capture_results` and `max_result_chars`.
+- LangGraph adapter (`toolreceipt[langgraph]`): `ReceiptCallbackHandler`, `merge_config`,
+  `final_reply`, `ledger_from_messages` and bound-tool discovery.
+- JSON fixtures for extractor and diff behaviour, README quickstart executed as a test,
+  `CONTRIBUTING.md`, issue templates and an architecture sketch.

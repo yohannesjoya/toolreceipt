@@ -1,0 +1,42 @@
+name: False positive
+description: A legitimate reply was flagged as fabricated or produced a wrong claim.
+title: "False positive: "
+labels: ["false-positive"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks. False positives matter most to us. The ledger may contain personal data.
+        Redact it before posting.
+  - type: textarea
+    id: reply
+    attributes:
+      label: Reply text
+      description: The agent's final reply, verbatim.
+    validations:
+      required: true
+  - type: textarea
+    id: ledger
+    attributes:
+      label: Ledger JSON or tool list
+      description: '`receipt.ledger.to_dict()` output, or the names of the tools the agent had and which ran.'
+      render: json
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected result
+      description: What the receipt should have said, for example "no claim" or "verdict clean".
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual receipt
+      description: '`receipt.verdict`, `receipt.summary` and the offending claim from `receipt.to_dict()`.'
+  - type: input
+    id: version
+    attributes:
+      label: toolreceipt version
+      placeholder: "0.1.0"

@@ -1,0 +1,41 @@
+name: Missed claim
+description: A reply claimed an action that never ran, and toolreceipt did not flag it.
+title: "Missed claim: "
+labels: ["missed-claim"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks. The ledger may contain personal data. Redact it before posting.
+  - type: textarea
+    id: reply
+    attributes:
+      label: Reply text
+      description: The agent's final reply, verbatim.
+    validations:
+      required: true
+  - type: textarea
+    id: ledger
+    attributes:
+      label: Ledger JSON or tool list
+      description: '`receipt.ledger.to_dict()` output, or the names of the tools the agent had and which ran.'
+      render: json
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected result
+      description: Which claim should have been found, which tool it maps to, and the expected verdict.
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual receipt
+      description: '`receipt.verdict` and `receipt.summary`, or `receipt.to_dict()`.'
+  - type: input
+    id: version
+    attributes:
+      label: toolreceipt version
+      placeholder: "0.1.0"
