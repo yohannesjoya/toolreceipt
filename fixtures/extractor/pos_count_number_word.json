@@ -12,10 +12,8 @@
       "text": "I've deleted two duplicate tickets",
       "object": "two duplicate tickets",
       "count": 2,
-      "candidates": [
-        "create_ticket"
-      ],
-      "confidence": "high"
+      "candidates": [],
+      "confidence": null
     }
   ]
 }

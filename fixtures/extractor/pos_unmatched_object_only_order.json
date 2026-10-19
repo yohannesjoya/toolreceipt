@@ -1,0 +1,19 @@
+{
+  "text": "I updated the order.",
+  "known_tools": [
+    {
+      "name": "lookup_order",
+      "description": "Look up an order"
+    }
+  ],
+  "expected": [
+    {
+      "verb": "update",
+      "text": "I updated the order",
+      "object": "order",
+      "count": null,
+      "candidates": [],
+      "confidence": null
+    }
+  ]
+}

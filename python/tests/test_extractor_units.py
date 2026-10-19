@@ -332,3 +332,22 @@ def test_lexicon_review_forms():
     assert find_action("I assigned the ticket to billing", LEX)[0] == "update"
     assert find_action("I e-mailed you the receipt", LEX)[0] == "send"
     assert find_action("I have summarised the issue", LEX)[0] == "create"
+
+
+@pytest.mark.parametrize(
+    "family,obj,tool",
+    [
+        ("delete", "two duplicate tickets", ToolSpec("create_ticket", "Open a support ticket")),
+        ("refund", "the order", ToolSpec("update_payment", "")),
+        ("update", "the order", ToolSpec("lookup_order", "Look up an order")),
+        ("schedule", "a call", ToolSpec("cancel_appointment", "")),
+    ],
+)
+def test_candidacy_requires_a_verb_family_hit(family, obj, tool):
+    assert match_tools(family, obj, [tool], LEX) == ([], None)
+
+
+def test_noun_tokens_still_match_as_objects():
+    tools = [ToolSpec("book_appointment", ""), ToolSpec("update_payment", "")]
+    assert match_tools("schedule", "the appointment", tools, LEX) == (["book_appointment"], "high")
+    assert match_tools("update", "the payment", tools, LEX) == (["update_payment"], "high")

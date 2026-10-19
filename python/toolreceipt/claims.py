@@ -408,11 +408,15 @@ def _family_terms(family: str, lexicon: Mapping[str, Any]) -> set[_Term]:
     """Family tokens, each expanded through every synonym group containing it.
 
     Dual-sense tokens ("issue": refund verb / ticket noun) stay literal so the verb
-    never picks up the noun's synonyms.
+    never picks up the noun's synonyms. Noun tokens ("payment", "appointment") are not
+    verb evidence and are left out; they still match as object words.
     """
     dual = set(lexicon.get("dual_sense_tokens", ()))
+    nouns = {_stem(n) for n in lexicon.get("noun_tokens", ())}
     fam = lexicon["families"].get(family, {})
-    terms: set[_Term] = {(_stem(family),)} | {tuple(_words(t)) for t in fam.get("tokens", ())}
+    terms: set[_Term] = {(_stem(family),)} | {
+        tuple(_words(t)) for t in fam.get("tokens", ()) if _stem(t) not in nouns
+    }
     groups = _synonym_groups(lexicon)
     for term in list(terms):
         if " ".join(term) in dual:
@@ -468,9 +472,19 @@ def match_tools(
     family: str, obj: str | None, known_tools: Sequence[ToolSpec], lexicon: Mapping[str, Any]
 ) -> tuple[list[str], Confidence | None]:
     """All tools at the maximum score (ties kept, in ``known_tools`` order) when it is
-    at least 2; ``high`` confidence from 3."""
+    at least 2; ``high`` confidence from 3.
+
+    Only tools whose name carries a verb-family token are eligible: an object or
+    description match alone ("deleted two tickets" vs ``create_ticket``) never makes
+    a candidate.
+    """
     words = _words(obj) if obj else []
-    scored = [(spec.name, score_tool(family, words, spec, lexicon)) for spec in known_tools]
+    fam_terms = _family_terms(family, lexicon)
+    eligible = [
+        spec for spec in known_tools
+        if any(_occurs(t, tokenize_tool_name(spec.name)) for t in fam_terms)
+    ]
+    scored = [(spec.name, score_tool(family, words, spec, lexicon)) for spec in eligible]
     best = max((score for _, score in scored), default=0)
     if best < 2:
         return [], None

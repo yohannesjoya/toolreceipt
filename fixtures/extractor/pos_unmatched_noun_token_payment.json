@@ -1,0 +1,19 @@
+{
+  "text": "I refunded the order.",
+  "known_tools": [
+    {
+      "name": "update_payment",
+      "description": ""
+    }
+  ],
+  "expected": [
+    {
+      "verb": "refund",
+      "text": "I refunded the order",
+      "object": "order",
+      "count": null,
+      "candidates": [],
+      "confidence": null
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "text": "I deleted two duplicate tickets.",
+  "known_tools": [
+    {
+      "name": "create_ticket",
+      "description": "Open a support ticket"
+    }
+  ],
+  "expected": [
+    {
+      "verb": "delete",
+      "text": "I deleted two duplicate tickets",
+      "object": "two duplicate tickets",
+      "count": 2,
+      "candidates": [],
+      "confidence": null
+    }
+  ]
+}
