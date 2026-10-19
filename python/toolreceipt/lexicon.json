@@ -5,7 +5,7 @@
       "tokens": ["send", "email", "mail", "notify", "message", "forward", "dispatch"]
     },
     "create": {
-      "forms": ["created", "opened", "filed", "raised", "logged", "made", "added", "generated", "set up"],
+      "forms": ["created", "opened", "filed", "raised", "logged", "added", "generated", "set up"],
       "tokens": ["create", "open", "file", "raise", "log", "make", "add", "new", "generate"]
     },
     "update": {
@@ -29,7 +29,7 @@
       "tokens": ["save", "store", "record", "write", "persist", "upload", "export"]
     },
     "submit": {
-      "forms": ["submitted", "filed", "posted", "published", "applied", "registered", "enrolled"],
+      "forms": ["submitted", "posted", "published"],
       "tokens": ["submit", "post", "publish", "apply", "register", "enroll", "form"]
     },
     "trigger": {

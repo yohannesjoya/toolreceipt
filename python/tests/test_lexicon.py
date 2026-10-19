@@ -28,3 +28,9 @@ def test_default_load_is_not_mutable_through_cache():
     lex = load_lexicon()
     lex["families"]["send"]["forms"].append("zzz")
     assert "zzz" not in load_lexicon()["families"]["send"]["forms"]
+
+
+def test_lexicon_forms_unique_across_families():
+    lex = load_lexicon()
+    all_forms = [f for fam in lex["families"].values() for f in fam["forms"]]
+    assert len(all_forms) == len(set(all_forms))
