@@ -8,7 +8,7 @@ two, and returns a receipt you can use to block, annotate or log the reply.
 [![PyPI](https://img.shields.io/pypi/v/toolreceipt.svg)](https://pypi.org/project/toolreceipt/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-<!-- demo gif: added in Task 12 -->
+![toolreceipt demo: the agent claims it emailed the customer, the receipt shows send_email failed](docs/demo.gif)
 
 Live demo: coming soon
 
