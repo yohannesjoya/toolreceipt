@@ -65,9 +65,21 @@ def test_ledger_property_none_before_config():
 def test_config_without_langgraph_raises_helpful_import_error(monkeypatch):
     import sys
 
-    monkeypatch.setitem(sys.modules, "toolreceipt.langgraph", None)
+    # Simulate the extra not being installed: langchain_core cannot be imported.
+    monkeypatch.delitem(sys.modules, "toolreceipt.langgraph", raising=False)
+    for name in [m for m in sys.modules if m.split(".")[0] == "langchain_core"]:
+        monkeypatch.setitem(sys.modules, name, None)
     with pytest.raises(ImportError, match=r"toolreceipt\[langgraph\] is required"):
         Receipts().config()
+
+
+def test_config_unrelated_import_error_propagates(monkeypatch):
+    import sys
+
+    monkeypatch.setitem(sys.modules, "toolreceipt.langgraph", None)
+    with pytest.raises(ImportError) as info:
+        Receipts().config()
+    assert "is required" not in str(info.value)
 
 
 def test_check_uses_stored_handler(monkeypatch):

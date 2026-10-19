@@ -13,6 +13,7 @@ from toolreceipt.receipt import Receipt
 
 ToolLike = str | ToolSpec | tuple[str, str] | Mapping[str, Any]
 
+_LANGGRAPH_DEPS = frozenset({"langchain_core", "langgraph"})
 _MISSING_LANGGRAPH = 'toolreceipt[langgraph] is required: pip install "toolreceipt[langgraph]"'
 
 
@@ -81,17 +82,18 @@ class Receipts:
     def config(self, base_config: Mapping[str, Any] | None = None) -> dict[str, Any]:
         """Return ``base_config`` with a fresh receipt callback handler added."""
         try:
-            handler_cls = importlib.import_module("toolreceipt.langgraph").ReceiptCallbackHandler
+            adapter = importlib.import_module("toolreceipt.langgraph")
         except ImportError as exc:
-            raise ImportError(_MISSING_LANGGRAPH) from exc
-        handler: _Handler = handler_cls(
+            if (exc.name or "").partition(".")[0] in _LANGGRAPH_DEPS:
+                raise ImportError(_MISSING_LANGGRAPH) from exc
+            raise
+        handler: _Handler = adapter.ReceiptCallbackHandler(
             Ledger(),
             capture_results=self._capture_results,
             max_result_chars=self._max_result_chars,
         )
         self._handler = handler
-        merged = dict(base_config or {})
-        merged["callbacks"] = [*(merged.get("callbacks") or []), handler]
+        merged: dict[str, Any] = adapter.merge_config(base_config, handler)
         return merged
 
     @property
