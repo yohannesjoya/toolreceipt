@@ -1,0 +1,32 @@
+[project]
+name = "toolreceipt-demo"
+version = "0.1.0"
+description = "Support desk demo for toolreceipt: a LangGraph agent on Groq, checked against its own tool ledger."
+requires-python = ">=3.10"
+dependencies = [
+    "toolreceipt[langgraph]",
+    "fastapi",
+    "uvicorn[standard]",
+    "langchain-groq>=1.1",
+    "python-dotenv",
+]
+
+[dependency-groups]
+dev = ["pytest>=8", "httpx", "ruff>=0.6"]
+
+[tool.uv]
+package = false
+
+[tool.uv.sources]
+toolreceipt = { path = "../python", editable = true }
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
