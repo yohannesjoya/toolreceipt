@@ -369,6 +369,8 @@ _MATCH_STOP = frozenset({
 })
 _SUBJECT_BOUNDARY = _SUBJECT_DETERMINERS | _OBJECT_STRIP | _FIRST_PERSON | {"that", "which", "who"}
 
+_SUBJECT_PREPOSITIONS = frozenset({"to", "for", "of", "from", "with"})
+
 _Term = tuple[str, ...]
 
 
@@ -404,41 +406,69 @@ def _synonym_groups(lexicon: Mapping[str, Any]) -> list[set[_Term]]:
     ]
 
 
-def _family_terms(family: str, lexicon: Mapping[str, Any]) -> set[_Term]:
-    """Family tokens, each expanded through every synonym group containing it.
-
-    Dual-sense tokens ("issue": refund verb / ticket noun) stay literal so the verb
-    never picks up the noun's synonyms. Noun tokens ("payment", "appointment") are not
-    verb evidence and are left out; they still match as object words.
-    """
-    dual = set(lexicon.get("dual_sense_tokens", ()))
-    nouns = {_stem(n) for n in lexicon.get("noun_tokens", ())}
-    fam = lexicon["families"].get(family, {})
-    terms: set[_Term] = {(_stem(family),)} | {
-        tuple(_words(t)) for t in fam.get("tokens", ()) if _stem(t) not in nouns
+def _noun_families(lexicon: Mapping[str, Any]) -> dict[str, str]:
+    """Noun-like family tokens ("email", "issue", "record") mapped to their family."""
+    nouns = set(lexicon.get("noun_tokens", ()))
+    return {
+        _stem(tok): name
+        for name, fam in lexicon["families"].items()
+        for tok in fam.get("tokens", ())
+        if tok in nouns
     }
-    groups = _synonym_groups(lexicon)
-    for term in list(terms):
-        if " ".join(term) in dual:
-            continue
-        for group in groups:
-            if term in group:
-                terms |= group
+
+
+def _verb_tokens(family: str, lexicon: Mapping[str, Any]) -> set[str]:
+    """A family's verb tokens: its name and every token not listed in ``noun_tokens``."""
+    nouns = set(lexicon.get("noun_tokens", ()))
+    fam = lexicon["families"].get(family, {})
+    return {_stem(family)} | {_stem(t) for t in fam.get("tokens", ()) if t not in nouns}
+
+
+def _conflicts(family: str, name: Sequence[str], lexicon: Mapping[str, Any]) -> bool:
+    """True when the tool name says it does something else than the claim.
+
+    Its name holds a read verb ("read_email", "lookup_order"), or a verb of another family
+    without one of the claim's own ("delete_email" for a send claim). Noun tokens never
+    conflict, and the claim's own verb keeps the tool ("create_refund" for a refund).
+    """
+    tokens = set(name)
+    if tokens & {_stem(v) for v in lexicon.get("read_verbs", ())}:
+        return True
+    if tokens & _verb_tokens(family, lexicon):
+        return False
+    return any(
+        tokens & _verb_tokens(other, lexicon) for other in lexicon["families"] if other != family
+    )
+
+
+def _family_terms(family: str, lexicon: Mapping[str, Any]) -> set[_Term]:
+    """Family tokens; verb tokens are also expanded through every synonym group holding them.
+
+    Noun tokens stay literal, so "issue" (a refund token) never reaches "ticket".
+    """
+    fam = lexicon["families"].get(family, {})
+    verbs = _verb_tokens(family, lexicon)
+    terms: set[_Term] = {(v,) for v in verbs} | {tuple(_words(t)) for t in fam.get("tokens", ())}
+    for group in _synonym_groups(lexicon):
+        if any(len(term) == 1 and term[0] in verbs for term in group):
+            terms |= group
     return {t for t in terms if t}
 
 
-def _object_terms(words: Sequence[str], lexicon: Mapping[str, Any]) -> set[_Term]:
+def _object_terms(
+    family: str, words: Sequence[str], lexicon: Mapping[str, Any]
+) -> set[_Term]:
     """Content words of the object plus synonyms of any group they (or a phrase) hit.
 
-    Synonym expansion never yields a dual-sense token: "ticket" does not reach the
-    "issue" of ``issue_refund``. A literal "issue" still matches.
+    Expansion never yields another family's noun token: "ticket" does not reach the
+    "issue" of ``issue_refund`` for a create claim. A literal "issue" still matches.
     """
-    dual = set(lexicon.get("dual_sense_tokens", ()))
+    foreign = {n for n, fam in _noun_families(lexicon).items() if fam != family}
     content = [w for w in words if w not in _MATCH_STOP]
     terms: set[_Term] = {(w,) for w in content}
     for group in _synonym_groups(lexicon):
         if any(_occurs(member, content) for member in group if member):
-            terms |= {m for m in group if m and " ".join(m) not in dual}
+            terms |= {m for m in group if m and " ".join(m) not in foreign}
     return terms
 
 
@@ -454,7 +484,7 @@ def score_tool(
     """
     name = tokenize_tool_name(spec.name)
     fam_terms = _family_terms(family, lexicon)
-    obj_terms = _object_terms([_stem(w) for w in object_words], lexicon)
+    obj_terms = _object_terms(family, [_stem(w) for w in object_words], lexicon)
     fam_hits: set[int] = set().union(*(_occurs(t, name) for t in fam_terms))
     obj_hits: set[int] = set().union(*(_occurs(t, name) for t in obj_terms))
     score = 0
@@ -476,14 +506,15 @@ def match_tools(
 
     Only tools whose name carries a verb-family token are eligible: an object or
     description match alone ("deleted two tickets" vs ``create_ticket``) never makes
-    a candidate.
+    a candidate, nor does a tool whose name conflicts (``_conflicts``).
     """
     words = _words(obj) if obj else []
     fam_terms = _family_terms(family, lexicon)
-    eligible = [
-        spec for spec in known_tools
-        if any(_occurs(t, tokenize_tool_name(spec.name)) for t in fam_terms)
-    ]
+    eligible = []
+    for spec in known_tools:
+        name = tokenize_tool_name(spec.name)
+        if any(_occurs(t, name) for t in fam_terms) and not _conflicts(family, name, lexicon):
+            eligible.append(spec)
     scored = [(spec.name, score_tool(family, words, spec, lexicon)) for spec in eligible]
     best = max((score for _, score in scored), default=0)
     if best < 2:
@@ -493,13 +524,27 @@ def match_tools(
 
 
 def _subject_phrase(subject: Sequence[str]) -> str | None:
-    """The noun phrase ending the subject tokens ("your refund" -> "refund")."""
+    """The noun phrase ending the subject tokens, cut at the first preposition
+    ("your refund" -> "refund", "the email to your manager" -> "email")."""
+    head = list(subject)
+    for i, tok in enumerate(head):
+        if tok in _SUBJECT_PREPOSITIONS:
+            head = head[:i]
+            break
     phrase: list[str] = []
-    for tok in reversed(subject):
+    for tok in reversed(head):
         if tok in _SUBJECT_BOUNDARY or len(phrase) == 4:
             break
         phrase.insert(0, tok)
     return " ".join(phrase) or None
+
+
+def _surface_stem(form: str, family: str, lexicon: Mapping[str, Any]) -> str | None:
+    """The noun token a matched form is built on ("emailed" -> "email", "texted" -> "text")."""
+    compact = re.sub(r"[^a-z]", "", form.lower())
+    stems = [n for n, fam in _noun_families(lexicon).items() if fam == family]
+    found = [n for n in stems if compact.startswith(n) and n != _stem(family)]
+    return max(found, key=len) if found else None
 
 
 def _dedupe(claims: list[Claim]) -> list[Claim]:
@@ -562,6 +607,9 @@ class RuleExtractor:
                     subject = _subject_phrase(action.subject)
                     obj = obj or subject
                     match_text = " ".join(p for p in (subject, match_text) if p) or None
+                # "I emailed you": the verb itself names the channel.
+                stem = _surface_stem(clause[action.start:action.end], action.family, lex)
+                match_text = " ".join(p for p in (match_text, stem) if p) or None
                 candidates, confidence = match_tools(action.family, match_text, known_tools, lex)
                 claims.append(Claim(
                     text=_clean(clause), verb=action.family, object=obj, count=count,

@@ -4,7 +4,7 @@ from toolreceipt.claims import load_lexicon
 def test_lexicon_shape():
     lex = load_lexicon()
     required = {
-        "send", "create", "update", "delete", "refund",
+        "send", "create", "update", "delete", "refund", "charge",
         "schedule", "save", "submit", "trigger",
     }
     assert required <= set(lex["families"])
@@ -34,3 +34,11 @@ def test_lexicon_forms_unique_across_families():
     lex = load_lexicon()
     all_forms = [f for fam in lex["families"].values() for f in fam["forms"]]
     assert len(all_forms) == len(set(all_forms))
+
+
+def test_lexicon_tokens_unique_across_families():
+    lex = load_lexicon()
+    all_tokens = [t for fam in lex["families"].values() for t in fam["tokens"]]
+    assert len(all_tokens) == len(set(all_tokens))
+    assert set(lex["noun_tokens"]) <= set(all_tokens)
+    assert "get" in lex["read_verbs"]

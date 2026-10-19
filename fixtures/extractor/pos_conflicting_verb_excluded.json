@@ -1,0 +1,29 @@
+{
+  "text": "I emailed you the receipt.",
+  "known_tools": [
+    {
+      "name": "read_email",
+      "description": "Read the customer's inbox"
+    },
+    {
+      "name": "delete_email",
+      "description": ""
+    },
+    {
+      "name": "send_email",
+      "description": "Send an email to the customer"
+    }
+  ],
+  "expected": [
+    {
+      "verb": "send",
+      "text": "I emailed you the receipt",
+      "object": "receipt",
+      "count": null,
+      "candidates": [
+        "send_email"
+      ],
+      "confidence": "high"
+    }
+  ]
+}

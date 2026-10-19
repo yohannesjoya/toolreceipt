@@ -351,3 +351,58 @@ def test_noun_tokens_still_match_as_objects():
     tools = [ToolSpec("book_appointment", ""), ToolSpec("update_payment", "")]
     assert match_tools("schedule", "the appointment", tools, LEX) == (["book_appointment"], "high")
     assert match_tools("update", "the payment", tools, LEX) == (["update_payment"], "high")
+
+
+def _cands(text, names):
+    claims = RuleExtractor().extract(text, [ToolSpec(n, "") for n in names])
+    return [(c.candidates, c.confidence) for c in claims]
+
+
+@pytest.mark.parametrize(
+    "text,names,expected",
+    [
+        # A different family's verb or a read verb in the name excludes the tool.
+        ("I notified you.", ["read_email", "send_email"], ["send_email"]),
+        ("I emailed you the receipt.", ["send_email", "delete_email"], ["send_email"]),
+        ("I've sent you a message.", ["get_messages", "send_sms"], ["send_sms"]),
+        ("I've sent it.", ["delete_email"], []),
+        ("I've emailed you the details.", ["read_email", "lookup_order"], []),
+        ("I've emailed you the details.", ["lookUpEmail"], []),
+        ("I refunded the order.", ["issue_refund", "create_issue"], ["issue_refund"]),
+        ("I issued a refund.", ["create_issue"], []),
+        # The claim's own verb in the name keeps the tool (Stripe-style names).
+        ("I refunded your order.", ["create_refund"], ["create_refund"]),
+        ("I sent the invoice.", ["send_invoice"], ["send_invoice"]),
+        ("I charged your card.", ["create_charge"], ["create_charge"]),
+    ],
+)
+def test_conflicting_verbs_exclude_tools(text, names, expected):
+    assert [c for c, _ in _cands(text, names)] == [expected]
+
+
+def test_surface_stem_is_an_object_word():
+    assert _cands("I emailed you.", ["send_email", "send_sms"]) == [(["send_email"], "high")]
+    assert _cands("I texted you.", ["send_email", "send_sms"]) == [(["send_sms"], "high")]
+    assert _cands("I messaged you.", ["send_message"]) == [(["send_message"], "high")]
+
+
+def test_charge_is_its_own_family():
+    assert find_action("I billed your card", LEX)[0] == "charge"
+    assert find_action("I paid the invoice", LEX)[0] == "charge"
+    assert _cands("I charged your card.", ["issue_refund"]) == [([], None)]
+    assert _cands("Your refund has been processed.", ["issue_refund"]) == [
+        (["issue_refund"], "high")
+    ]
+
+
+def test_closed_is_delete():
+    assert _cands("I closed the ticket.", ["close_ticket"]) == [(["close_ticket"], "high")]
+
+
+def test_subject_phrase_stops_at_prepositions():
+    claims = RuleExtractor().extract(
+        "The email to your manager has been sent.", [ToolSpec("send_email", "")]
+    )
+    assert [(c.object, c.candidates, c.confidence) for c in claims] == [
+        ("email", ["send_email"], "high")
+    ]

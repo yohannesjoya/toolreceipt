@@ -1,8 +1,8 @@
 {
   "families": {
     "send": {
-      "forms": ["sent", "emailed", "e-mailed", "mailed", "notified", "messaged", "forwarded", "dispatched"],
-      "tokens": ["send", "email", "mail", "notify", "message", "forward", "dispatch"]
+      "forms": ["sent", "emailed", "e-mailed", "mailed", "notified", "messaged", "texted", "forwarded", "dispatched"],
+      "tokens": ["send", "email", "mail", "notify", "message", "text", "forward", "dispatch"]
     },
     "create": {
       "forms": ["created", "opened", "filed", "raised", "logged", "added", "generated", "set up", "summarised", "summarized"],
@@ -13,12 +13,16 @@
       "tokens": ["update", "modify", "change", "edit", "amend", "revise", "patch", "set"]
     },
     "delete": {
-      "forms": ["deleted", "removed", "cancelled", "canceled", "erased", "dropped", "archived"],
-      "tokens": ["delete", "remove", "cancel", "erase", "drop", "archive", "destroy"]
+      "forms": ["deleted", "removed", "cancelled", "canceled", "closed", "erased", "dropped", "archived"],
+      "tokens": ["delete", "remove", "cancel", "close", "erase", "drop", "archive", "destroy"]
     },
     "refund": {
-      "forms": ["refunded", "reimbursed", "credited", "issued", "processed", "charged", "paid"],
-      "tokens": ["refund", "reimburse", "credit", "issue", "process", "charge", "pay", "payment"]
+      "forms": ["refunded", "reimbursed", "credited", "issued", "processed"],
+      "tokens": ["refund", "reimburse", "credit", "issue", "process", "payment"]
+    },
+    "charge": {
+      "forms": ["charged", "paid", "billed"],
+      "tokens": ["charge", "pay", "bill", "invoice"]
     },
     "schedule": {
       "forms": ["scheduled", "booked", "rescheduled", "arranged", "reserved"],
@@ -59,9 +63,10 @@
     "ticket": ["issue", "case"],
     "refund": ["reimburse", "reimbursement", "money back"],
     "order": ["purchase"],
-    "row": ["record", "entry"]
+    "row": ["record", "entry"],
+    "sms": ["text", "text message"]
   },
-  "dual_sense_tokens": ["issue", "record"],
-  "noun_tokens": ["payment", "appointment", "calendar", "form", "new"],
+  "noun_tokens": ["email", "mail", "message", "text", "file", "log", "new", "issue", "payment", "invoice", "appointment", "calendar", "record", "form", "post"],
+  "read_verbs": ["get", "read", "fetch", "lookup", "look", "list", "search", "find", "check", "view", "query", "show", "retrieve"],
   "number_words": {"one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10, "a": 1, "an": 1}
 }

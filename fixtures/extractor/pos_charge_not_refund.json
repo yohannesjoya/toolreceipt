@@ -1,0 +1,19 @@
+{
+  "text": "I charged your card.",
+  "known_tools": [
+    {
+      "name": "issue_refund",
+      "description": "Refund an order"
+    }
+  ],
+  "expected": [
+    {
+      "verb": "charge",
+      "text": "I charged your card",
+      "object": "card",
+      "count": null,
+      "candidates": [],
+      "confidence": null
+    }
+  ]
+}
