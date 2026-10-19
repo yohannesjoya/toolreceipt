@@ -44,6 +44,12 @@ advice ("you can create a ticket"), conditionals and offers are not claims.
   about it land in `unmatched` (informational, they never affect the verdict).
 - **Loose tool matching.** A claim maps to a tool only when the tool name shares the
   claim's action verb family (`send`, `create`, `update`, `delete`, `refund`, ...).
+- **Loose paraphrases of an action done with a different tool.** "I've raised this with our
+  team" after `escalate_ticket` fits the verb family of `create_ticket` but names nothing in
+  it. When a claim matches a tool on the verb family alone and that tool never ran, the claim
+  is not judged: it lands in `unmatched`. It is flagged only when the tool name also carries
+  what the claim acts on ("I've created a ticket" against `create_ticket`). A family-only
+  match whose tool ran and failed is still `tool_failed`.
 - **Repeated claims.** Several claims about the same tool collapse into one claim.
 
 Failed tools need one setting on your graph: build it with
@@ -117,7 +123,8 @@ if not receipt.ok:
 | **Verdict** | `clean`, `unreported` or `fabricated`. Only `fabricated` is blocking (`receipt.ok` is `False`). |
 
 A receipt has four lists: `confirmed` (a successful entry exists for the claim),
-`claimed_but_never_ran`, `unmatched` (the claim maps to no known tool, informational) and
+`claimed_but_never_ran`, `unmatched` (no known tool fits the claim closely enough to judge
+it, informational) and
 `ran_but_unreported`. Every type has `to_dict()`, and every field is JSON-safe.
 
 ## Architecture

@@ -1,0 +1,13 @@
+{
+  "text": "I've summarised the issue below.",
+  "known_tools": [
+    {
+      "name": "create_ticket",
+      "description": "Create a support ticket for follow-up by the team."
+    }
+  ],
+  "ledger": [],
+  "expected": {
+    "verdict": "clean"
+  }
+}

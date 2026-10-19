@@ -35,6 +35,13 @@ def diff(
         hit = next((c for c in claim.candidates if c in ok_tools), None)
         if hit is not None:
             confirmed.append(replace(claim, candidates=list(claim.candidates), tool=hit))
+        elif not any(c in error_tools for c in claim.candidates) and (
+            claim._object_matched is False
+        ):
+            # Matched on the verb family alone and never attempted: likely an honest
+            # paraphrase of work done with another tool ("raised this with our team" after
+            # escalate_ticket), so it is not judged.
+            unmatched.append(replace(claim, candidates=list(claim.candidates)))
         else:
             reason: Reason = (
                 "tool_failed"

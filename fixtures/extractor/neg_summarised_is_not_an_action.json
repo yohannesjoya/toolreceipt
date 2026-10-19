@@ -1,0 +1,10 @@
+{
+  "text": "I have summarised the issue for you.",
+  "known_tools": [
+    {
+      "name": "send_email",
+      "description": "Send an email to the customer"
+    }
+  ],
+  "expected": []
+}

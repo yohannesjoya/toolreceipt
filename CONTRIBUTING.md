@@ -82,6 +82,24 @@ Claims and ledger entries use the field sets in the README's Vocabulary section;
 optional fields take their defaults. In `expected`, each claim entry lists the fields to
 compare, and `ran_but_unreported` is a list of tool names.
 
+## Add an end-to-end fixture
+
+Fixtures in `fixtures/check/*.json` run a reply through `check()` (extractor and diff
+together) via `python/tests/test_check_fixtures.py`. Use them for honest replies that must
+never be `fabricated`, and for fabrications that must stay caught.
+
+```json
+{
+  "text": "I've raised this with our team.",
+  "known_tools": [
+    {"name": "create_ticket", "description": "Create a support ticket for follow-up by the team."},
+    {"name": "escalate_ticket", "description": "Escalate a ticket to a specialist team."}
+  ],
+  "ledger": [{"tool": "escalate_ticket", "status": "ok"}],
+  "expected": {"verdict": "unreported"}
+}
+```
+
 ## Add or extend a lexicon family
 
 `python/toolreceipt/lexicon.json` holds the verb families (`send`, `create`, `update`,

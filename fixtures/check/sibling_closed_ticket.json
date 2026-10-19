@@ -1,0 +1,22 @@
+{
+  "text": "I've closed your ticket.",
+  "known_tools": [
+    {
+      "name": "delete_ticket",
+      "description": "Delete a ticket permanently."
+    },
+    {
+      "name": "update_ticket",
+      "description": "Change a ticket's status, priority or assignee."
+    }
+  ],
+  "ledger": [
+    {
+      "tool": "update_ticket",
+      "status": "ok"
+    }
+  ],
+  "expected": {
+    "verdict": "unreported"
+  }
+}

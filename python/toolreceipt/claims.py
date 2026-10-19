@@ -44,6 +44,14 @@ class Claim:
             "reason": self.reason,
         }
 
+    def __post_init__(self) -> None:
+        # Extractor evidence, deliberately not a dataclass field: the field set is fixed and
+        # ``to_dict()`` never emits it. True when the candidates matched on an object word of
+        # their tool name, False when on the verb family alone, None when unknown (a claim
+        # built by hand or by ``from_dict``). ``diff`` only reports a family-alone match whose
+        # tool never ran as ``unmatched``, never as ``not_called``.
+        self._object_matched: bool | None = None
+
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> Claim:
         return cls(
@@ -472,30 +480,53 @@ def _object_terms(
     return terms
 
 
-def score_tool(
+def _score(
     family: str, object_words: list[str], spec: ToolSpec, lexicon: Mapping[str, Any]
-) -> int:
-    """Score a claim against one tool (PRD §9.2 step 6).
-
-    +2 when a family token (synonym-expanded) is a tool-name token, +2 when an object
-    word (synonym-expanded) is a tool-name token, +1 once when either appears in the
-    description. One tool-name token cannot earn both +2s ("sent the email" scores the
-    ``email`` of ``email_report`` once).
-    """
+) -> tuple[int, bool]:
+    """``(score, object component earned)``; see ``score_tool``."""
     name = tokenize_tool_name(spec.name)
     fam_terms = _family_terms(family, lexicon)
     obj_terms = _object_terms(family, [_stem(w) for w in object_words], lexicon)
     fam_hits: set[int] = set().union(*(_occurs(t, name) for t in fam_terms))
     obj_hits: set[int] = set().union(*(_occurs(t, name) for t in obj_terms))
-    score = 0
-    if fam_hits:
-        score += 2
-    if obj_hits and (not fam_hits or len(fam_hits | obj_hits) > 1):
-        score += 2
+    object_matched = bool(obj_hits) and (not fam_hits or len(fam_hits | obj_hits) > 1)
+    score = (2 if fam_hits else 0) + (2 if object_matched else 0)
     desc = _words(spec.description)
-    if any(_occurs(t, desc) for t in fam_terms | obj_terms):
+    if any(_occurs(t, desc) and not _occurs(t, name) for t in obj_terms):
         score += 1
-    return score
+    return score, object_matched
+
+
+def score_tool(
+    family: str, object_words: list[str], spec: ToolSpec, lexicon: Mapping[str, Any]
+) -> int:
+    """Score a claim against one tool.
+
+    +2 when a family token (synonym-expanded) is a tool-name token, +2 when an object
+    word (synonym-expanded) is a tool-name token, +1 when the description holds an object
+    word (synonym-expanded) that the tool name lacks. One tool-name token cannot earn both
+    +2s ("sent the email" scores the ``email`` of ``email_report`` once).
+    """
+    return _score(family, object_words, spec, lexicon)[0]
+
+
+def _match(
+    family: str, obj: str | None, known_tools: Sequence[ToolSpec], lexicon: Mapping[str, Any]
+) -> tuple[list[str], Confidence | None, bool]:
+    """``match_tools`` plus whether the candidates earned the object component."""
+    words = _words(obj) if obj else []
+    verbs = _verb_tokens(family, lexicon)
+    scored: list[tuple[str, int, bool]] = []
+    for spec in known_tools:
+        name = tokenize_tool_name(spec.name)
+        if verbs & set(name) and not _conflicts(family, name, lexicon):
+            scored.append((spec.name, *_score(family, words, spec, lexicon)))
+    best = max((score for _, score, _ in scored), default=0)
+    if best < 2:
+        return [], None, False
+    top = [(name, matched) for name, score, matched in scored if score == best]
+    candidates = list(dict.fromkeys(name for name, _ in top))
+    return candidates, "high" if best >= 3 else "medium", any(m for _, m in top)
 
 
 def match_tools(
@@ -509,19 +540,8 @@ def match_tools(
     ``create_ticket``, "emailed" vs ``email_customer``) never makes a candidate, nor
     does a tool whose name conflicts (``_conflicts``).
     """
-    words = _words(obj) if obj else []
-    verbs = _verb_tokens(family, lexicon)
-    eligible = []
-    for spec in known_tools:
-        name = tokenize_tool_name(spec.name)
-        if verbs & set(name) and not _conflicts(family, name, lexicon):
-            eligible.append(spec)
-    scored = [(spec.name, score_tool(family, words, spec, lexicon)) for spec in eligible]
-    best = max((score for _, score in scored), default=0)
-    if best < 2:
-        return [], None
-    candidates = list(dict.fromkeys(name for name, score in scored if score == best))
-    return candidates, "high" if best >= 3 else "medium"
+    candidates, confidence, _ = _match(family, obj, known_tools, lexicon)
+    return candidates, confidence
 
 
 def _subject_phrase(subject: Sequence[str]) -> str | None:
@@ -611,9 +631,13 @@ class RuleExtractor:
                 # "I emailed you": the verb itself names the channel.
                 stem = _surface_stem(clause[action.start:action.end], action.family, lex)
                 match_text = " ".join(p for p in (match_text, stem) if p) or None
-                candidates, confidence = match_tools(action.family, match_text, known_tools, lex)
-                claims.append(Claim(
+                candidates, confidence, matched = _match(
+                    action.family, match_text, known_tools, lex
+                )
+                claim = Claim(
                     text=_clean(clause), verb=action.family, object=obj, count=count,
                     candidates=candidates, confidence=confidence,
-                ))
+                )
+                claim._object_matched = matched
+                claims.append(claim)
         return _dedupe(claims)

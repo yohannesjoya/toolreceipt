@@ -259,8 +259,10 @@ def test_match_keeps_ties():
 
 def test_score_components():
     spec = ToolSpec("send_email", "Send an email to the customer")
-    assert score_tool("send", [], spec, LEX) == 3  # family +2, description +1
-    assert score_tool("send", ["email"], spec, LEX) == 5
+    # The description only adds an object word the name lacks.
+    assert score_tool("send", [], spec, LEX) == 2  # family +2, no description object word
+    assert score_tool("send", ["email"], spec, LEX) == 4  # "email" is already in the name
+    assert score_tool("send", ["customer"], spec, LEX) == 3  # family +2, description +1
     assert score_tool("delete", ["customer"], spec, LEX) == 1  # description only, once
     assert score_tool("refund", ["money", "back"], ToolSpec("refund_order", ""), LEX) == 2
 
@@ -331,7 +333,7 @@ def test_dedupe_ties_are_a_set():
 def test_lexicon_review_forms():
     assert find_action("I assigned the ticket to billing", LEX)[0] == "update"
     assert find_action("I e-mailed you the receipt", LEX)[0] == "send"
-    assert find_action("I have summarised the issue", LEX)[0] == "create"
+    assert find_action("I have summarised the issue", LEX) is None  # no family
 
 
 @pytest.mark.parametrize(
@@ -395,8 +397,9 @@ def test_charge_is_its_own_family():
     ]
 
 
-def test_closed_is_delete():
-    assert _cands("I closed the ticket.", ["close_ticket"]) == [(["close_ticket"], "high")]
+def test_closed_is_not_an_action():
+    # "closed" belongs to no family: closing a ticket is often an update, not a delete.
+    assert find_action("I closed the ticket", LEX) is None
 
 
 def test_subject_phrase_stops_at_prepositions():

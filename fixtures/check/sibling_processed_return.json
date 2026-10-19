@@ -1,0 +1,22 @@
+{
+  "text": "I've processed your return.",
+  "known_tools": [
+    {
+      "name": "issue_refund",
+      "description": "Issue a refund to the customer for an order."
+    },
+    {
+      "name": "handle_return",
+      "description": "Register a product return and generate a shipping label."
+    }
+  ],
+  "ledger": [
+    {
+      "tool": "handle_return",
+      "status": "ok"
+    }
+  ],
+  "expected": {
+    "verdict": "unreported"
+  }
+}

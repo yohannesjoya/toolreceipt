@@ -5,7 +5,7 @@
       "tokens": ["send", "email", "mail", "notify", "message", "text", "forward", "dispatch"]
     },
     "create": {
-      "forms": ["created", "opened", "filed", "raised", "logged", "added", "generated", "set up", "summarised", "summarized"],
+      "forms": ["created", "opened", "filed", "raised", "logged", "added", "generated", "set up"],
       "tokens": ["create", "open", "file", "raise", "log", "make", "add", "new", "generate"]
     },
     "update": {
@@ -13,7 +13,7 @@
       "tokens": ["update", "modify", "change", "edit", "amend", "revise", "patch", "set"]
     },
     "delete": {
-      "forms": ["deleted", "removed", "cancelled", "canceled", "closed", "erased", "dropped", "archived"],
+      "forms": ["deleted", "removed", "cancelled", "canceled", "erased", "dropped", "archived"],
       "tokens": ["delete", "remove", "cancel", "close", "erase", "drop", "archive", "destroy"]
     },
     "refund": {
@@ -60,7 +60,7 @@
   "by_exempt": ["me", "us", "our", "myself", "ourselves", "email", "e-mail", "sms", "text", "phone", "mail", "post", "fax", "today", "tomorrow", "tonight", "end", "noon"],
   "synonyms": {
     "email": ["mail", "notify", "message", "reach out", "confirmation"],
-    "ticket": ["issue", "case"],
+    "ticket": ["case"],
     "refund": ["reimburse", "reimbursement", "money back"],
     "order": ["purchase"],
     "row": ["record", "entry"],

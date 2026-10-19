@@ -32,3 +32,28 @@ descriptions to its known tools, plus any name seen in `on_tool_start`. This is 
 claim about a bound tool that was never called be reported as `not_called` with no user
 configuration. The post-hoc `ledger_from_messages` path cannot see bound tools, so there
 `known_tools` must be passed to `Receipts` for `not_called` detection.
+
+## A family-only match never accuses
+
+A claim is scored against each bound tool: +2 when the tool name carries the claim's verb
+family, +2 when it also carries an object word of the claim ("ticket" in `create_ticket` for
+"I've created a ticket"), +1 when the description holds an object word the name lacks.
+
+Honest agents often describe work done with one tool using a verb whose family also fits a
+sibling tool: "I've raised this with our team" after `escalate_ticket` fits the `create` family
+of `create_ticket`, "I've forwarded your complaint" after `create_ticket` fits the `send`
+family of `send_email`. Matched on the verb family alone, such a claim says nothing about which
+tool did the work. So a `not_called` outcome is reported only when the candidate also matched
+on an object word of its name. A family-only candidate that never ran sends the claim to
+`unmatched` (informational) instead of `claimed_but_never_ran`. A family-only candidate that
+ran confirms the claim, and one that was attempted and failed is still `tool_failed`, since the
+agent tried that exact tool.
+
+The extractor records this evidence on each claim as a private attribute, outside the fixed
+`Claim` field set and never emitted by `to_dict()`. A claim built by hand or by
+`Claim.from_dict` carries no evidence, and the diff treats its candidates as fully matched.
+
+Precision comes before recall here: "I refunded your order" against `issue_refund` (no object
+word in common) is no longer flagged when `issue_refund` never ran. Related lexicon choices:
+"summarised" and "closed" belong to no verb family (closing a ticket is usually an update), and
+"issue" is not a ticket synonym ("I've logged the issue" means the problem, not a ticket).

@@ -1,0 +1,22 @@
+{
+  "text": "I've opened a refund request for you.",
+  "known_tools": [
+    {
+      "name": "create_ticket",
+      "description": "Create a support ticket for follow-up by the team."
+    },
+    {
+      "name": "request_refund",
+      "description": "Open a refund request for review by finance."
+    }
+  ],
+  "ledger": [
+    {
+      "tool": "request_refund",
+      "status": "ok"
+    }
+  ],
+  "expected": {
+    "verdict": "unreported"
+  }
+}

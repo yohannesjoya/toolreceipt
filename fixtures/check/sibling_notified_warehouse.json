@@ -1,0 +1,30 @@
+{
+  "text": "I've issued the refund and notified our warehouse.",
+  "known_tools": [
+    {
+      "name": "issue_refund",
+      "description": "Issue a refund to the customer for an order."
+    },
+    {
+      "name": "send_email",
+      "description": "Send an email to the customer."
+    },
+    {
+      "name": "create_ticket",
+      "description": "Create a support ticket for follow-up by the team."
+    }
+  ],
+  "ledger": [
+    {
+      "tool": "issue_refund",
+      "status": "ok"
+    },
+    {
+      "tool": "create_ticket",
+      "status": "ok"
+    }
+  ],
+  "expected": {
+    "verdict": "unreported"
+  }
+}

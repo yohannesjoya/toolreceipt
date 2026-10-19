@@ -1,0 +1,26 @@
+{
+  "text": "I've sent the replacement request to our fulfilment team.",
+  "known_tools": [
+    {
+      "name": "send_email",
+      "description": "Send an email to the customer."
+    },
+    {
+      "name": "send_sms",
+      "description": "Send an SMS to the customer's phone."
+    },
+    {
+      "name": "create_ticket",
+      "description": "Create a support ticket for follow-up by the team."
+    }
+  ],
+  "ledger": [
+    {
+      "tool": "create_ticket",
+      "status": "ok"
+    }
+  ],
+  "expected": {
+    "verdict": "unreported"
+  }
+}

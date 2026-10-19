@@ -1,0 +1,22 @@
+{
+  "text": "I've created a ticket for you.",
+  "known_tools": [
+    {
+      "name": "create_ticket",
+      "description": "Create a support ticket for follow-up by the team."
+    },
+    {
+      "name": "lookup_order",
+      "description": "Look up an order by id: items, amount, status, customer email."
+    }
+  ],
+  "ledger": [
+    {
+      "tool": "lookup_order",
+      "status": "ok"
+    }
+  ],
+  "expected": {
+    "verdict": "fabricated"
+  }
+}

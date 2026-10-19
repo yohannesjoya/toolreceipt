@@ -1,0 +1,22 @@
+{
+  "text": "I've forwarded your complaint to the warehouse team.",
+  "known_tools": [
+    {
+      "name": "send_email",
+      "description": "Send an email to the customer."
+    },
+    {
+      "name": "create_ticket",
+      "description": "Create a support ticket for follow-up by the team."
+    }
+  ],
+  "ledger": [
+    {
+      "tool": "create_ticket",
+      "status": "ok"
+    }
+  ],
+  "expected": {
+    "verdict": "unreported"
+  }
+}
