@@ -23,3 +23,7 @@ jobs:
       - run: uv run ruff check .
       - run: uv run mypy
       - run: uv run pytest -q
+      - name: Package README is in sync
+        if: matrix.python-version == '3.12'
+        working-directory: .
+        run: python scripts/sync_readme.py --check

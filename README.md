@@ -8,7 +8,7 @@ two, and returns a receipt you can use to block, annotate or log the reply.
 [![PyPI](https://img.shields.io/pypi/v/toolreceipt.svg)](https://pypi.org/project/toolreceipt/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-![toolreceipt demo: the agent claims it emailed the customer, the receipt shows send_email failed](docs/demo.gif)
+![toolreceipt demo: the agent claims it emailed the customer, the receipt shows send_email failed](https://raw.githubusercontent.com/yohannesjoya/toolreceipt/main/docs/demo.gif)
 
 Live demo: coming soon
 
@@ -122,7 +122,7 @@ A receipt has four lists: `confirmed` (a successful entry exists for the claim),
 
 ## Architecture
 
-![toolreceipt architecture: a LangGraph run feeds a ledger and an extractor, the diff produces a receipt](docs/architecture.svg)
+![toolreceipt architecture: a LangGraph run feeds a ledger and an extractor, the diff produces a receipt](https://raw.githubusercontent.com/yohannesjoya/toolreceipt/main/docs/architecture.svg)
 
 The adapter is a LangChain callback handler, so capture needs no tool wrapping. The extractor
 (`ClaimExtractor`) and the adapter are small protocols and the default extractor,
