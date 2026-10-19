@@ -95,6 +95,8 @@
   th, td { text-align: left; vertical-align: top; padding: 6px 8px; border-bottom: 1px solid var(--border); }
   th { color: var(--muted); font-weight: 600; }
   code, .mono { font-family: var(--mono); font-size: 0.8125rem; overflow-wrap: anywhere; }
+  td.tool { white-space: nowrap; }
+  .clip { display: block; max-width: 60ch; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; overflow-wrap: normal; }
   .status-ok { color: var(--ok-fg); }
   .status-error { color: var(--bad-fg); }
   .receipt { display: grid; grid-template-columns: 1fr; gap: 12px; }
@@ -214,10 +216,24 @@
     statusEl.className = "small" + (isError ? " error" : "");
   }
 
-  // Find each claim's span in the reply: exact indexOf first, then case-insensitive.
-  // Overlapping or missing spans are returned separately so they can be listed instead.
+  // BEGIN locate
+  // Find each claim's span in the reply: exact indexOf first, then a normalized fallback.
+  // The model's reply may carry typographic characters (U+202F/U+00A0 spaces, curly quotes)
+  // that the extractor's claim text has already folded to ASCII, so the fallback compares
+  // 1:1 folded characters (indexes stay aligned) and ignores case. Spans that overlap an
+  // earlier one, or are absent, are returned in `missing`; `placed` is in text order.
+  function fold(str) {
+    return Array.prototype.map.call(str, function (ch) {
+      if (/\s/.test(ch)) return " ";
+      if (ch === "\u2018" || ch === "\u2019" || ch === "\u02bc") return "'";
+      if (ch === "\u201c" || ch === "\u201d") return '"';
+      if (ch === "\u2010" || ch === "\u2011" || ch === "\u2012" || ch === "\u2013" || ch === "\u2014") return "-";
+      var low = ch.toLowerCase();
+      return low.length === ch.length ? low : ch;
+    }).join("");
+  }
   function locate(reply, claims) {
-    var lower = reply.toLowerCase(), taken = [], placed = [], missing = [];
+    var folded = fold(reply), taken = [], placed = [], missing = [];
     function free(start, end) {
       return taken.every(function (r) { return end <= r[0] || start >= r[1]; });
     }
@@ -232,14 +248,20 @@
     claims.forEach(function (claim) {
       var text = String(claim.text || "");
       var at = text ? find(reply, text) : -1;
-      if (at === -1 && text) at = find(lower, text.toLowerCase());
+      var len = text.length;
+      if (at === -1 && text) {
+        var needle = fold(text);
+        at = find(folded, needle);
+        len = needle.length;
+      }
       if (at === -1) { missing.push(claim); return; }
-      taken.push([at, at + text.length]);
-      placed.push({ start: at, end: at + text.length, claim: claim });
+      taken.push([at, at + len]);
+      placed.push({ start: at, end: at + len, claim: claim });
     });
     placed.sort(function (a, b) { return a.start - b.start; });
     return { placed: placed, missing: missing };
   }
+  // END locate
 
   function claimTitle(claim) {
     var parts = [claim.bucket.replace(/_/g, " ")];
@@ -286,11 +308,17 @@
     }
     ledger.forEach(function (entry) {
       var row = el("tr");
-      row.appendChild(el("td", "mono", entry.tool));
-      row.appendChild(el("td", "mono", compactArgs(entry.args)));
+      row.appendChild(el("td", "mono tool", entry.tool));
+      var argsCell = el("td", "mono"), argsText = compactArgs(entry.args);
+      var argsClip = el("span", "clip", argsText);
+      argsClip.title = argsText;
+      argsCell.appendChild(argsClip);
+      row.appendChild(argsCell);
       var status = el("td", entry.status === "ok" ? "status-ok" : "status-error", entry.status);
       if (entry.status !== "ok" && entry.error) {
-        status.appendChild(el("div", "mono small", entry.error));
+        var errText = String(entry.error), errClip = el("span", "mono small clip", errText.split("\n")[0]);
+        errClip.title = errText;
+        status.appendChild(errClip);
       }
       row.appendChild(status);
       body.appendChild(row);

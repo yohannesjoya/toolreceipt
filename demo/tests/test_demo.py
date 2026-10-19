@@ -388,3 +388,52 @@ def test_make_model_requires_key(monkeypatch):
     monkeypatch.delenv("GROQ_API_KEY", raising=False)
     with pytest.raises(RuntimeError, match="GROQ_API_KEY"):
         demo_app.make_model()
+
+
+def _locate_js(reply: str, claims: list[dict[str, str]]) -> dict[str, Any]:
+    import re
+    import shutil
+    import subprocess
+    from pathlib import Path
+
+    node = shutil.which("node")
+    if node is None:
+        pytest.skip("node is not installed")
+    html = (Path(demo_app.__file__).parent / "static" / "index.html").read_text()
+    match = re.search(r"// BEGIN locate\n(.*?)// END locate", html, re.S)
+    assert match
+    script = (
+        match.group(1) + "\nconsole.log(JSON.stringify(locate(...JSON.parse(process.argv[1]))));"
+    )
+    out = subprocess.run(
+        [node, "-e", script, json.dumps([reply, claims])],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    return json.loads(out.stdout)
+
+
+def test_locate_matches_through_nbsp_and_curly_quotes():
+    reply = (
+        "Your refund for order\u202f#4821 has been processed and a confirmation email "
+        "has been sent to you. We\u2019re done."
+    )
+    claims = [
+        {"text": "Your refund for order #4821 has been processed"},
+        {"text": "a confirmation email has been sent to you"},
+        {"text": "we're done"},
+    ]
+    found = _locate_js(reply, claims)
+    assert found["missing"] == []
+    starts = [p["start"] for p in found["placed"]]
+    assert starts == sorted(starts) and len(starts) == 3
+    first = found["placed"][0]
+    assert reply[first["start"] : first["end"]].startswith("Your refund")
+    assert reply[first["start"] : first["end"]].endswith("processed")
+
+
+def test_locate_skips_overlaps_and_reports_missing():
+    found = _locate_js("abc def", [{"text": "abc def"}, {"text": "c d"}, {"text": "zzz"}])
+    assert len(found["placed"]) == 1
+    assert [c["text"] for c in found["missing"]] == ["c d", "zzz"]
