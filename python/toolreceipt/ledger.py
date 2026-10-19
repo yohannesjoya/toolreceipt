@@ -88,10 +88,20 @@ class Ledger:
 
 
 def coerce_args(args: Any) -> dict[str, Any]:
-    """Return a JSON-safe dict; non-dict input is wrapped as ``{"input": ...}``."""
+    """Return a JSON-safe dict; non-dict input is wrapped as ``{"input": ...}``.
+
+    Never raises: input JSON cannot hold (non-string keys, cycles, very deep nesting) is
+    kept as ``{"input": str(args)}``.
+    """
     if args is None:
         return {}
-    coerced = json.loads(json.dumps(args, default=str))
+    try:
+        coerced = json.loads(json.dumps(args, default=str))
+    except (TypeError, ValueError, RecursionError):
+        try:
+            return {"input": str(args)}
+        except Exception:
+            return {"input": f"<unserialisable {type(args).__name__}>"}
     if isinstance(coerced, dict):
         return coerced
     return {"input": coerced}

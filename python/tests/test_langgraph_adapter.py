@@ -198,3 +198,51 @@ def test_on_tool_end_command_output_uses_matching_tool_message():
     entry = ledger.entries[0]
     assert entry.status == "error" and entry.error == "SMTP gateway timeout"
     assert entry.call_id == "c2"
+
+
+class _Unprintable:
+    def __str__(self):
+        raise RuntimeError("cannot render")
+
+    __repr__ = __str__
+
+
+def test_on_tool_start_with_unserialisable_args_still_opens_entry():
+    handler = ReceiptCallbackHandler(Ledger())
+    run_id = uuid.uuid4()
+    handler.on_tool_start({"name": "create_ticket"}, "", run_id=run_id, inputs={(1, 2): "x"})
+    handler.on_tool_end("TCK-1", run_id=run_id)
+    [entry] = handler.ledger.entries
+    assert (entry.tool, entry.status, entry.result) == ("create_ticket", "ok", "TCK-1")
+    assert entry.args == {"input": "{(1, 2): 'x'}"}
+
+
+def test_callbacks_never_raise_and_still_record():
+    handler = ReceiptCallbackHandler(Ledger())
+    # A broken serialized payload: the entry is still opened with a fallback name.
+    start_fail, end_fail, err_fail = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
+    handler.on_chat_model_start({}, [], run_id=uuid.uuid4(), invocation_params=_BadMapping())
+    handler.on_tool_start(_BadMapping(), "", run_id=start_fail)
+    handler.on_tool_end("done", run_id=start_fail)
+    # Output whose text cannot be read: closed as ok, no result.
+    handler.on_tool_start({"name": "send_email"}, "", run_id=end_fail)
+    handler.on_tool_end(_Unprintable(), run_id=end_fail)
+    # Error whose repr fails: still an error entry.
+    handler.on_tool_start({"name": "issue_refund"}, "", run_id=err_fail)
+    handler.on_tool_error(_BadError(), run_id=err_fail)
+    entries = {e.tool: e for e in handler.ledger.entries}
+    assert set(entries) == {"unknown", "send_email", "issue_refund"}
+    assert entries["unknown"].status == "ok"
+    assert (entries["send_email"].status, entries["send_email"].result) == ("ok", None)
+    assert entries["issue_refund"].status == "error"
+    assert entries["issue_refund"].error == "_BadError"
+
+
+class _BadMapping(dict):
+    def get(self, *args, **kwargs):
+        raise RuntimeError("broken mapping")
+
+
+class _BadError(Exception):
+    def __repr__(self):
+        raise RuntimeError("cannot render")

@@ -48,3 +48,22 @@ def test_ledger_sets_and_order():
     assert ledger.tools() == {"a", "b", "c"}
     assert json.dumps(ledger.to_dict())
     assert Ledger.from_dict(ledger.to_dict()).to_dict() == ledger.to_dict()
+
+
+def test_coerce_args_never_raises():
+    assert coerce_args({(1, 2): "x"}) == {"input": "{(1, 2): 'x'}"}  # non-string key
+    loop: list = []
+    loop.append(loop)
+    assert coerce_args(loop) == {"input": "[[...]]"}  # circular
+    deep: list = []
+    for _ in range(5000):
+        deep = [deep]
+    assert set(coerce_args(deep)) == {"input"}  # recursion limit
+
+    class Unprintable:
+        def __str__(self):
+            raise RuntimeError("no")
+
+        __repr__ = __str__
+
+    assert coerce_args({(1,): Unprintable()}) == {"input": "<unserialisable dict>"}

@@ -74,6 +74,13 @@ def _tool_message_from(output: Any, call_id: str | None) -> Any:
     return next((m for m in messages if m.tool_call_id == call_id), messages[0])
 
 
+def _safe_name(serialized: Any) -> str:
+    try:
+        return str(serialized.get("name") or "unknown")
+    except Exception:
+        return "unknown"
+
+
 class ReceiptCallbackHandler(BaseCallbackHandler):
     """Records every tool call of a run into ``ledger``; thread-safe.
 
@@ -115,10 +122,14 @@ class ReceiptCallbackHandler(BaseCallbackHandler):
         metadata: dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> None:
-        params = kwargs.get("invocation_params")
-        if not isinstance(params, Mapping):
+        # Callbacks never raise: LangChain would log and swallow the exception, losing data.
+        try:
+            params = kwargs.get("invocation_params")
+            if not isinstance(params, Mapping):
+                return
+            specs = tool_specs_from_invocation_params(params)
+        except Exception:
             return
-        specs = tool_specs_from_invocation_params(params)
         with self._lock:
             for name, description in specs:
                 self._add_known(name, description)
@@ -135,21 +146,28 @@ class ReceiptCallbackHandler(BaseCallbackHandler):
         inputs: dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> None:
-        serialized = serialized or {}
-        name = str(serialized.get("name") or "unknown")
-        description = serialized.get("description")
-        tool_call_id = kwargs.get("tool_call_id")
-        entry = LedgerEntry(
-            tool=name,
-            args=coerce_args(inputs if inputs is not None else input_str)
-            if self._capture_results
-            else {},
-            call_id=str(tool_call_id) if tool_call_id else str(run_id),
-            parent_run_id=str(parent_run_id) if parent_run_id is not None else None,
-            started_at=time.time(),
-        )
+        description: Any = None
+        try:
+            serialized = serialized or {}
+            name = str(serialized.get("name") or "unknown")
+            description = serialized.get("description")
+            tool_call_id = kwargs.get("tool_call_id")
+            entry = LedgerEntry(
+                tool=name,
+                args=coerce_args(inputs if inputs is not None else input_str)
+                if self._capture_results
+                else {},
+                call_id=str(tool_call_id) if tool_call_id else str(run_id),
+                parent_run_id=str(parent_run_id) if parent_run_id is not None else None,
+                started_at=time.time(),
+            )
+        except Exception:
+            # Still open an entry, so the call is never missing from the ledger.
+            entry = LedgerEntry(
+                tool=_safe_name(serialized), call_id=str(run_id), started_at=time.time()
+            )
         with self._lock:
-            self._add_known(name, description if isinstance(description, str) else "")
+            self._add_known(entry.tool, description if isinstance(description, str) else "")
             self._in_flight[run_id] = entry
 
     def on_tool_end(
@@ -163,15 +181,20 @@ class ReceiptCallbackHandler(BaseCallbackHandler):
         with self._lock:
             pending = self._in_flight.get(run_id)
             expected_id = pending.call_id if pending is not None else None
-        output = _tool_message_from(output, expected_id)
-        if isinstance(output, ToolMessage):
-            failed = output.status == "error"
-            text = str(output.text)
-            call_id: str | None = output.tool_call_id or None
-        else:
-            failed = False
-            text = str(output)
-            call_id = None
+        failed = False
+        text: str | None = None
+        call_id: str | None = None
+        try:
+            output = _tool_message_from(output, expected_id)
+            if isinstance(output, ToolMessage):
+                failed = output.status == "error"
+                text = str(output.text)
+                call_id = output.tool_call_id or None
+            else:
+                text = str(output)
+        except Exception:
+            # The tool returned but its output cannot be read: record it as ran, no result.
+            failed, text, call_id = False, None, None
         with self._lock:
             entry = self._close(run_id)
             if entry is None:
@@ -192,11 +215,15 @@ class ReceiptCallbackHandler(BaseCallbackHandler):
         parent_run_id: UUID | None = None,
         **kwargs: Any,
     ) -> None:
+        try:
+            message = repr(error)
+        except Exception:
+            message = type(error).__name__
         with self._lock:
             entry = self._close(run_id)
             if entry is not None:
                 entry.status = "error"
-                entry.error = truncate(repr(error), self._max_result_chars)
+                entry.error = truncate(message, self._max_result_chars)
 
     def flush(self) -> None:
         """Close every in-flight entry as ``status="error", error="no result"``."""
