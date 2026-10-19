@@ -50,6 +50,9 @@ advice ("you can create a ticket"), conditionals and offers are not claims.
   is not judged: it lands in `unmatched`. It is flagged only when the tool name also carries
   what the claim acts on ("I've created a ticket" against `create_ticket`). A family-only
   match whose tool ran and failed is still `tool_failed`.
+- **Claims about a sibling tool when another tool of the same action ran.** "I've removed the
+  mug from your order" after `remove_item` ran is not judged against `cancel_order`: it lands in
+  `unmatched`.
 - **Repeated claims.** Several claims about the same tool collapse into one claim.
 
 Failed tools need one setting on your graph: build it with

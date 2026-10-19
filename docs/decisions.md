@@ -62,3 +62,13 @@ Precision comes before recall here: "I've sent it" (a `send_email`/`send_sms` ti
 updated your address" against `update_customer` are no longer flagged when the tool never ran. Related lexicon choices:
 "summarised" and "closed" belong to no verb family (closing a ticket is usually an update), and
 "issue" is not a ticket synonym ("I've logged the issue" means the problem, not a ticket).
+
+## Another tool of the same action makes a claim ambiguous
+
+A claim that would be `not_called` blocks only when no successful ledger entry exists for any
+tool whose name carries a verb of the claim's family. If `remove_item` ran, "I've removed the
+duplicate mug from your order" may describe it even though the object matches `cancel_order`, so
+the claim goes to `unmatched`. `tool_failed` is unchanged. The verb-stem evidence ("refunded" naming
+the `refund` of `issue_refund`) marks a claim as object-matched but never adds to the score, so a
+sibling `refund_payment` cannot outrank the tool that ran. "case" is not a ticket synonym either
+("opened a case with our specialist team" after `escalate_ticket`).

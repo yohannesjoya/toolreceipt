@@ -10,6 +10,7 @@ import pytest
 
 from tests.helpers import load_cases
 from toolreceipt import Ledger, check
+from toolreceipt.diff import diff
 
 CASES = load_cases("check")
 DEMO = Path(__file__).resolve().parents[2] / "demo"
@@ -86,3 +87,11 @@ def test_verb_stem_naming_the_tool_object_is_not_called():
         assert [(c.tool, c.reason) for c in r.claimed_but_never_ran] == [
             ("issue_refund", "not_called")
         ], stem
+
+
+def test_unmatched_claims_stay_unmatched_when_diffed_again():
+    case = dict(CASES)["sibling_raised_with_team"]
+    ledger = Ledger.from_dict(case["ledger"])
+    r = check(case["text"], ledger, known_tools=case["known_tools"])
+    again = diff(r.unmatched, ledger)
+    assert again.claimed_but_never_ran == [] and len(again.unmatched) == 1

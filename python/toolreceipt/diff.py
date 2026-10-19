@@ -4,10 +4,18 @@ from __future__ import annotations
 
 from collections.abc import Collection, Sequence
 from dataclasses import replace
+from typing import Any
 
-from toolreceipt.claims import Claim, Reason
+from toolreceipt.claims import Claim, Reason, family_ran
 from toolreceipt.ledger import Ledger
 from toolreceipt.receipt import Receipt, Verdict, render_summary
+
+
+def _copy(claim: Claim, **changes: Any) -> Claim:
+    """``dataclasses.replace`` that keeps the extractor's private match evidence."""
+    out = replace(claim, **changes)
+    out._object_matched = claim._object_matched
+    return out
 
 
 def diff(
@@ -30,32 +38,28 @@ def diff(
     unmatched: list[Claim] = []
     for claim in claims:
         if not claim.candidates:
-            unmatched.append(replace(claim, candidates=[]))
+            unmatched.append(_copy(claim, candidates=[]))
             continue
         hit = next((c for c in claim.candidates if c in ok_tools), None)
         if hit is not None:
-            confirmed.append(replace(claim, candidates=list(claim.candidates), tool=hit))
-        elif not any(c in error_tools for c in claim.candidates) and (
-            claim._object_matched is False
-        ):
-            # Matched on the verb family alone and never attempted: likely an honest
-            # paraphrase of work done with another tool ("raised this with our team" after
-            # escalate_ticket), so it is not judged.
-            unmatched.append(replace(claim, candidates=list(claim.candidates)))
+            confirmed.append(_copy(claim, candidates=list(claim.candidates), tool=hit))
+        elif any(c in error_tools for c in claim.candidates):
+            never_ran.append(_copy(
+                claim, candidates=list(claim.candidates), tool=claim.candidates[0],
+                reason="tool_failed",
+            ))
+        elif claim._object_matched is False or family_ran(claim.verb, ok_tools):
+            # Not judged: matched on the verb family alone (likely an honest paraphrase of
+            # work done with another tool, "raised this with our team" after
+            # escalate_ticket), or another tool of the same action ran, so the claim may
+            # describe that one ("removed the mug" after remove_item, cancel_order bound).
+            unmatched.append(_copy(claim, candidates=list(claim.candidates)))
         else:
-            reason: Reason = (
-                "tool_failed"
-                if any(c in error_tools for c in claim.candidates)
-                else "not_called"
-            )
-            never_ran.append(
-                replace(
-                    claim,
-                    candidates=list(claim.candidates),
-                    tool=claim.candidates[0],
-                    reason=reason,
-                )
-            )
+            reason: Reason = "not_called"
+            never_ran.append(_copy(
+                claim, candidates=list(claim.candidates), tool=claim.candidates[0],
+                reason=reason,
+            ))
 
     confirmed_tools = {c.tool for c in confirmed}
     unreported = [

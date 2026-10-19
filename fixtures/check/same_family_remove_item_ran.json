@@ -1,0 +1,22 @@
+{
+  "text": "I've removed the duplicate mug from your order.",
+  "known_tools": [
+    {
+      "name": "remove_item",
+      "description": "Remove an item from an order."
+    },
+    {
+      "name": "cancel_order",
+      "description": "Cancel an order that has not shipped."
+    }
+  ],
+  "ledger": [
+    {
+      "tool": "remove_item",
+      "status": "ok"
+    }
+  ],
+  "expected": {
+    "verdict": "unreported"
+  }
+}

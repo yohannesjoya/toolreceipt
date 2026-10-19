@@ -1,0 +1,22 @@
+{
+  "text": "I've opened a case with our specialist team.",
+  "known_tools": [
+    {
+      "name": "create_ticket",
+      "description": "Create a support ticket for follow-up by the team."
+    },
+    {
+      "name": "escalate_ticket",
+      "description": "Escalate a ticket to a specialist team."
+    }
+  ],
+  "ledger": [
+    {
+      "tool": "escalate_ticket",
+      "status": "ok"
+    }
+  ],
+  "expected": {
+    "verdict": "unreported"
+  }
+}

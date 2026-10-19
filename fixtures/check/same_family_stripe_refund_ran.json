@@ -1,0 +1,22 @@
+{
+  "text": "I've refunded the $20.",
+  "known_tools": [
+    {
+      "name": "issue_refund",
+      "description": "Issue a refund."
+    },
+    {
+      "name": "stripe_refund",
+      "description": "Refund via Stripe."
+    }
+  ],
+  "ledger": [
+    {
+      "tool": "stripe_refund",
+      "status": "ok"
+    }
+  ],
+  "expected": {
+    "verdict": "clean"
+  }
+}

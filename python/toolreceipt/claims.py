@@ -432,6 +432,15 @@ def _verb_tokens(family: str, lexicon: Mapping[str, Any]) -> set[str]:
     return {_stem(family)} | {_stem(t) for t in fam.get("tokens", ()) if t not in nouns}
 
 
+def family_ran(family: str, tools: Iterable[str], lexicon: Mapping[str, Any] | None = None) -> bool:
+    """True when any of ``tools`` carries a verb token of ``family`` in its name."""
+    lex = _default_lexicon() if lexicon is None else lexicon
+    if family not in lex["families"]:
+        return False
+    verbs = _verb_tokens(family, lex)
+    return any(verbs & set(tokenize_tool_name(t)) for t in tools)
+
+
 def _conflicts(family: str, name: Sequence[str], lexicon: Mapping[str, Any]) -> bool:
     """True when the tool name says it does something else than the claim.
 
@@ -503,13 +512,14 @@ def _score(
     fam_hits: set[int] = set().union(*(_occurs(t, name) for t in fam_terms))
     obj_hits: set[int] = set().union(*(_occurs(t, name) for t in obj_terms))
     object_matched = bool(obj_hits) and (not fam_hits or len(fam_hits | obj_hits) > 1)
-    family_tokens = {_stem(t) for t in lexicon["families"].get(family, {}).get("tokens", ())}
-    object_matched = object_matched or _names_object(verb_stem, name, family_tokens)
     score = (2 if fam_hits else 0) + (2 if object_matched else 0)
     desc = _words(spec.description)
     if any(_occurs(t, desc) and not _occurs(t, name) for t in obj_terms):
         score += 1
-    return score, object_matched
+    # Evidence only, never score: a sibling ``<verb>_<stem>`` tool must not outrank the
+    # tool that ran ("refunded you" vs ``issue_refund`` and ``refund_payment``).
+    family_tokens = {_stem(t) for t in lexicon["families"].get(family, {}).get("tokens", ())}
+    return score, object_matched or _names_object(verb_stem, name, family_tokens)
 
 
 def score_tool(

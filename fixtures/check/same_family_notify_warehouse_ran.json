@@ -1,0 +1,22 @@
+{
+  "text": "I've messaged the courier about the missed delivery window.",
+  "known_tools": [
+    {
+      "name": "send_email",
+      "description": "Send an email to the customer."
+    },
+    {
+      "name": "notify_warehouse",
+      "description": "Notify the warehouse about an order problem."
+    }
+  ],
+  "ledger": [
+    {
+      "tool": "notify_warehouse",
+      "status": "ok"
+    }
+  ],
+  "expected": {
+    "verdict": "unreported"
+  }
+}

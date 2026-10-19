@@ -60,7 +60,6 @@
   "by_exempt": ["me", "us", "our", "myself", "ourselves", "email", "e-mail", "sms", "text", "phone", "mail", "post", "fax", "today", "tomorrow", "tonight", "end", "noon"],
   "synonyms": {
     "email": ["mail", "notify", "message", "reach out", "confirmation"],
-    "ticket": ["case"],
     "refund": ["reimburse", "reimbursement", "money back"],
     "order": ["purchase"],
     "row": ["record", "entry"],

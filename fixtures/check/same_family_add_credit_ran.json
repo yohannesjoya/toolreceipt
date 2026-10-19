@@ -1,0 +1,22 @@
+{
+  "text": "I've credited your account.",
+  "known_tools": [
+    {
+      "name": "issue_credit",
+      "description": "Issue store credit."
+    },
+    {
+      "name": "add_credit",
+      "description": "Add store credit to an account."
+    }
+  ],
+  "ledger": [
+    {
+      "tool": "add_credit",
+      "status": "ok"
+    }
+  ],
+  "expected": {
+    "verdict": "clean"
+  }
+}

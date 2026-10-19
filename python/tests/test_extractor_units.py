@@ -244,9 +244,12 @@ def test_match_high_medium_none():
     assert match_tools("send", "the summary", [ToolSpec("notify_customer", "")], LEX) == (
         ["notify_customer"], "medium"
     )
-    # open~create, case~ticket
-    assert match_tools("create", "a ticket", [ToolSpec("open_case", "")], LEX) == (
+    # open~create; "case" is no ticket synonym ("opened a case with our team" is generic)
+    assert match_tools("create", "a case", [ToolSpec("open_case", "")], LEX) == (
         ["open_case"], "high"
+    )
+    assert match_tools("create", "a ticket", [ToolSpec("open_case", "")], LEX) == (
+        ["open_case"], "medium"
     )
     assert match_tools("send", "the summary", [ToolSpec("issue_refund", "")], LEX) == ([], None)
 
