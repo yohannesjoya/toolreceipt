@@ -569,17 +569,24 @@ def _surface_stem(form: str, family: str, lexicon: Mapping[str, Any]) -> str | N
 
 
 def _dedupe(claims: list[Claim]) -> list[Claim]:
-    """One claim per candidate set; unmatched claims collapse on ``(verb, object)``."""
-    seen: set[tuple[str | None, ...]] = set()
+    """One claim per candidate set; unmatched claims collapse on ``(verb, object)``.
+
+    The first claim's span is kept, but it carries object evidence when any duplicate has
+    it, so the order of sentences never decides whether a claim is judged.
+    """
+    seen: dict[tuple[str | None, ...], Claim] = {}
     out: list[Claim] = []
     for claim in claims:
         key: tuple[str | None, ...] = (
             ("tools", *sorted(claim.candidates)) if claim.candidates
             else ("verb", claim.verb, claim.object)
         )
-        if key not in seen:
-            seen.add(key)
+        first = seen.get(key)
+        if first is None:
+            seen[key] = claim
             out.append(claim)
+        elif claim._object_matched:
+            first._object_matched = True
     return out
 
 

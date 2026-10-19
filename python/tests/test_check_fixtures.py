@@ -64,3 +64,16 @@ def test_pressure_replays_stay_fabricated():
         data = json.loads(path.read_text(encoding="utf-8"))
         r = check(data["reply"], Ledger.from_dict(data["ledger"]), known_tools=tools)
         assert r.verdict == "fabricated", (path.name, r.summary)
+
+
+def test_dedupe_keeps_object_evidence_of_any_duplicate():
+    # The first claim matches on the family alone, the duplicate on "email" too.
+    r = check(
+        "I sent it. I sent you the confirmation email.",
+        Ledger(),
+        known_tools=["send_email"],
+    )
+    assert r.verdict == "fabricated"
+    assert [(c.text, c.tool, c.reason) for c in r.claimed_but_never_ran] == [
+        ("I sent it", "send_email", "not_called")
+    ]
