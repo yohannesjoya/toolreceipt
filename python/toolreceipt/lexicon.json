@@ -1,0 +1,53 @@
+{
+  "families": {
+    "send": {
+      "forms": ["sent", "emailed", "mailed", "notified", "messaged", "forwarded", "dispatched"],
+      "tokens": ["send", "email", "mail", "notify", "message", "forward", "dispatch"]
+    },
+    "create": {
+      "forms": ["created", "opened", "filed", "raised", "logged", "made", "added", "generated", "set up"],
+      "tokens": ["create", "open", "file", "raise", "log", "make", "add", "new", "generate"]
+    },
+    "update": {
+      "forms": ["updated", "modified", "changed", "edited", "amended", "revised", "patched"],
+      "tokens": ["update", "modify", "change", "edit", "amend", "revise", "patch", "set"]
+    },
+    "delete": {
+      "forms": ["deleted", "removed", "cancelled", "canceled", "erased", "dropped", "archived"],
+      "tokens": ["delete", "remove", "cancel", "erase", "drop", "archive", "destroy"]
+    },
+    "refund": {
+      "forms": ["refunded", "reimbursed", "credited", "issued", "processed", "charged", "paid"],
+      "tokens": ["refund", "reimburse", "credit", "issue", "process", "charge", "pay", "payment"]
+    },
+    "schedule": {
+      "forms": ["scheduled", "booked", "rescheduled", "arranged", "reserved"],
+      "tokens": ["schedule", "book", "reschedule", "arrange", "reserve", "calendar", "appointment"]
+    },
+    "save": {
+      "forms": ["saved", "stored", "recorded", "wrote", "written", "persisted", "uploaded", "exported"],
+      "tokens": ["save", "store", "record", "write", "persist", "upload", "export"]
+    },
+    "submit": {
+      "forms": ["submitted", "filed", "posted", "published", "applied", "registered", "enrolled"],
+      "tokens": ["submit", "post", "publish", "apply", "register", "enroll", "form"]
+    },
+    "trigger": {
+      "forms": ["triggered", "launched", "started", "ran", "executed", "initiated", "kicked off", "deployed", "invoked"],
+      "tokens": ["trigger", "launch", "start", "run", "execute", "initiate", "deploy", "invoke"]
+    }
+  },
+  "exclusions": ["found", "checked", "looked", "saw", "noticed", "verified", "reviewed", "read", "confirmed", "located", "retrieved", "fetched", "searched", "analysed", "analyzed", "understood", "received"],
+  "negation": ["not", "n't", "never", "unable", "failed to", "couldn't", "could not", "cannot", "can't", "wasn't able", "was not able", "didn't", "did not"],
+  "future": ["will", "would", "can ", "could ", "shall", "going to", "once ", "if ", "when you", "should i", "let me know", "would you like"],
+  "advice": ["you can", "please", "you may", "you should", "you'll need"],
+  "other_subject": ["you sent", "you created", "they sent", "the customer sent"],
+  "synonyms": {
+    "email": ["mail", "notify", "message", "reach out", "confirmation"],
+    "ticket": ["issue", "case"],
+    "refund": ["reimburse", "reimbursement", "money back"],
+    "order": ["purchase"],
+    "row": ["record", "entry"]
+  },
+  "number_words": {"one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10, "a": 1, "an": 1}
+}
