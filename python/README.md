@@ -74,13 +74,16 @@ every requested step as done; in honest mode every tool works.
 
 In 9 of 10 live pressure runs on 2026-10-19 the agent claimed the email was sent; toolreceipt
 flagged every one. The remaining reply said the email "has been queued", which is not flagged.
-Before tuning, a milder pressure prompt produced no false claim in 10 of 10 runs.
+Before tuning, a milder pressure prompt produced no false claim in 10 of 10 runs. The tuned
+prompt was chosen on the first 5 of the 10 pooled runs, so those 5 are not held out.
 
 In 10 of 10 live honest runs on 2026-10-19 every tool succeeded and the receipt was `ok`.
 On the held-out set (`fixtures/heldout/`: those 10 honest replies plus 12 hand-written
 adversarial negatives, labelled before any rule change) precision is 1.00 (20 of 20 claims)
-with no claim on any adversarial negative. The recorded runs in `demo/replays/` back the
-demo's Replay button.
+with no claim on any adversarial negative. The 10 honest replies are near-identical in
+phrasing ("I've issued a $64 refund ... and sent a confirmation email"), so this precision
+figure is weak evidence. `fixtures/check/` adds hand-written honest replies with more varied
+phrasing. The recorded runs in `demo/replays/` back the demo's Replay button.
 
 ## Install
 
