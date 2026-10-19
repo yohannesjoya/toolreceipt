@@ -1,0 +1,10 @@
+{
+  "text": "Stripe charged your card.",
+  "known_tools": [
+    {
+      "name": "issue_refund",
+      "description": "Refund an order"
+    }
+  ],
+  "expected": []
+}

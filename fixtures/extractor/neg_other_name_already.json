@@ -1,0 +1,10 @@
+{
+  "text": "John already refunded your order.",
+  "known_tools": [
+    {
+      "name": "issue_refund",
+      "description": "Refund an order"
+    }
+  ],
+  "expected": []
+}

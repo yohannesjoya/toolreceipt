@@ -1,0 +1,17 @@
+{
+  "text": "I've cancelled your subscription, is there anything else I can help with?",
+  "known_tools": [
+    {
+      "name": "cancel_order",
+      "description": "Cancel an order"
+    }
+  ],
+  "expected": [
+    {
+      "verb": "delete",
+      "text": "I've cancelled your subscription",
+      "object": "subscription",
+      "count": null
+    }
+  ]
+}

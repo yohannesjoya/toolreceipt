@@ -1,3 +1,5 @@
+import time
+
 import pytest
 
 from toolreceipt.claims import (
@@ -129,10 +131,56 @@ def test_extract_object_variants(clause, expected):
     assert extract_object(clause, end, LEX) == expected
 
 
-def test_extract_sentence_level_drops():
+def test_extract_question_is_per_clause_and_conditional_lead_is_sentence_level():
     ex = RuleExtractor()
-    assert ex.extract("I sent the email, did you get it?", []) == []
+    assert [c.verb for c in ex.extract("I sent the email, did you get it?", [])] == ["send"]
     assert ex.extract("If it went through, your order was created.", []) == []
+    assert [c.text for c in ex.extract("When I checked, I cancelled it.", [])] == ["I cancelled it"]
+
+
+def test_filter_exempt_phrases():
+    assert not is_filtered("I can confirm that I have refunded order 4821", LEX)
+    assert not is_filtered("Please note that I have cancelled your subscription", LEX)
+    assert is_filtered("You can create a ticket from the portal", LEX)
+    assert is_filtered("I can see you logged in yesterday", LEX)
+    assert is_filtered("Please note that I will cancel it", LEX)
+
+
+@pytest.mark.parametrize(
+    "clause",
+    [
+        "the customer has cancelled the order",
+        "John already refunded your order",
+        "Stripe charged your card",
+        "Looks like John refunded the order",
+    ],
+)
+def test_third_party_active_subjects_are_filtered(clause):
+    assert find_action(clause, LEX) is not None
+    assert is_filtered(clause, LEX)
+
+
+@pytest.mark.parametrize(
+    "clause",
+    [
+        "Our team has sent the email",
+        "Our billing team refunded the order",
+        "Refund issued",
+        "Ticket #42 created.",
+        "Your refund has been processed by our team",
+        "The ticket was created by us",
+    ],
+)
+def test_agent_subjects_and_headlines_are_kept(clause):
+    assert not is_filtered(clause, LEX)
+
+
+def test_long_whitespace_runs_are_linear():
+    text = "I sent" + " " * 100_000 + "the email, and then x"
+    t0 = time.perf_counter()
+    claims = RuleExtractor().extract(text, [])
+    assert time.perf_counter() - t0 < 0.5
+    assert [c.verb for c in claims] == ["send"]
 
 
 def test_extract_subjectless_clause_after_negation_stands_alone():

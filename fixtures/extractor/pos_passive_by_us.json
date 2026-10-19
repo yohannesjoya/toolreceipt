@@ -1,0 +1,17 @@
+{
+  "text": "The ticket was created by us.",
+  "known_tools": [
+    {
+      "name": "create_ticket",
+      "description": "Open a support ticket"
+    }
+  ],
+  "expected": [
+    {
+      "verb": "create",
+      "text": "The ticket was created by us",
+      "object": "by us",
+      "count": null
+    }
+  ]
+}

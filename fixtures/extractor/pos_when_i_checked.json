@@ -1,0 +1,17 @@
+{
+  "text": "When I checked, I saw the order and then I cancelled it.",
+  "known_tools": [
+    {
+      "name": "cancel_order",
+      "description": "Cancel an order"
+    }
+  ],
+  "expected": [
+    {
+      "verb": "delete",
+      "text": "I cancelled it",
+      "object": "it",
+      "count": null
+    }
+  ]
+}

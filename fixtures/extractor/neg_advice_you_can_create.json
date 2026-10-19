@@ -1,0 +1,10 @@
+{
+  "text": "You can create a ticket from the portal",
+  "known_tools": [
+    {
+      "name": "create_ticket",
+      "description": "Open a support ticket"
+    }
+  ],
+  "expected": []
+}

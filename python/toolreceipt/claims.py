@@ -106,7 +106,10 @@ def load_lexicon(path: Path | None = None) -> dict[str, Any]:
 _BULLET = re.compile(r"^\s*(?:[-*•+]|\d+[.)])\s+")
 _SENTENCE_END = re.compile(r"(?<=[.!?])\s+")
 _CONJUNCTIONS = r"(?:and|but|so|because|however|then)"
-_CLAUSE_SPLIT = re.compile(rf"\s*[;]\s*|\s*,(?=\s|$)\s*|\s+{_CONJUNCTIONS}\b\s*", re.IGNORECASE)
+# Sentences are whitespace-collapsed before splitting, so single spaces suffice here
+# (unbounded leading \s* made long whitespace runs quadratic).
+_CLAUSE_SPLIT = re.compile(rf" ?; ?|,(?= |$) ?| {_CONJUNCTIONS}\b ?", re.IGNORECASE)
+_WHITESPACE = re.compile(r"\s+")
 _LEADING_CONJ = re.compile(rf"^(?:{_CONJUNCTIONS}\b[\s,]*)+", re.IGNORECASE)
 _TRAILING_PUNCT = ".!?,;:"
 _TOKEN = re.compile(r"'s|[a-z0-9#$@_-]+")
@@ -115,7 +118,7 @@ _CONTRACTIONS = (("'ve", " have"), ("'re", " are"), ("'m", " am"), ("'d", " had"
 _PERFECT = frozenset({"have", "has", "had"})
 _BE_DONE = frozenset({"been", "was", "were", "got"})
 _BE_PRESENT = frozenset({"is", "are", "am", "'s", "be", "being", "get", "gets", "getting"})
-_ADVERBS = frozenset({"already", "just", "also", "now", "all", "both"})
+_ADVERBS = frozenset({"already", "just", "also", "now", "all", "both", "since"})
 _AUX = _PERFECT | _BE_DONE | _BE_PRESENT
 # A determiner or preposition right before a participle makes it an adjective
 # ("your scheduled call", "with saved card"), not a completed action.
@@ -127,7 +130,7 @@ _FIRST_PERSON = frozenset({"i", "we"})
 _OTHER_PRONOUNS = frozenset({"you", "they", "he", "she", "it", "someone", "somebody", "everyone"})
 _SUBJECT_DETERMINERS = frozenset({
     "the", "a", "an", "your", "their", "his", "her", "its", "this", "that", "these", "those",
-    "my", "our", "some", "someone", "somebody", "everyone",
+    "my", "some", "someone", "somebody", "everyone",
 })
 _OBJECT_STRIP = frozenset({"you", "me", "the", "a", "an", "your", "our"})
 
@@ -176,7 +179,7 @@ def split_sentences(text: str) -> list[str]:
 def split_clauses(sentence: str) -> list[str]:
     """Split a sentence on ``,`` ``;`` and the conjunctions and/but/so/because/however/then."""
     out: list[str] = []
-    for piece in _CLAUSE_SPLIT.split(sentence):
+    for piece in _CLAUSE_SPLIT.split(_WHITESPACE.sub(" ", sentence).strip()):
         piece = _LEADING_CONJ.sub("", piece.strip()).strip()
         if piece.strip(_TRAILING_PUNCT + " "):
             out.append(piece)
@@ -249,36 +252,63 @@ def _by_other_agent(clause: str, lexicon: Mapping[str, Any]) -> bool:
     return False
 
 
+def _is_agent_subject(subject: list[str]) -> bool:
+    """``I``/``we`` right before the verb chain, or an ``our <noun>`` subject."""
+    return subject[-1] in _FIRST_PERSON or "our" in subject[-3:-1]
+
+
 def _subject_kind(action: _Action, clause: str, lexicon: Mapping[str, Any]) -> str:
     """Classify who did the action: agent, implicit, other or state."""
     subject, aux = action.subject, set(action.aux)
     passive = bool(aux & (_BE_DONE | _BE_PRESENT))
     if not subject:
         return "implicit"
-    last = subject[-1]
-    if last in _FIRST_PERSON:
+    if _is_agent_subject(subject):
         return "agent"
-    if last in _OTHER_PRONOUNS:
-        if not passive:
-            return "other"  # "you sent", "they created"
-        if last == "you" and "been" not in aux:
-            return "state"  # "you're booked", "you were charged"
-    elif not passive and subject[0] in _SUBJECT_DETERMINERS:
-        return "other"  # "the customer created", "the nightly sync ran"
-    # Passive or headline ("Refund issued") with no first-person agent.
+    last = subject[-1]
+    if not passive:
+        # Active voice with any other subject is someone else's action ("John refunded",
+        # "the customer has cancelled"), except a headline whose participle ends the
+        # clause ("Refund issued").
+        headline = not aux and last not in _OTHER_PRONOUNS and not _tokens(clause[action.end:])
+        if not headline:
+            return "other"
+    elif last == "you" and "been" not in aux:
+        return "state"  # "you were charged"
+    # Passive or headline with no first-person agent.
     timed = any(re.search(p, _normalize(clause).lower()) for p in lexicon.get("time_markers", ()))
     if timed or _by_other_agent(clause, lexicon):
         return "state"
     return "passive"
 
 
+def _verbless_other_subject(clause: str) -> bool | None:
+    """For a clause with no lexicon verb: does it open with a non-agent subject?
+
+    True for "The warehouse has shipped", False for "I looked", None when unknown.
+    """
+    tokens = _tokens(clause)
+    if not tokens:
+        return None
+    if tokens[0] in _FIRST_PERSON or tokens[0] == "our":
+        return False
+    if tokens[0] in _SUBJECT_DETERMINERS or tokens[0] in _OTHER_PRONOUNS:
+        return True
+    if any(t in _PERFECT or t in _BE_DONE for t in tokens[1:3]):
+        return True  # "Stripe has shipped"
+    return None
+
+
 def _lexically_filtered(clause: str, lexicon: Mapping[str, Any]) -> bool:
     if clause.strip().endswith("?"):
         return True
-    return any(
-        _contains_any(clause, lexicon.get(key, ()))
-        for key in ("negation", "future", "advice", "other_subject")
-    )
+    low = _normalize(clause).lower()
+    if any(_contains_any(low, lexicon.get(k, ())) for k in ("negation", "other_subject")):
+        return True
+    # "I can confirm ..." / "Please note ..." are not future or advice.
+    for phrase in lexicon.get("filter_exempt", ()):
+        low = re.sub(_phrase(phrase), " ", low)
+    return any(_contains_any(low, lexicon.get(k, ())) for k in ("future", "advice"))
 
 
 def is_filtered(clause: str, lexicon: Mapping[str, Any]) -> bool:
@@ -319,8 +349,6 @@ class RuleExtractor:
         self._lexicon: Mapping[str, Any] = _default_lexicon() if lexicon is None else lexicon
 
     def _sentence_filtered(self, sentence: str) -> bool:
-        if sentence.strip().endswith("?"):
-            return True
         low = _normalize(sentence).lower().lstrip(" \"'(*_")
         return any(
             re.match(_phrase(lead), low) for lead in self._lexicon.get("conditional_lead", ())
@@ -336,10 +364,16 @@ class RuleExtractor:
             for clause in split_clauses(sentence):
                 action = _scan(clause, lex)
                 if action is None:
+                    other = _verbless_other_subject(clause)
+                    if other is not None:
+                        prev_other = other
                     continue
                 kind = _subject_kind(action, clause, lex)
-                inherited = kind == "implicit" and prev_other and not action.aux
-                prev_other = kind == "other"
+                # A subject-less clause carries the previous clause's non-agent subject
+                # ("The customer sent the form and has since cancelled the order").
+                inherited = kind == "implicit" and prev_other
+                if kind != "implicit":
+                    prev_other = kind == "other"
                 if inherited or kind in {"other", "state"} or _lexically_filtered(clause, lex):
                     continue
                 obj, count = extract_object(clause, action.end, lex)

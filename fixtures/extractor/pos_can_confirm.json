@@ -1,0 +1,17 @@
+{
+  "text": "I can confirm that I have refunded order 4821.",
+  "known_tools": [
+    {
+      "name": "issue_refund",
+      "description": "Refund an order"
+    }
+  ],
+  "expected": [
+    {
+      "verb": "refund",
+      "text": "I can confirm that I have refunded order 4821",
+      "object": "order 4821",
+      "count": null
+    }
+  ]
+}

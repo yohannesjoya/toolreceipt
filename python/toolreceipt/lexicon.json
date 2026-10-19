@@ -42,7 +42,8 @@
   "future": ["will", "would", "can ", "could ", "shall", "going to", "once ", "if ", "when you", "should i", "let me know", "would you like", "'ll"],
   "advice": ["you can", "please", "you may", "you should", "you'll need"],
   "other_subject": ["you sent", "you created", "they sent", "the customer sent"],
-  "conditional_lead": ["if", "once", "unless", "when", "whenever", "as soon as", "in case", "should you"],
+  "conditional_lead": ["if", "once", "unless", "as soon as", "in case", "should you"],
+  "filter_exempt": ["can confirm", "please note", "please be advised", "happy to confirm"],
   "time_markers": [
     "\\byesterday\\b", "\\blast (?:night|week|month|year|time|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\\b",
     "\\bago\\b", "\\bearlier\\b", "\\bthis (?:morning|afternoon|evening)\\b",
@@ -51,7 +52,7 @@
     "\\bon (?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]* \\d{1,2}\\b",
     "\\bat \\d{1,2}(?::\\d{2})? ?(?:am|pm)\\b", "\\bat \\d{1,2}:\\d{2}\\b"
   ],
-  "by_exempt": ["me", "us", "myself", "ourselves", "email", "e-mail", "sms", "text", "phone", "mail", "post", "fax", "today", "tomorrow", "tonight", "end", "noon"],
+  "by_exempt": ["me", "us", "our", "myself", "ourselves", "email", "e-mail", "sms", "text", "phone", "mail", "post", "fax", "today", "tomorrow", "tonight", "end", "noon"],
   "synonyms": {
     "email": ["mail", "notify", "message", "reach out", "confirmation"],
     "ticket": ["issue", "case"],
