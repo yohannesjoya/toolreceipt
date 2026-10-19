@@ -1,0 +1,40 @@
+{
+  "claims": [
+    {
+      "text": "I have emailed you",
+      "verb": "send",
+      "candidates": [
+        "send_email"
+      ],
+      "confidence": "high"
+    }
+  ],
+  "ledger": [
+    {
+      "tool": "lookup_order",
+      "status": "ok"
+    }
+  ],
+  "known_tools": [
+    "send_email",
+    "lookup_order",
+    "issue_refund"
+  ],
+  "ignore_tools": [],
+  "expected": {
+    "verdict": "fabricated",
+    "ok": false,
+    "confirmed": [],
+    "claimed_but_never_ran": [
+      {
+        "tool": "send_email",
+        "reason": "not_called"
+      }
+    ],
+    "unmatched": [],
+    "ran_but_unreported": [
+      "lookup_order"
+    ],
+    "summary": "1 claimed action never ran: send_email (\"I have emailed you\")."
+  }
+}

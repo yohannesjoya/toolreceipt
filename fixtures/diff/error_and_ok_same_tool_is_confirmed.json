@@ -1,0 +1,42 @@
+{
+  "claims": [
+    {
+      "text": "I have emailed you",
+      "verb": "send",
+      "candidates": [
+        "send_email"
+      ],
+      "confidence": "high"
+    }
+  ],
+  "ledger": [
+    {
+      "tool": "send_email",
+      "status": "error",
+      "error": "timeout"
+    },
+    {
+      "tool": "send_email",
+      "status": "ok"
+    }
+  ],
+  "known_tools": [
+    "send_email",
+    "lookup_order",
+    "issue_refund"
+  ],
+  "ignore_tools": [],
+  "expected": {
+    "verdict": "clean",
+    "ok": true,
+    "confirmed": [
+      {
+        "tool": "send_email"
+      }
+    ],
+    "claimed_but_never_ran": [],
+    "unmatched": [],
+    "ran_but_unreported": [],
+    "summary": "All claims confirmed."
+  }
+}

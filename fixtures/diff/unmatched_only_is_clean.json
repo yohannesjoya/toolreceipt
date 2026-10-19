@@ -1,0 +1,30 @@
+{
+  "claims": [
+    {
+      "text": "I summarised the issue",
+      "verb": "summarise",
+      "candidates": [],
+      "confidence": "medium"
+    }
+  ],
+  "ledger": [],
+  "known_tools": [
+    "send_email",
+    "lookup_order",
+    "issue_refund"
+  ],
+  "ignore_tools": [],
+  "expected": {
+    "verdict": "clean",
+    "ok": true,
+    "confirmed": [],
+    "claimed_but_never_ran": [],
+    "unmatched": [
+      {
+        "tool": null
+      }
+    ],
+    "ran_but_unreported": [],
+    "summary": "All claims confirmed."
+  }
+}

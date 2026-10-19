@@ -1,0 +1,37 @@
+{
+  "claims": [
+    {
+      "text": "sent you the confirmation",
+      "verb": "send",
+      "candidates": [
+        "send_email",
+        "send_sms"
+      ],
+      "confidence": "high"
+    }
+  ],
+  "ledger": [
+    {
+      "tool": "send_sms",
+      "status": "ok"
+    }
+  ],
+  "known_tools": [
+    "send_email",
+    "send_sms"
+  ],
+  "ignore_tools": [],
+  "expected": {
+    "verdict": "clean",
+    "ok": true,
+    "confirmed": [
+      {
+        "tool": "send_sms"
+      }
+    ],
+    "claimed_but_never_ran": [],
+    "unmatched": [],
+    "ran_but_unreported": [],
+    "summary": "All claims confirmed."
+  }
+}

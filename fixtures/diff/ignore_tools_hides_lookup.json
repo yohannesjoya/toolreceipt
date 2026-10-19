@@ -1,0 +1,43 @@
+{
+  "claims": [
+    {
+      "text": "I issued the refund",
+      "verb": "issue",
+      "candidates": [
+        "issue_refund"
+      ],
+      "confidence": "high"
+    }
+  ],
+  "ledger": [
+    {
+      "tool": "lookup_order",
+      "status": "ok"
+    },
+    {
+      "tool": "issue_refund",
+      "status": "ok"
+    }
+  ],
+  "known_tools": [
+    "send_email",
+    "lookup_order",
+    "issue_refund"
+  ],
+  "ignore_tools": [
+    "lookup_order"
+  ],
+  "expected": {
+    "verdict": "clean",
+    "ok": true,
+    "confirmed": [
+      {
+        "tool": "issue_refund"
+      }
+    ],
+    "claimed_but_never_ran": [],
+    "unmatched": [],
+    "ran_but_unreported": [],
+    "summary": "All claims confirmed."
+  }
+}
