@@ -91,12 +91,16 @@
   mark.unmatched { background: var(--grey-bg); border-color: var(--grey-line); }
   .legend { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 8px; }
   .table-wrap { overflow-x: auto; }
-  table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+  table { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: 0.875rem; }
   th, td { text-align: left; vertical-align: top; padding: 6px 8px; border-bottom: 1px solid var(--border); }
   th { color: var(--muted); font-weight: 600; }
   code, .mono { font-family: var(--mono); font-size: 0.8125rem; overflow-wrap: anywhere; }
+  th.c-tool { width: 120px; }
+  th.c-status { width: 38%; }
+  td { overflow: hidden; }
   td.tool { white-space: nowrap; }
-  .clip { display: block; max-width: 60ch; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; overflow-wrap: normal; }
+  .clip { display: block; width: 100%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; overflow-wrap: normal; }
+  .wrap2 { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; }
   .status-ok { color: var(--ok-fg); }
   .status-error { color: var(--bad-fg); }
   .receipt { display: grid; grid-template-columns: 1fr; gap: 12px; }
@@ -167,7 +171,7 @@
       <h2 id="ledger-h">Ledger: tools that ran</h2>
       <div class="panel table-wrap">
         <table>
-          <thead><tr><th scope="col">Tool</th><th scope="col">Args</th><th scope="col">Status</th></tr></thead>
+          <thead><tr><th scope="col" class="c-tool">Tool</th><th scope="col">Args</th><th scope="col" class="c-status">Status</th></tr></thead>
           <tbody id="ledger"></tbody>
         </table>
       </div>
@@ -316,7 +320,10 @@
       row.appendChild(argsCell);
       var status = el("td", entry.status === "ok" ? "status-ok" : "status-error", entry.status);
       if (entry.status !== "ok" && entry.error) {
-        var errText = String(entry.error), errClip = el("span", "mono small clip", errText.split("\n")[0]);
+        var errText = String(entry.error), shown = errText.split("\n")[0];
+        var repr = /^\w+\((['"])([\s\S]*)\1\)$/.exec(shown);
+        if (repr) shown = repr[2];
+        var errClip = el("span", "mono small wrap2", shown);
         errClip.title = errText;
         status.appendChild(errClip);
       }
