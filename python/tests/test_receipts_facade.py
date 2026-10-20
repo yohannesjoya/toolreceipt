@@ -108,3 +108,33 @@ def test_capture_results_false_redacts_caller_ledger():
     r = Receipts(capture_results=False).check("I issued the refund.", ledger=ledger)
     assert [(e.tool, e.args, e.result) for e in r.ledger] == [("issue_refund", {}, None)]
     assert entry.args == {"order_id": "1"} and entry.result == "refunded"
+
+
+def test_known_tools_accepts_objects_with_name_and_description():
+    class Tool:  # duck-typed like LangChain's BaseTool
+        name = "send_email"
+        description = "Send an email to the customer"
+
+    r = check(REPLY, Ledger(), known_tools=[Tool()])
+    assert r.known_tools == ["send_email"]
+    assert [c.tool for c in r.claimed_but_never_ran] == ["send_email"]
+    rc = Receipts(known_tools=[Tool()])
+    assert rc.check(REPLY, ledger=Ledger()).known_tools == ["send_email"]
+
+
+def test_known_tools_accepts_langchain_tools():
+    tools = pytest.importorskip("langchain_core.tools")
+
+    def send_email(to: str) -> str:
+        """Send an email to the customer."""
+        return "sent"
+
+    tool = tools.StructuredTool.from_function(send_email)
+    r = check(REPLY, Ledger(), known_tools=[tool])
+    assert r.known_tools == ["send_email"]
+    assert [c.tool for c in r.claimed_but_never_ran] == ["send_email"]
+
+
+def test_known_tools_rejects_unknown_shapes():
+    with pytest.raises(TypeError, match="known_tools"):
+        check(REPLY, Ledger(), known_tools=[42])  # type: ignore[list-item]

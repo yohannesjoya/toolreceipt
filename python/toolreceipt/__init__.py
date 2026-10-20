@@ -5,7 +5,7 @@ from toolreceipt.ledger import Ledger, LedgerEntry
 from toolreceipt.receipt import Receipt, Verdict
 from toolreceipt.receipts import Receipts, check
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"
 
 __all__ = [
     "Claim",

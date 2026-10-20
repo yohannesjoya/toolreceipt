@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-10-20
+
+### Fixed
+
+- `known_tools` accepts tool objects with a `name` and a `description`, such as LangChain's
+  `BaseTool`. Passing one used to raise `TypeError: expected string or bytes-like object`.
+  An entry of any other shape now raises a `TypeError` that names `known_tools`.
+
 ## [0.1.0] - 2026-10-20
 
 ### Added

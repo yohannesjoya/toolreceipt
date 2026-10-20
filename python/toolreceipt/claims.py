@@ -21,6 +21,16 @@ class ToolSpec(NamedTuple):
     description: str = ""
 
 
+class NamedTool(Protocol):
+    """Any tool object with a ``name`` and a ``description``, such as LangChain's ``BaseTool``."""
+
+    @property
+    def name(self) -> str: ...
+
+    @property
+    def description(self) -> str: ...
+
+
 @dataclass
 class Claim:
     text: str
@@ -71,9 +81,9 @@ class ClaimExtractor(Protocol):
 
 
 def normalize_tool_specs(
-    tools: Iterable[str | ToolSpec | tuple[str, str] | Mapping[str, Any]],
+    tools: Iterable[str | ToolSpec | tuple[str, str] | Mapping[str, Any] | NamedTool],
 ) -> list[ToolSpec]:
-    """Normalize names, pairs, ToolSpecs and (OpenAI-style) dicts to ``ToolSpec``."""
+    """Normalize names, pairs, ToolSpecs, (OpenAI-style) dicts and tool objects to ``ToolSpec``."""
     specs: list[ToolSpec] = []
     for tool in tools:
         if isinstance(tool, str):
@@ -82,9 +92,17 @@ def normalize_tool_specs(
             inner = tool.get("function")
             src: Mapping[str, Any] = inner if isinstance(inner, Mapping) else tool
             specs.append(ToolSpec(str(src["name"]), str(src.get("description") or "")))
-        else:
+        elif isinstance(tool, (tuple, list)):
             name, *rest = tool
             specs.append(ToolSpec(name, rest[0] if rest else ""))
+        else:
+            tool_name = getattr(tool, "name", None)
+            if not isinstance(tool_name, str):
+                raise TypeError(
+                    "known_tools entries must be a name, a (name, description) pair, a ToolSpec,"
+                    f" a dict or an object with a name attribute; got {type(tool).__name__}"
+                )
+            specs.append(ToolSpec(tool_name, str(getattr(tool, "description", "") or "")))
     return specs
 
 
