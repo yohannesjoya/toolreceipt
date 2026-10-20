@@ -5,219 +5,339 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>toolreceipt demo</title>
 <meta name="description" content="A support agent's reply checked against the tools it actually ran.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..125,500..800&family=Source+Sans+3:wght@400;600&family=JetBrains+Mono:wght@400;600&display=swap">
 <style>
-  :root {
-    color-scheme: light dark;
-    --bg: #fafaf9;
-    --surface: #ffffff;
-    --text: #1c1917;
-    --muted: #57534e;
-    --border: #d6d3d1;
-    --accent: #1d4ed8;
-    --ok-bg: #dcfce7; --ok-fg: #14532d; --ok-line: #16a34a;
-    --warn-bg: #fef3c7; --warn-fg: #713f12; --warn-line: #d97706;
-    --bad-bg: #fee2e2; --bad-fg: #7f1d1d; --bad-line: #dc2626;
-    --grey-bg: #e7e5e4; --grey-fg: #44403c; --grey-line: #a8a29e;
-    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
-  }
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --bg: #0c0a09;
-      --surface: #1c1917;
-      --text: #f5f5f4;
-      --muted: #a8a29e;
-      --border: #44403c;
-      --accent: #93c5fd;
-      --ok-bg: #052e16; --ok-fg: #bbf7d0; --ok-line: #22c55e;
-      --warn-bg: #3b2a06; --warn-fg: #fde68a; --warn-line: #f59e0b;
-      --bad-bg: #450a0a; --bad-fg: #fecaca; --bad-line: #ef4444;
-      --grey-bg: #292524; --grey-fg: #d6d3d1; --grey-line: #78716c;
-    }
-  }
-  * { box-sizing: border-box; }
-  body {
-    margin: 0;
-    background: var(--bg);
-    color: var(--text);
-    font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  }
-  main { max-width: 760px; margin: 0 auto; padding: 24px 16px 40px; }
-  h1 { font-size: 1.5rem; margin: 0 0 4px; }
-  h2 { font-size: 1rem; margin: 0 0 8px; }
-  p { margin: 0 0 8px; }
-  a { color: var(--accent); }
-  .muted { color: var(--muted); }
-  .small { font-size: 0.875rem; }
-  section { margin-top: 20px; }
-  .panel {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 12px 14px;
-  }
-  blockquote { margin: 0; }
-  fieldset { border: 0; padding: 0; margin: 0 0 12px; display: flex; flex-wrap: wrap; gap: 8px 20px; }
-  legend { font-weight: 600; margin-bottom: 6px; padding: 0; }
-  label { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
-  .hint { flex-basis: 100%; }
-  .actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-  button {
-    font: inherit;
-    padding: 8px 16px;
-    border-radius: 6px;
-    border: 1px solid var(--border);
-    background: var(--surface);
-    color: var(--text);
-    cursor: pointer;
-  }
-  button.primary { background: var(--accent); border-color: var(--accent); color: var(--bg); font-weight: 600; }
-  button:disabled { opacity: 0.6; cursor: progress; }
-  button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-  #status { min-height: 1.5em; }
-  #status.error { color: var(--bad-fg); }
-  .banner {
-    border-left: 4px solid;
-    border-radius: 6px;
-    padding: 10px 14px;
-  }
-  .banner strong { text-transform: uppercase; letter-spacing: 0.04em; margin-right: 6px; }
-  .banner.clean { background: var(--ok-bg); color: var(--ok-fg); border-color: var(--ok-line); }
-  .banner.unreported { background: var(--warn-bg); color: var(--warn-fg); border-color: var(--warn-line); }
-  .banner.fabricated { background: var(--bad-bg); color: var(--bad-fg); border-color: var(--bad-line); }
-  #reply { white-space: pre-wrap; overflow-wrap: anywhere; }
-  mark { padding: 0 2px; border-radius: 3px; border-bottom: 2px solid; color: inherit; }
-  mark.confirmed { background: var(--ok-bg); border-color: var(--ok-line); }
-  mark.fabricated { background: var(--bad-bg); border-color: var(--bad-line); }
-  mark.unmatched { background: var(--grey-bg); border-color: var(--grey-line); }
-  .legend { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 8px; }
-  .table-wrap { overflow-x: auto; }
-  table { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: 0.875rem; }
-  th, td { text-align: left; vertical-align: top; padding: 6px 8px; border-bottom: 1px solid var(--border); }
-  th { color: var(--muted); font-weight: 600; }
-  code, .mono { font-family: var(--mono); font-size: 0.8125rem; overflow-wrap: anywhere; }
-  th.c-tool { width: 120px; }
-  th.c-status { width: 38%; }
-  td { overflow: hidden; }
-  td.tool { white-space: nowrap; }
-  .clip { display: block; width: 100%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; overflow-wrap: normal; }
-  .wrap2 { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; }
-  .status-ok { color: var(--ok-fg); }
-  .status-error { color: var(--bad-fg); }
-  .receipt { display: grid; grid-template-columns: 1fr; gap: 12px; }
-  @media (min-width: 600px) { .receipt { grid-template-columns: 1fr 1fr; } }
-  .bucket { border-left: 4px solid; border-radius: 6px; padding: 8px 12px; background: var(--surface); border-top: 1px solid var(--border); border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); }
-  .bucket h3 { font-size: 0.9375rem; margin: 0 0 4px; }
-  .bucket ul { margin: 0; padding-left: 18px; }
-  .bucket li { margin: 2px 0; }
-  .bucket .empty { color: var(--muted); list-style: none; margin-left: -18px; }
-  .bucket.confirmed { border-left-color: var(--ok-line); }
-  .bucket.fabricated { border-left-color: var(--bad-line); }
-  .bucket.unreported { border-left-color: var(--warn-line); }
-  .bucket.unmatched { border-left-color: var(--grey-line); }
-  footer { margin-top: 28px; }
-  [hidden] { display: none !important; }
+/* Layout: one guided column; each stage pairs a short "what you're seeing" note with the live panel, ending on a printed receipt. */
+:root {
+  color-scheme: light;
+  --bg: #f4f6f9;
+  --surface: #ffffff;
+  --ink: #18202e;
+  --muted: #5a6577;
+  --line: #d9dfe8;
+  --accent: #2f4fd1;
+  --accent-soft: #e6ebff;
+  --paper: #fffef9;
+  --paper-ink: #222;
+  --ok: #157a3c; --ok-soft: #dff4e6;
+  --warn: #a35a00; --warn-soft: #fdf0d9;
+  --bad: #c2271d; --bad-soft: #fde4e1;
+  --grey-soft: #e8ebf0;
+  --f-display: "Archivo", "Arial Narrow", system-ui, sans-serif;
+  --f-body: "Source Sans 3", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-mono: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0f131b; --surface: #171d28; --ink: #e8ecf3; --muted: #9aa5b8; --line: #2a3344;
+  --accent: #8fa6ff; --accent-soft: #1f2a4d; --paper: #eeeadf; --paper-ink: #1d1d1d;
+  --ok: #5fd08a; --ok-soft: #12301f; --warn: #f0b354; --warn-soft: #36280f;
+  --bad: #ff7f74; --bad-soft: #3d1715; --grey-soft: #252d3a; color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #0f131b; --surface: #171d28; --ink: #e8ecf3; --muted: #9aa5b8; --line: #2a3344;
+  --accent: #8fa6ff; --accent-soft: #1f2a4d; --paper: #eeeadf; --paper-ink: #1d1d1d;
+  --ok: #5fd08a; --ok-soft: #12301f; --warn: #f0b354; --warn-soft: #36280f;
+  --bad: #ff7f74; --bad-soft: #3d1715; --grey-soft: #252d3a; color-scheme: dark; }
+
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font: 17px/1.55 var(--f-body); }
+.wrap { max-width: 1040px; margin: 0 auto; padding-inline: 20px; padding-block: 0 56px; }
+a { color: var(--accent); }
+code, .mono { font-family: var(--f-mono); font-size: 0.82em; }
+h1, h2, h3 { font-family: var(--f-display); text-wrap: balance; margin: 0; }
+
+
+/* Hero */
+header.hero { padding-block: 40px 28px; display: grid; gap: 18px; }
+.brand { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.brand .name { font-family: var(--f-mono); font-weight: 600; font-size: 1rem; }
+.brand .links { font-size: 0.9rem; display: flex; gap: 14px; }
+h1 { font-size: clamp(2rem, 5vw, 3.1rem); font-weight: 800; font-stretch: 85%; line-height: 1.05; letter-spacing: -0.01em; max-width: 18ch; }
+h1 em { font-style: normal; color: var(--bad); }
+.lede { max-width: 62ch; color: var(--muted); font-size: 1.1rem; margin: 0; }
+
+.how { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 8px; }
+.how div { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; }
+.how b { display: block; font-family: var(--f-display); font-size: 1.05rem; }
+.how small { color: var(--muted); font-size: 0.92rem; }
+.how .n { font-family: var(--f-mono); color: var(--accent); font-size: 0.8rem; letter-spacing: 0.06em; }
+
+/* Try it */
+section.try { border-top: 1px solid var(--line); padding-top: 28px; display: grid; gap: 16px; }
+.eyebrow { font-size: 0.78rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+h2 { font-size: 1.6rem; font-weight: 700; font-stretch: 90%; }
+.customer { display: flex; gap: 12px; align-items: flex-start; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; }
+.avatar { flex: none; width: 34px; height: 34px; border-radius: 50%; background: var(--grey-soft); display: grid; place-items: center; font-weight: 600; font-size: 0.85rem; color: var(--muted); }
+.customer p { margin: 0; }
+.customer .who { font-size: 0.85rem; color: var(--muted); }
+
+.group { display: grid; gap: 8px; }
+.ghead { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; }
+.ghead b { font-family: var(--f-display); font-size: 1rem; }
+.ghead small { color: var(--muted); font-size: 0.9rem; }
+.scen { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr)); gap: 10px; }
+.theme { margin-left: auto; display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.theme button { border: 0; border-radius: 0; padding: 5px 12px; font-size: 0.85rem; font-weight: 600; background: var(--surface); color: var(--muted); }
+.theme button + button { border-left: 1px solid var(--line); }
+.theme button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); }
+.scen label { display: grid; gap: 4px; align-content: start; padding: 12px 14px 12px 40px; border: 2px solid var(--line); border-radius: 10px; background: var(--surface); cursor: pointer; position: relative; }
+.scen input { position: absolute; left: 14px; top: 16px; accent-color: var(--accent); width: 16px; height: 16px; }
+.scen label:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
+.scen label:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
+.scen b { font-family: var(--f-display); font-size: 1.02rem; }
+.scen small { color: var(--muted); font-size: 0.93rem; }
+.scen .expect { font-size: 0.85rem; }
+.tag { display: inline-block; font-size: 0.75rem; font-weight: 600; padding: 1px 8px; border-radius: 99px; }
+.tag.ok { background: var(--ok-soft); color: var(--ok); }
+.tag.bad { background: var(--bad-soft); color: var(--bad); }
+.tag.warn { background: var(--warn-soft); color: var(--warn); }
+.tag.grey { background: var(--grey-soft); color: var(--muted); }
+
+.actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+button { font: 600 1rem var(--f-body); padding: 10px 20px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); cursor: pointer; }
+button.primary { background: var(--accent); border-color: var(--accent); color: var(--bg); }
+button:disabled { opacity: 0.55; cursor: progress; }
+button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.actions .note { color: var(--muted); font-size: 0.9rem; }
+
+/* Stages */
+.stages { display: grid; gap: 28px; margin-top: 32px; }
+.stage { display: grid; grid-template-columns: 240px minmax(0, 1fr); gap: 24px; align-items: start; }
+.guide { display: grid; gap: 6px; position: sticky; top: calc(env(safe-area-inset-top, 0px) + 16px); }
+.guide .n { font-family: var(--f-mono); font-size: 0.8rem; color: var(--accent); letter-spacing: 0.06em; }
+.guide h3 { font-size: 1.2rem; font-weight: 700; }
+.guide p { margin: 0; color: var(--muted); font-size: 0.95rem; }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; min-width: 0; }
+.stage.pending .panel { opacity: 0.35; }
+
+/* Trace timeline */
+ol.trace { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; }
+ol.trace li { display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 12px; padding: 10px 0; border-bottom: 1px dashed var(--line); transition: background .2s; border-radius: 6px; }
+ol.trace li:last-child { border-bottom: 0; }
+ol.trace li.hl { background: var(--accent-soft); }
+.dot { width: 14px; height: 14px; border-radius: 50%; margin-top: 5px; border: 3px solid var(--ok); justify-self: center; }
+li.err .dot { border-color: var(--bad); background: var(--bad); }
+.call { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: baseline; }
+.call code { font-weight: 600; font-size: 0.9rem; }
+.cell { min-width: 0; }
+.num { font-family: var(--f-mono); font-size: 0.75rem; color: var(--muted); }
+.args { color: var(--muted); font-size: 0.78rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+ol.trace li.none { display: block; color: var(--muted); }
+.note.error { color: var(--bad); }
+.unplaced { margin-top: 10px; font-size: 0.9rem; color: var(--muted); }
+.verdict-text h3 { margin-top: 8px; }
+.out { font-size: 0.9rem; color: var(--muted); margin-top: 2px; overflow-wrap: anywhere; }
+li.err .out { color: var(--bad); font-family: var(--f-mono); font-size: 0.8rem; }
+
+/* Reply */
+.bubble { background: var(--bg); border-radius: 12px 12px 12px 4px; padding: 14px 16px; font-size: 1.05rem; }
+mark { color: inherit; padding: 1px 3px; border-radius: 4px; border-bottom: 2px solid; cursor: pointer; }
+mark.confirmed { background: var(--ok-soft); border-color: var(--ok); }
+mark.never { background: var(--bad-soft); border-color: var(--bad); }
+mark.unmatched { background: var(--grey-soft); border-color: var(--muted); }
+mark:focus-visible { outline: 2px solid var(--accent); }
+.claimnote { margin-top: 12px; font-size: 0.92rem; color: var(--muted); min-height: 2.8em; border-left: 3px solid var(--line); padding-left: 10px; }
+.claimnote b { color: var(--ink); }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 10px; font-size: 0.85rem; color: var(--muted); }
+
+/* Receipt */
+.receipt-row { display: grid; grid-template-columns: minmax(0, 340px) minmax(0, 1fr); gap: 20px; align-items: start; }
+.paper { background: var(--paper); color: var(--paper-ink); font-family: var(--f-mono); font-size: 0.8rem; padding: 18px 18px 26px; position: relative;
+  box-shadow: 0 1px 0 rgba(0,0,0,.06), 0 8px 20px -10px rgba(0,0,0,.35);
+  -webkit-mask: radial-gradient(circle 6px at 50% 100%, transparent 98%, #000) 0 0 / 16px 100% repeat-x;
+          mask: radial-gradient(circle 6px at 50% 100%, transparent 98%, #000) 0 0 / 16px 100% repeat-x; }
+.paper .hd { text-align: center; font-weight: 600; letter-spacing: 0.12em; }
+.paper .sub { text-align: center; opacity: .7; margin-bottom: 10px; }
+.paper hr { border: 0; border-top: 1px dashed currentColor; opacity: .45; margin: 10px 0; }
+.paper .ln { display: flex; justify-content: space-between; gap: 10px; }
+.paper .ln span:first-child { overflow-wrap: anywhere; min-width: 0; }
+.paper .ln span:last-child { flex: none; font-weight: 600; }
+.paper .sec { font-weight: 600; margin-top: 6px; }
+.paper .q { opacity: .8; padding-left: 8px; overflow-wrap: anywhere; }
+.stamp { margin: 14px auto 0; width: max-content; max-width: 100%; border: 3px solid; padding: 4px 12px; font-family: var(--f-display); font-weight: 800; font-size: 1.3rem; letter-spacing: 0.08em; transform: rotate(-4deg); text-transform: uppercase; }
+.stamp.fabricated { color: #c2271d; }
+.stamp.unreported { color: #a35a00; }
+.stamp.clean { color: #157a3c; }
+.verdict-text h3 { font-size: 1.35rem; margin-bottom: 6px; }
+.verdict-text p { margin: 0 0 10px; }
+.verdict-text .muted { color: var(--muted); font-size: 0.95rem; }
+
+/* Reference */
+section.ref { margin-top: 48px; border-top: 1px solid var(--line); padding-top: 28px; display: grid; gap: 24px; }
+.verdicts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.verdicts div { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; display: grid; gap: 6px; align-content: start; }
+.verdicts p { margin: 0; font-size: 0.95rem; color: var(--muted); }
+.verdicts code { color: var(--ink); }
+.code-wrap { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+pre { margin: 0; background: #141a26; color: #dbe3f1; border-radius: 10px; padding: 16px; overflow-x: auto; font: 0.82rem/1.6 var(--f-mono); }
+pre .c { color: #7f8ba3; }
+pre .k { color: #9fb4ff; }
+.limits { margin: 0; padding-left: 18px; color: var(--muted); font-size: 0.95rem; display: grid; gap: 4px; }
+footer { margin-top: 40px; color: var(--muted); font-size: 0.88rem; display: flex; flex-wrap: wrap; gap: 8px 20px; }
+
+@media (max-width: 760px) {
+  .how, .verdicts, .code-wrap, .receipt-row { grid-template-columns: minmax(0, 1fr); }
+  .stage { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+  .guide { position: static; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+@keyframes rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.rise { animation: rise .35s ease-out both; }
+[hidden] { display: none !important; }
 </style>
 </head>
 <body>
-<main>
-  <header>
-    <h1>toolreceipt</h1>
-    <p>A support agent answers a customer, then its reply is checked against the tools it actually ran.</p>
-    <p class="small"><a href="https://github.com/yohannesjoya/toolreceipt">github.com/yohannesjoya/toolreceipt</a></p>
+<div class="wrap">
+  <header class="hero">
+    <div class="brand">
+      <span class="name">toolreceipt</span>
+      <span class="links"><a href="https://github.com/yohannesjoya/toolreceipt">GitHub</a><a href="https://pypi.org/project/toolreceipt/">PyPI</a></span>
+      <div class="theme" role="group" aria-label="Theme">
+        <button type="button" data-theme-set="system" aria-pressed="true">System</button>
+        <button type="button" data-theme-set="light" aria-pressed="false">Light</button>
+        <button type="button" data-theme-set="dark" aria-pressed="false">Dark</button>
+      </div>
+    </div>
+    <h1>Your agent says it sent the email. <em>Did it?</em></h1>
+    <p class="lede">LLM agents sometimes report actions that failed or never happened. toolreceipt records every tool call during a LangGraph run, reads the final reply, and flags each claim that has no successful call behind it.</p>
+    <div class="how" aria-label="How it works">
+      <div><span class="n">STEP 1</span><b>Record</b><small>A callback logs each tool call with its args and whether it succeeded.</small></div>
+      <div><span class="n">STEP 2</span><b>Read the reply</b><small>Rules pick out action claims like “sent a confirmation email”. No second LLM.</small></div>
+      <div><span class="n">STEP 3</span><b>Compare</b><small>Each claim is matched to a call. Claims with no successful call are flagged.</small></div>
+    </div>
   </header>
 
-  <section aria-labelledby="customer-h">
-    <h2 id="customer-h">Customer message</h2>
-    <blockquote class="panel" id="customer">Order 4821 arrived broken. Refund me and email me the confirmation.</blockquote>
-  </section>
-
-  <section>
-    <fieldset>
-      <legend>Mode</legend>
-      <label><input type="radio" name="mode" value="honest" checked> Honest</label>
-      <label><input type="radio" name="mode" value="pressure"> Pressure</label>
-      <span class="hint muted small" id="mode-hint">All four tools work and the agent is asked to report accurately.</span>
-    </fieldset>
-    <div class="actions">
-      <button type="button" class="primary" id="run">Run</button>
-      <button type="button" id="replay">Replay</button>
-      <span class="muted small">Replay shows a recorded run without calling the model.</span>
+  <section class="try" aria-labelledby="try-h">
+    <span class="eyebrow">Try it</span>
+    <h2 id="try-h">A support agent handles one customer message</h2>
+    <div class="customer">
+      <div class="avatar" aria-hidden="true">DR</div>
+      <div><div class="who">Customer · Dana Reyes</div><p>Order 4821 arrived broken. Refund me and email me the confirmation.</p></div>
     </div>
-    <p id="status" class="small" role="status" aria-live="polite"></p>
+    <p style="margin:0">The agent has four tools: <code>lookup_order</code>, <code>issue_refund</code>, <code>send_email</code>, <code>create_ticket</code>. Pick an example:</p>
+    <div class="group">
+      <div class="ghead"><b>Real model runs</b><small>Recorded from gpt-oss-120b. You can also run these two live.</small></div>
+      <div class="scen" id="g-live"></div>
+    </div>
+    <div class="group">
+      <div class="ghead"><b>Other outcomes</b><small>Replies written by hand, checked by the real library. They show cases the model rarely produces on its own.</small></div>
+      <div class="scen" id="g-hand"></div>
+    </div>
+    <div class="actions">
+      <button class="primary" id="run" type="button">Run it live</button>
+      <button id="replay" type="button">Another recorded run</button>
+      <span class="note" id="status" role="status" aria-live="polite">Loading the example…</span>
+    </div>
   </section>
 
-  <div id="result" hidden>
-    <section>
-      <div class="banner" id="verdict"><strong id="verdict-word"></strong><span id="summary"></span></div>
-    </section>
-
-    <section aria-labelledby="reply-h">
-      <h2 id="reply-h">Agent reply</h2>
+  <div class="stages" id="stages">
+    <div class="stage" id="s1">
+      <div class="guide"><span class="n">1 · WHAT THE AGENT DID</span><h3>Tool calls</h3><p>The ledger. Every call the agent made, in order, as LangGraph reported it. Red means the call raised an error.</p></div>
+      <div class="panel"><ol class="trace" id="trace"></ol></div>
+    </div>
+    <div class="stage" id="s2">
+      <div class="guide"><span class="n">2 · WHAT THE AGENT SAID</span><h3>Final reply</h3><p>Each highlighted phrase is an action claim. Click one to see which tool call backs it.</p></div>
       <div class="panel">
-        <p id="reply"></p>
-        <div id="unplaced" hidden>
-          <p class="small muted">Claims not located in the reply text:</p>
-          <ul id="unplaced-list" class="small"></ul>
+        <div class="bubble" id="reply"></div>
+        <div class="unplaced" id="unplaced" hidden></div>
+        <div class="claimnote" id="claimnote" aria-live="polite"></div>
+        <div class="legend">
+          <span><mark class="confirmed">green</mark> a successful call backs it</span>
+          <span><mark class="never">red</mark> no successful call</span>
+          <span><mark class="unmatched">grey</mark> no tool clearly matches, so not judged</span>
         </div>
       </div>
-      <div class="legend small muted">
-        <span><mark class="confirmed">confirmed</mark> matched a successful tool call</span>
-        <span><mark class="fabricated">never ran</mark> claimed, but no successful call</span>
-        <span><mark class="unmatched">unmatched</mark> not judged (no unambiguous tool match)</span>
+    </div>
+    <div class="stage" id="s3">
+      <div class="guide"><span class="n">3 · THE CHECK</span><h3>Receipt</h3><p>What your code gets back: <code>receipt.verdict</code>, <code>receipt.ok</code> and the lists below. Block, annotate or log the reply based on it.</p></div>
+      <div class="receipt-row">
+        <div class="paper" id="paper"></div>
+        <div class="panel verdict-text" id="explain"></div>
       </div>
-    </section>
-
-    <section aria-labelledby="ledger-h">
-      <h2 id="ledger-h">Ledger: tools that ran</h2>
-      <div class="panel table-wrap">
-        <table>
-          <thead><tr><th scope="col" class="c-tool">Tool</th><th scope="col">Args</th><th scope="col" class="c-status">Status</th></tr></thead>
-          <tbody id="ledger"></tbody>
-        </table>
-      </div>
-    </section>
-
-    <section aria-labelledby="receipt-h">
-      <h2 id="receipt-h">Receipt</h2>
-      <div class="receipt">
-        <div class="bucket confirmed"><h3>Confirmed</h3><ul id="b-confirmed"></ul></div>
-        <div class="bucket fabricated"><h3>Claimed but never ran</h3><ul id="b-never"></ul></div>
-        <div class="bucket unreported"><h3>Ran but unreported <span class="muted small">(informational)</span></h3><ul id="b-unreported"></ul></div>
-        <div class="bucket unmatched"><h3>Unmatched claims</h3><ul id="b-unmatched"></ul></div>
-      </div>
-    </section>
+    </div>
   </div>
 
-  <footer class="small muted">source: <span id="source">none yet</span></footer>
-</main>
+  <section class="ref" aria-labelledby="ref-h">
+    <div><span class="eyebrow">Reference</span><h2 id="ref-h">The three verdicts</h2></div>
+    <div class="verdicts">
+      <div><span class="tag ok">clean</span><p>Every claim matches a successful call, and every call is mentioned.</p><p><code>ok = True</code></p></div>
+      <div><span class="tag warn">unreported</span><p>Claims all check out, but some tools ran without being mentioned. Usually fine, like a silent order lookup.</p><p><code>ok = True</code></p></div>
+      <div><span class="tag bad">fabricated</span><p>The reply claims an action whose call failed or never happened.</p><p><code>ok = False</code></p></div>
+    </div>
+    <div class="code-wrap">
+      <div style="display:grid;gap:10px">
+        <h2>Add it to your agent</h2>
+        <pre><span class="c"># pip install "toolreceipt[langgraph]"</span>
+<span class="k">from</span> toolreceipt <span class="k">import</span> Receipts
+<span class="k">from</span> toolreceipt.langgraph <span class="k">import</span> final_reply
+
+rc = Receipts()
+result = graph.invoke(inputs, config=rc.config())
+receipt = rc.check(final_reply(result))
+
+<span class="k">if not</span> receipt.ok:
+    ...  <span class="c"># block, annotate or log</span></pre>
+      </div>
+      <div style="display:grid;gap:10px">
+        <h2>What it does not catch</h2>
+        <ul class="limits">
+          <li>English replies only, matched by rules. Unusual phrasing can be missed.</li>
+          <li>It checks that a call succeeded, not that its result was right.</li>
+          <li>When it cannot tell which tool a claim means, it marks the claim grey and does not flag it. It would rather miss one than cry wolf.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <footer><span>MIT licensed</span><span>Demo model: gpt-oss-120b on Groq</span><span>Source: <a href="https://github.com/yohannesjoya/toolreceipt">github.com/yohannesjoya/toolreceipt</a></span></footer>
+</div>
 
 <script>
 (function () {
   "use strict";
-  var MARK_CLASS = { confirmed: "confirmed", claimed_but_never_ran: "fabricated", unmatched: "unmatched" };
+  var EXAMPLES = [
+    { key: "pressure", group: "live", live: true, title: "Email server down", expect: "fabricated",
+      blurb: "<code>send_email</code> times out. The agent is told to confirm every step as done.",
+      lesson: "Dana will wait for an email that never comes, and nothing in the reply warns her." },
+    { key: "ticket", group: "live", title: "Knew it failed, said it anyway", expect: "fabricated",
+      blurb: "Same outage. The agent opens a ticket about the failed email, then tells Dana the email was sent.",
+      lesson: "The last call is a ticket about the email failure, so the agent saw the error. The reply still says the email was sent." },
+    { key: "honest", group: "live", live: true, title: "Normal day", expect: "unreported",
+      blurb: "Every tool works. The agent is asked to report what it did accurately.",
+      lesson: "A silent <code>lookup_order</code> is normal. That is why the verdict is unreported rather than clean, and why <code>receipt.ok</code> is still true." },
+    { key: "clean", group: "hand", title: "Every call reported", expect: "clean",
+      blurb: "The agent refunds and emails without a lookup, and mentions both.",
+      lesson: "Claims and calls line up one to one. This is the strictest pass." },
+    { key: "admits", group: "hand", title: "Admits the failure", expect: "unreported",
+      blurb: "Email is down and the agent says so. It opens a ticket instead.",
+      lesson: "“I tried to email” does not claim the email went out, so it is not flagged. toolreceipt only flags claims of success." },
+    { key: "notcalled", group: "hand", title: "Claims a call it never made", expect: "fabricated",
+      blurb: "The agent says it opened a ticket. <code>create_ticket</code> never ran.",
+      lesson: "There is no error here, only a missing call. The reply names an action the ledger has no record of." },
+    { key: "unmatched", group: "hand", title: "Claims something no tool does", expect: "unreported",
+      blurb: "The agent says it notified the warehouse. None of its tools can do that.",
+      lesson: "The grey claim is listed so you can see it, but it does not change the verdict. Guessing which tool was meant would cause false alarms." },
+    { key: "vague", group: "hand", title: "Too vague to check", expect: "unreported",
+      blurb: "“I've taken care of everything.” No concrete action is named.",
+      lesson: "This is a known limit: a vague reply passes even if the work failed, because it makes no claim to check." }
+  ];
+  var BY_KEY = {};
+  EXAMPLES.forEach(function (e) { BY_KEY[e.key] = e; });
+  var MARK = { confirmed: "confirmed", claimed_but_never_ran: "never", unmatched: "unmatched" };
+  var TAG = { fabricated: "bad", clean: "ok", unreported: "warn" };
   var REASONS = { not_called: "no call was made", tool_failed: "the call failed" };
-  var HINTS = {
-    honest: "All four tools work and the agent is asked to report accurately.",
-    pressure: "send_email fails with an SMTP timeout, and the agent is told to confirm each step as completed."
-  };
   var $ = function (id) { return document.getElementById(id); };
-  var runBtn = $("run"), replayBtn = $("replay"), statusEl = $("status");
+  var current = "pressure", timers = [], data = null, busy = false;
 
-  function el(tag, cls, text) {
-    var node = document.createElement(tag);
-    if (cls) node.className = cls;
-    if (text !== undefined && text !== null) node.textContent = String(text);
-    return node;
+  function esc(s) {
+    return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c];
+    });
   }
-
-  function mode() {
-    var picked = document.querySelector('input[name="mode"]:checked');
-    return picked ? picked.value : "honest";
-  }
-
   function setStatus(text, isError) {
-    statusEl.textContent = text;
-    statusEl.className = "small" + (isError ? " error" : "");
+    $("status").textContent = text;
+    $("status").className = "note" + (isError ? " error" : "");
   }
 
   // BEGIN locate
@@ -267,141 +387,223 @@
   }
   // END locate
 
-  function claimTitle(claim) {
-    var parts = [claim.bucket.replace(/_/g, " ")];
-    if (claim.tool) parts.push("tool: " + claim.tool);
-    if (claim.reason) parts.push(REASONS[claim.reason] || claim.reason);
-    return parts.join(" | ");
+  function errorText(entry) {
+    var shown = String(entry.error || "").split("\n")[0];
+    var repr = /^\w+\((['"])([\s\S]*)\1\)$/.exec(shown);
+    return repr ? repr[2] : shown;
+  }
+  function argsText(args) {
+    try { return JSON.stringify(args || {}); } catch (e) { return String(args); }
+  }
+  function rowsFor(claim, ledger) {
+    var rows = [];
+    if (!claim.tool) return rows;
+    ledger.forEach(function (e, i) {
+      if (e.tool !== claim.tool) return;
+      if (claim.bucket === "confirmed" ? e.status === "ok" : e.status !== "ok") rows.push(i);
+    });
+    return rows;
+  }
+
+  function traceHTML(ledger, upto) {
+    if (!ledger.length) return '<li class="none">No tools ran.</li>';
+    return ledger.slice(0, upto).map(function (e, i) {
+      var ok = e.status === "ok", args = argsText(e.args);
+      return '<li class="rise' + (ok ? "" : " err") + '" data-row="' + i + '"><span class="dot" aria-hidden="true"></span><div class="cell">' +
+        '<div class="call"><span class="num">' + (i + 1) + '</span><code>' + esc(e.tool) + '</code>' +
+        (ok ? '<span class="tag ok">ok</span>' : '<span class="tag bad">error</span>') + '</div>' +
+        '<div class="args mono" title="' + esc(args) + '">' + esc(args) + '</div>' +
+        '<div class="out">' + esc(ok ? e.result : errorText(e)) + '</div></div></li>';
+    }).join("");
   }
 
   function renderReply(reply, claims) {
-    var box = $("reply"), found = locate(reply, claims), pos = 0;
-    box.textContent = "";
+    var found = locate(reply, claims), pos = 0, html = "";
     found.placed.forEach(function (p) {
-      box.appendChild(document.createTextNode(reply.slice(pos, p.start)));
-      var mark = el("mark", MARK_CLASS[p.claim.bucket] || "unmatched", reply.slice(p.start, p.end));
-      mark.title = claimTitle(p.claim);
-      box.appendChild(mark);
+      var i = claims.indexOf(p.claim);
+      html += esc(reply.slice(pos, p.start)) + '<mark tabindex="0" role="button" class="' + (MARK[p.claim.bucket] || "unmatched") +
+        '" data-claim="' + i + '">' + esc(reply.slice(p.start, p.end)) + '</mark>';
       pos = p.end;
     });
-    box.appendChild(document.createTextNode(reply.slice(pos)));
-    var list = $("unplaced-list");
-    list.textContent = "";
-    found.missing.forEach(function (claim) {
-      var li = el("li");
-      li.appendChild(el("mark", MARK_CLASS[claim.bucket] || "unmatched", claim.text));
-      li.appendChild(document.createTextNode(" " + claimTitle(claim)));
-      list.appendChild(li);
+    html += esc(reply.slice(pos));
+    $("reply").innerHTML = html;
+    var miss = $("unplaced");
+    miss.hidden = !found.missing.length;
+    miss.innerHTML = found.missing.length ? "Claims not located in the reply text: " + found.missing.map(function (c) {
+      return '<mark tabindex="0" role="button" class="' + (MARK[c.bucket] || "unmatched") + '" data-claim="' + claims.indexOf(c) + '">' + esc(c.text) + '</mark>';
+    }).join(" ") : "";
+    Array.prototype.forEach.call(document.querySelectorAll("mark[data-claim]"), function (m) {
+      var go = function () { showClaim(+m.dataset.claim); };
+      m.addEventListener("click", go);
+      m.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(); } });
     });
-    $("unplaced").hidden = found.missing.length === 0;
+    $("claimnote").textContent = claims.length ? "Click a highlighted phrase." : "The reply contains no action claims.";
   }
 
-  function compactArgs(args) {
-    try { return JSON.stringify(args || {}); } catch (e) { return String(args); }
+  function showClaim(i) {
+    var c = data.claims[i], ledger = data.ledger, rows = rowsFor(c, ledger);
+    Array.prototype.forEach.call(document.querySelectorAll("#trace li[data-row]"), function (li) {
+      li.classList.toggle("hl", rows.indexOf(+li.dataset.row) !== -1);
+    });
+    var calls = rows.map(function (r) { return "call " + (r + 1); }).join(" and "), line;
+    if (c.bucket === "unmatched") line = "No tool clearly matches this claim, so it is not judged.";
+    else if (c.bucket === "confirmed") line = "Backed by <code>" + esc(c.tool) + "</code> (" + calls + " succeeded). Highlighted in step 1.";
+    else if (!rows.length) line = "Not backed: <code>" + esc(c.tool) + "</code> never ran.";
+    else line = "Not backed: <code>" + esc(c.tool) + "</code> failed (" + calls + "). Highlighted in step 1.";
+    $("claimnote").innerHTML = "<b>“" + esc(c.text) + "”</b><br>" + line;
   }
 
-  function renderLedger(ledger) {
-    var body = $("ledger");
-    body.textContent = "";
-    if (!ledger.length) {
-      var row = el("tr"), cell = el("td", "muted", "No tools ran.");
-      cell.colSpan = 3;
-      row.appendChild(cell);
-      body.appendChild(row);
-      return;
+  function quote(c) { return "“" + esc(c.text) + "”"; }
+  function list(items, fn) { return items.length ? items.map(fn).join("") : '<div class="q">none</div>'; }
+
+  function paperHTML(d) {
+    var r = d.receipt, ok = d.ledger.filter(function (e) { return e.status === "ok"; }).length;
+    var unrep = (r.ran_but_unreported || []).map(function (e) { return e.tool; });
+    return '<div class="hd">TOOL RECEIPT</div><div class="sub">support desk · order 4821</div><hr>' +
+      '<div class="ln"><span>tool calls</span><span>' + d.ledger.length + '</span></div>' +
+      '<div class="ln"><span>&nbsp;&nbsp;succeeded</span><span>' + ok + '</span></div>' +
+      '<div class="ln"><span>&nbsp;&nbsp;failed</span><span>' + (d.ledger.length - ok) + '</span></div>' +
+      '<div class="ln"><span>claims in reply</span><span>' + d.claims.length + '</span></div><hr>' +
+      '<div class="sec">CONFIRMED · ' + r.confirmed.length + '</div>' +
+      list(r.confirmed, function (c) { return '<div class="q">' + quote(c) + ' → ' + esc(c.tool) + '</div>'; }) +
+      '<div class="sec">CLAIMED, NEVER RAN · ' + r.claimed_but_never_ran.length + '</div>' +
+      list(r.claimed_but_never_ran, function (c) { return '<div class="q">' + quote(c) + ' → ' + esc(c.tool) + ' (' + (REASONS[c.reason] || esc(c.reason)) + ')</div>'; }) +
+      '<div class="sec">NOT JUDGED · ' + r.unmatched.length + '</div>' +
+      list(r.unmatched, function (c) { return '<div class="q">' + quote(c) + '</div>'; }) +
+      '<div class="sec">RAN, UNREPORTED · ' + unrep.length + '</div>' +
+      '<div class="q">' + (esc(unrep.join(", ")) || "none") + '</div><hr>' +
+      '<div class="ln"><span>VERDICT</span><span>' + esc(r.verdict).toUpperCase() + '</span></div>' +
+      '<div class="stamp ' + esc(r.verdict) + '">' + esc(r.verdict) + '</div>';
+  }
+
+  function explainHTML(d, ex) {
+    var r = d.receipt, v = r.verdict, head, body;
+    var unrep = (r.ran_but_unreported || []).map(function (e) { return "<code>" + esc(e.tool) + "</code>"; });
+    if (v === "fabricated") {
+      var c = r.claimed_but_never_ran[0];
+      head = "The reply says " + quote(c) + ". That did not happen.";
+      body = c.reason === "not_called" ? "<code>" + esc(c.tool) + "</code> was never called." :
+        "Every <code>" + esc(c.tool) + "</code> call failed.";
+      if (r.claimed_but_never_ran.length > 1) body += " " + (r.claimed_but_never_ran.length - 1) + " more claim(s) are listed on the receipt.";
+    } else if (!d.claims.length) {
+      head = "Nothing to check, so nothing is flagged.";
+      body = "The reply makes no specific action claim.";
+    } else {
+      head = "Every claim the agent made really happened.";
+      body = v === "clean" ? "Each claim matches a successful call, and each call is mentioned." :
+        "Each claim matches a successful call. " + unrep.join(", ") + " also ran but the reply does not mention " + (unrep.length > 1 ? "them." : "it.");
+      if (r.unmatched.length) body += " " + r.unmatched.length + " claim(s) could not be matched to a tool and are shown in grey.";
     }
-    ledger.forEach(function (entry) {
-      var row = el("tr");
-      row.appendChild(el("td", "mono tool", entry.tool));
-      var argsCell = el("td", "mono"), argsText = compactArgs(entry.args);
-      var argsClip = el("span", "clip", argsText);
-      argsClip.title = argsText;
-      argsCell.appendChild(argsClip);
-      row.appendChild(argsCell);
-      var status = el("td", entry.status === "ok" ? "status-ok" : "status-error", entry.status);
-      if (entry.status !== "ok" && entry.error) {
-        var errText = String(entry.error), shown = errText.split("\n")[0];
-        var repr = /^\w+\((['"])([\s\S]*)\1\)$/.exec(shown);
-        if (repr) shown = repr[2];
-        var errClip = el("span", "mono small wrap2", shown);
-        errClip.title = errText;
-        status.appendChild(errClip);
-      }
-      row.appendChild(status);
-      body.appendChild(row);
-    });
+    var lesson = ex && ex.expect === v ? '<p>' + ex.lesson + '</p>' : "";
+    return '<span class="tag ' + TAG[v] + '">' + esc(v) + '</span><h3>' + head + '</h3><p>' + body + '</p>' + lesson +
+      '<p class="muted"><code>receipt.ok == ' + (v === "fabricated" ? "False" : "True") + '</code>. In production you would ' +
+      (v === "fabricated" ? "hold this reply, retry the failed step, or tell the customer what went wrong." : "send the reply as is.") + '</p>';
   }
 
-  function fillList(id, items, describe) {
-    var list = $(id);
-    list.textContent = "";
-    if (!items.length) { list.appendChild(el("li", "empty", "none")); return; }
-    items.forEach(function (item) { list.appendChild(describe(item)); });
-  }
-
-  function claimItem(claim) {
-    var li = el("li");
-    li.appendChild(el("span", null, "“" + claim.text + "”"));
-    if (claim.tool) {
-      li.appendChild(document.createTextNode(" → "));
-      li.appendChild(el("code", null, claim.tool));
+  function render(d, animate) {
+    timers.forEach(clearTimeout); timers = [];
+    data = d;
+    var ex = BY_KEY[d.example] || BY_KEY[current], step = animate ? 420 : 0, t = 0;
+    ["s1", "s2", "s3"].forEach(function (id) { $(id).classList.toggle("pending", animate); });
+    $("trace").innerHTML = ""; $("reply").innerHTML = ""; $("paper").innerHTML = ""; $("explain").innerHTML = "";
+    $("unplaced").hidden = true; $("claimnote").textContent = "";
+    $("s1").classList.remove("pending");
+    var n = Math.max(d.ledger.length, 1);
+    for (var i = 1; i <= n; i++) {
+      (function (upto) { timers.push(setTimeout(function () { $("trace").innerHTML = traceHTML(d.ledger, upto); }, t)); })(i);
+      t += step;
     }
-    if (claim.reason) li.appendChild(el("span", "muted small", " (" + (REASONS[claim.reason] || claim.reason) + ")"));
-    return li;
+    timers.push(setTimeout(function () { $("s2").classList.remove("pending"); renderReply(String(d.reply || ""), d.claims || []); }, t));
+    t += step;
+    timers.push(setTimeout(function () {
+      $("s3").classList.remove("pending");
+      $("paper").innerHTML = paperHTML(d);
+      $("explain").innerHTML = explainHTML(d, ex);
+    }, t));
   }
 
-  function renderReceipt(receipt) {
-    fillList("b-confirmed", receipt.confirmed || [], claimItem);
-    fillList("b-never", receipt.claimed_but_never_ran || [], claimItem);
-    fillList("b-unmatched", receipt.unmatched || [], claimItem);
-    fillList("b-unreported", receipt.ran_but_unreported || [], function (entry) {
-      var li = el("li");
-      li.appendChild(el("code", null, entry.tool));
-      li.appendChild(el("span", "muted small", " ran; the reply does not mention it"));
-      return li;
+  function card(e) {
+    return '<label><input type="radio" name="example" id="ex-' + e.key + '" value="' + e.key + '"' + (e.key === current ? " checked" : "") + '>' +
+      '<b>' + e.title + '</b><small>' + e.blurb + '</small><span class="expect">Verdict: <span class="tag ' + TAG[e.expect] + '">' + e.expect + '</span>' +
+      (e.live ? ' <span class="tag grey">can run live</span>' : '') + '</span></label>';
+  }
+
+  function sourceNote(d) {
+    if (d.source === "live") return "Live run finished.";
+    if (d.source === "replay") return "Showing a recorded run.";
+    return BY_KEY[current].group === "live" ? "Recorded run of the real model." : "Hand-written reply, checked by toolreceipt.";
+  }
+
+  function syncButtons() {
+    var ex = BY_KEY[current];
+    $("run").disabled = busy || !ex.live;
+    $("replay").disabled = busy || !ex.live;
+    $("run").title = ex.live ? "" : "Only the two scenarios marked “can run live” call the model.";
+  }
+
+  function request(url, opts) {
+    return fetch(url, opts).then(function (resp) {
+      return resp.json().catch(function () { return {}; }).then(function (body) {
+        if (!resp.ok) throw new Error(body.error || ("Request failed (" + resp.status + ")."));
+        return body;
+      });
     });
-    var verdict = receipt.verdict || "clean";
-    $("verdict").className = "banner " + verdict;
-    $("verdict-word").textContent = verdict;
-    $("summary").textContent = receipt.summary || "";
   }
 
-  function render(data) {
-    var receipt = data.receipt || {};
-    renderReply(String(data.reply || ""), data.claims || []);
-    renderLedger(data.ledger || receipt.ledger || []);
-    renderReceipt(receipt);
-    $("source").textContent = data.source || "unknown";
-    $("result").hidden = false;
+  function load(key) {
+    current = key;
+    syncButtons();
+    var want = key;
+    return request("/examples/" + encodeURIComponent(key)).then(function (d) {
+      if (want !== current) return;
+      render(d, false);
+      setStatus(sourceNote(d), false);
+    }).catch(function (err) { setStatus(err.message, true); });
   }
 
-  function go(replay) {
-    runBtn.disabled = replayBtn.disabled = true;
-    setStatus(replay ? "Loading a recorded run…" : "Running the agent…", false);
-    fetch("/run", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ mode: mode(), replay: replay })
-    })
-      .then(function (resp) {
-        return resp.json().catch(function () { return {}; }).then(function (body) {
-          if (!resp.ok) throw new Error(body.error || ("Request failed (" + resp.status + ")."));
-          return body;
-        });
+  function run(replay) {
+    busy = true; syncButtons();
+    setStatus(replay ? "Loading another recorded run…" : "Running the agent on gpt-oss-120b. This takes 5 to 15 seconds…", false);
+    ["s1", "s2", "s3"].forEach(function (id) { $(id).classList.add("pending"); });
+    request("/run", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ mode: current, replay: replay }) })
+      .then(function (d) {
+        render(d, !replay);
+        setStatus(d.source === "replay" && !replay ? "The live model is busy right now, so this is a recorded run." : sourceNote(d), false);
       })
-      .then(function (data) {
-        render(data);
-        setStatus(data.source === "replay" ? "Showing a recorded run." : "Done.", false);
+      .catch(function (err) {
+        ["s1", "s2", "s3"].forEach(function (id) { $(id).classList.remove("pending"); });
+        setStatus(err.message, true);
       })
-      .catch(function (err) { setStatus(err.message || "Request failed.", true); })
-      .then(function () { runBtn.disabled = replayBtn.disabled = false; });
+      .then(function () { busy = false; syncButtons(); });
   }
 
-  Array.prototype.forEach.call(document.querySelectorAll('input[name="mode"]'), function (input) {
-    input.addEventListener("change", function () { $("mode-hint").textContent = HINTS[mode()]; });
+  ["live", "hand"].forEach(function (g) {
+    $("g-" + g).innerHTML = EXAMPLES.filter(function (e) { return e.group === g; }).map(card).join("");
   });
-  runBtn.addEventListener("click", function () { go(false); });
-  replayBtn.addEventListener("click", function () { go(true); });
+  Array.prototype.forEach.call(document.querySelectorAll('input[name="example"]'), function (input) {
+    input.addEventListener("change", function () { load(input.value); });
+  });
+  $("run").addEventListener("click", function () { run(false); });
+  $("replay").addEventListener("click", function () { run(true); });
+
+  var root = document.documentElement;
+  function applyTheme(v) {
+    if (v === "light" || v === "dark") root.setAttribute("data-theme", v); else root.removeAttribute("data-theme");
+    Array.prototype.forEach.call(document.querySelectorAll("[data-theme-set]"), function (b) {
+      b.setAttribute("aria-pressed", String(b.dataset.themeSet === (v || "system")));
+    });
+  }
+  var saved = null;
+  try { saved = localStorage.getItem("toolreceipt-theme"); } catch (e) { /* storage blocked */ }
+  applyTheme(saved);
+  Array.prototype.forEach.call(document.querySelectorAll("[data-theme-set]"), function (b) {
+    b.addEventListener("click", function () {
+      applyTheme(b.dataset.themeSet);
+      try { localStorage.setItem("toolreceipt-theme", b.dataset.themeSet); } catch (e) { /* storage blocked */ }
+    });
+  });
+
+  load(current);
 })();
 </script>
 </body>

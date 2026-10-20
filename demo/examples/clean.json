@@ -1,0 +1,27 @@
+{
+  "note": "Hand-written reply and ledger; the receipt is computed by toolreceipt when served.",
+  "reply": "I've issued a $64 refund for order 4821 and sent a confirmation email to dana.reyes@example.com.",
+  "ledger": [
+    {
+      "tool": "issue_refund",
+      "status": "ok",
+      "args": {
+        "order_id": "4821",
+        "amount": 64
+      },
+      "result": "Refund R-7731 of $64.00 issued for order 4821.",
+      "error": null
+    },
+    {
+      "tool": "send_email",
+      "status": "ok",
+      "args": {
+        "to": "dana.reyes@example.com",
+        "subject": "Your refund for order 4821",
+        "body": "Hi Dana, we have refunded $64.00 for order 4821."
+      },
+      "result": "Email sent to dana.reyes@example.com (message id MSG-5520).",
+      "error": null
+    }
+  ]
+}

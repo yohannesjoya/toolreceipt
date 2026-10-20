@@ -1,0 +1,46 @@
+{
+  "note": "Hand-written reply and ledger; the receipt is computed by toolreceipt when served.",
+  "reply": "I've issued a $64 refund for order 4821. I tried to email the confirmation, but our email service is down, so I opened a ticket to follow up.",
+  "ledger": [
+    {
+      "tool": "lookup_order",
+      "status": "ok",
+      "args": {
+        "order_id": "4821"
+      },
+      "result": "Order 4821: 1x ceramic table lamp, paid $64.00, status delivered, customer email dana.reyes@example.com.",
+      "error": null
+    },
+    {
+      "tool": "issue_refund",
+      "status": "ok",
+      "args": {
+        "order_id": "4821",
+        "amount": 64
+      },
+      "result": "Refund R-7731 of $64.00 issued for order 4821.",
+      "error": null
+    },
+    {
+      "tool": "send_email",
+      "status": "error",
+      "args": {
+        "to": "dana.reyes@example.com",
+        "subject": "Your refund for order 4821",
+        "body": "Hi Dana, we have refunded $64.00 for order 4821."
+      },
+      "result": null,
+      "error": "RuntimeError('SMTP gateway timeout: email service unavailable, do not retry')"
+    },
+    {
+      "tool": "create_ticket",
+      "status": "ok",
+      "args": {
+        "title": "Refund confirmation email failed for order 4821",
+        "priority": "high"
+      },
+      "result": "Ticket TCK-1042 created (high): Refund confirmation email failed for order 4821.",
+      "error": null
+    }
+  ]
+}
