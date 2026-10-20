@@ -31,7 +31,7 @@ from langgraph.graph import START, MessagesState, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 from langgraph.prebuilt import ToolNode, tools_condition
 from pydantic import BaseModel
-from toolreceipt import Ledger, Receipts, ToolSpec, check
+from toolreceipt import Ledger, Receipts, check
 from toolreceipt.langgraph import final_reply
 
 from scenarios import support_desk
@@ -289,7 +289,7 @@ def _payload(reply: str, receipt: dict[str, Any]) -> dict[str, Any]:
 def load_example(name: str) -> dict[str, Any]:
     """The named example's reply and ledger, checked against the support desk's tools."""
     data = json.loads(EXAMPLES[name].read_text(encoding="utf-8"))
-    tools = [ToolSpec(t.name, t.description) for t in support_desk.build_tools("honest")]
+    tools = support_desk.build_tools("honest")
     receipt = check(data["reply"], Ledger.from_dict(data["ledger"]), known_tools=tools).to_dict()
     return {"example": name, "source": "example", **_payload(data["reply"], receipt)}
 
