@@ -1,8 +1,8 @@
 """Support desk demo: run a LangGraph agent on Groq and show its reply, ledger and receipt.
 
-Routes: ``GET /`` (the page), ``GET /healthz``, ``POST /run``. A live run that fails for any
-reason (missing key, Groq rate limit, network) falls back to a recorded replay; with no
-replay available the API answers 503 with a JSON error.
+Routes: ``GET /`` (the page), ``GET /healthz``, ``POST /run``, ``GET /examples/{name}``.
+A live run that fails for any reason (missing key, Groq rate limit, network) falls back to
+a recorded replay; with no replay available the API answers 503 with a JSON error.
 """
 
 from __future__ import annotations
@@ -17,6 +17,7 @@ import time
 from collections import OrderedDict, deque
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import TimeoutError as FutureTimeout
+from functools import lru_cache
 from pathlib import Path
 from typing import Any, Literal
 
@@ -30,7 +31,7 @@ from langgraph.graph import START, MessagesState, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 from langgraph.prebuilt import ToolNode, tools_condition
 from pydantic import BaseModel
-from toolreceipt import Receipts
+from toolreceipt import Ledger, Receipts, ToolSpec, check
 from toolreceipt.langgraph import final_reply
 
 from scenarios import support_desk
@@ -38,6 +39,19 @@ from scenarios import support_desk
 HERE = Path(__file__).resolve().parent
 INDEX_HTML = HERE / "static" / "index.html"
 DEFAULT_REPLAY_DIR = HERE / "replays"
+EXAMPLE_DIR = HERE / "examples"
+
+# Fixed runs the page shows on demand: three recorded live runs and five hand-written replies
+# (see examples/). Each is re-checked by the installed toolreceipt when served.
+EXAMPLES: dict[str, Path] = {
+    "pressure": DEFAULT_REPLAY_DIR / "pressure-001.json",
+    "ticket": DEFAULT_REPLAY_DIR / "pressure-002.json",
+    "honest": DEFAULT_REPLAY_DIR / "honest-001.json",
+    **{
+        name: EXAMPLE_DIR / f"{name}.json"
+        for name in ("clean", "admits", "notcalled", "unmatched", "vague")
+    },
+}
 
 log = logging.getLogger("toolreceipt.demo")
 
@@ -211,16 +225,7 @@ def _run_live(mode: str, model: BaseChatModel, deadline: float) -> dict[str, Any
     if not reply.strip():
         raise RuntimeError("the agent produced no reply")
     receipt = receipts.check(reply).to_dict()
-    claims = [{**claim, "bucket": bucket} for bucket in BUCKETS for claim in receipt[bucket]]
-    return {
-        "mode": mode,
-        "source": "live",
-        "customer_message": support_desk.CUSTOMER_MESSAGE,
-        "reply": reply,
-        "ledger": receipt["ledger"],
-        "receipt": receipt,
-        "claims": claims,
-    }
+    return {"mode": mode, "source": "live", **_payload(reply, receipt)}
 
 
 def run_scenario(mode: str, *, model: BaseChatModel | None = None) -> dict[str, Any]:
@@ -267,6 +272,26 @@ def load_replay(mode: str) -> dict[str, Any]:
     data: dict[str, Any] = json.loads(random.choice(files).read_text(encoding="utf-8"))
     data["source"] = "replay"
     return data
+
+
+def _payload(reply: str, receipt: dict[str, Any]) -> dict[str, Any]:
+    claims = [{**claim, "bucket": bucket} for bucket in BUCKETS for claim in receipt[bucket]]
+    return {
+        "customer_message": support_desk.CUSTOMER_MESSAGE,
+        "reply": reply,
+        "ledger": receipt["ledger"],
+        "receipt": receipt,
+        "claims": claims,
+    }
+
+
+@lru_cache(maxsize=len(EXAMPLES))
+def load_example(name: str) -> dict[str, Any]:
+    """The named example's reply and ledger, checked against the support desk's tools."""
+    data = json.loads(EXAMPLES[name].read_text(encoding="utf-8"))
+    tools = [ToolSpec(t.name, t.description) for t in support_desk.build_tools("honest")]
+    receipt = check(data["reply"], Ledger.from_dict(data["ledger"]), known_tools=tools).to_dict()
+    return {"example": name, "source": "example", **_payload(data["reply"], receipt)}
 
 
 # --- rate limit: one POST /run per client IP per RATE_LIMIT_SECONDS (in memory) ---
@@ -352,3 +377,11 @@ def run(body: RunRequest, request: Request) -> dict[str, Any] | JSONResponse:
             {"error": "The live agent is unavailable and no recorded run exists yet."},
             status_code=503,
         )
+
+
+@app.get("/examples/{name}", response_model=None)
+def example(name: str) -> dict[str, Any] | JSONResponse:
+    # Not rate limited: a fixed file checked once per process, no model call.
+    if name not in EXAMPLES:
+        return JSONResponse({"error": f"No example named {name!r}."}, status_code=404)
+    return load_example(name)

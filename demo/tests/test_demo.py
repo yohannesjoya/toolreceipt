@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import time
 from collections.abc import Sequence
 from typing import Any
@@ -459,3 +460,65 @@ def test_locate_skips_overlaps_and_reports_missing():
     found = _locate_js("abc def", [{"text": "abc def"}, {"text": "c d"}, {"text": "zzz"}])
     assert len(found["placed"]) == 1
     assert [c["text"] for c in found["missing"]] == ["c d", "zzz"]
+
+
+EXPECTED_EXAMPLES = {
+    "pressure": "fabricated",
+    "ticket": "fabricated",
+    "honest": "unreported",
+    "clean": "clean",
+    "admits": "unreported",
+    "notcalled": "fabricated",
+    "unmatched": "unreported",
+    "vague": "unreported",
+}
+
+
+def _buckets(body: dict[str, Any]) -> dict[str, list[str | None]]:
+    return {b: [c.get("tool") for c in body["receipt"][b]] for b in demo_app.BUCKETS}
+
+
+@pytest.mark.parametrize("name,verdict", sorted(EXPECTED_EXAMPLES.items()))
+def test_example_is_checked_by_the_library(name, verdict):
+    body = TestClient(demo_app.app).get(f"/examples/{name}").json()
+    assert body["source"] == "example" and body["example"] == name
+    assert body["receipt"]["verdict"] == verdict
+    assert body["customer_message"] == support_desk.CUSTOMER_MESSAGE
+    assert body["ledger"] == body["receipt"]["ledger"]
+    assert len(body["claims"]) == sum(len(body["receipt"][b]) for b in demo_app.BUCKETS)
+
+    def fold(text: str) -> str:  # as the page's locate(): any space, curly apostrophe
+        return re.sub(r"\s", " ", text.replace("’", "'"))
+
+    for claim in body["claims"]:  # every claim is a span of the reply (the page highlights it)
+        assert fold(claim["text"]) in fold(body["reply"])
+
+
+def test_example_outcomes_show_the_intended_case():
+    client = TestClient(demo_app.app)
+    get = lambda name: client.get(f"/examples/{name}").json()  # noqa: E731
+    assert _buckets(get("admits"))["confirmed"] == ["issue_refund", "create_ticket"]
+    never = get("notcalled")["receipt"]["claimed_but_never_ran"]
+    assert [(c["tool"], c["reason"]) for c in never] == [("create_ticket", "not_called")]
+    assert _buckets(get("unmatched"))["unmatched"] == [None]
+    assert get("vague")["claims"] == []
+    ticket = get("ticket")
+    assert [e["tool"] for e in ticket["ledger"]][-1] == "create_ticket"
+    assert _buckets(ticket)["claimed_but_never_ran"] == ["send_email"]
+
+
+def test_examples_list_names_every_example():
+    assert set(demo_app.EXAMPLES) == set(EXPECTED_EXAMPLES)
+
+
+@pytest.mark.parametrize("name", ["nope", "..%2Fapp", "pressure-001"])
+def test_unknown_example_is_404_json(name):
+    resp = TestClient(demo_app.app).get(f"/examples/{name}")
+    assert resp.status_code == 404
+    if "/" not in name and "%" not in name:  # an encoded slash never reaches the handler
+        assert "error" in resp.json()
+
+
+def test_examples_are_not_rate_limited():
+    client = TestClient(demo_app.app)
+    assert [client.get("/examples/clean").status_code for _ in range(3)] == [200, 200, 200]

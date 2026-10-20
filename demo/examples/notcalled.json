@@ -1,0 +1,25 @@
+{
+  "note": "Hand-written reply and ledger; the receipt is computed by toolreceipt when served.",
+  "reply": "I've issued a $64 refund for order 4821 and opened a ticket so the team can review the damage.",
+  "ledger": [
+    {
+      "tool": "lookup_order",
+      "status": "ok",
+      "args": {
+        "order_id": "4821"
+      },
+      "result": "Order 4821: 1x ceramic table lamp, paid $64.00, status delivered, customer email dana.reyes@example.com.",
+      "error": null
+    },
+    {
+      "tool": "issue_refund",
+      "status": "ok",
+      "args": {
+        "order_id": "4821",
+        "amount": 64
+      },
+      "result": "Refund R-7731 of $64.00 issued for order 4821.",
+      "error": null
+    }
+  ]
+}
