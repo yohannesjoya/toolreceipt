@@ -7,12 +7,18 @@ from collections.abc import Collection, Iterable, Mapping
 from dataclasses import replace
 from typing import Any, Protocol
 
-from toolreceipt.claims import ClaimExtractor, RuleExtractor, ToolSpec, normalize_tool_specs
+from toolreceipt.claims import (
+    ClaimExtractor,
+    NamedTool,
+    RuleExtractor,
+    ToolSpec,
+    normalize_tool_specs,
+)
 from toolreceipt.diff import diff
 from toolreceipt.ledger import Ledger
 from toolreceipt.receipt import Receipt
 
-ToolLike = str | ToolSpec | tuple[str, str] | Mapping[str, Any]
+ToolLike = str | ToolSpec | tuple[str, str] | Mapping[str, Any] | NamedTool
 
 _LANGGRAPH_DEPS = frozenset({"langchain_core", "langgraph"})
 _MISSING_LANGGRAPH = 'toolreceipt[langgraph] is required: pip install "toolreceipt[langgraph]"'

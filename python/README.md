@@ -180,8 +180,8 @@ rc = Receipts(
 )
 ```
 
-- `known_tools`: names, `(name, description)` pairs or tool dicts. Merged with the tools
-  discovered from the run.
+- `known_tools`: names, `(name, description)` pairs, tool dicts or tool objects such as
+  LangChain tools. Merged with the tools discovered from the run.
 - `ignore_tools`: read-only tools you do not want listed as unreported.
 - `capture_results=False`: the ledger records only tool name, status and error. Use it when
   tool arguments or results are sensitive.
