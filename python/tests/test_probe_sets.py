@@ -10,8 +10,6 @@ from __future__ import annotations
 import json
 from typing import Any
 
-import pytest
-
 from tests.helpers import FIXTURES
 
 PROBE = FIXTURES / "probe"
@@ -49,11 +47,12 @@ def test_dev_set_shape_and_labels():
     assert sum(c["category"] == "I_trap" for c in cases) == 23
 
 
-@pytest.mark.skipif(not (PROBE / "heldout.json").exists(), reason="held-out set not written yet")
 def test_heldout_set_shape_and_labels():
     cases = _load("heldout.json")
     assert len(cases) == 30
     _check_shape(cases, "heldout-")
     assert sum(c["category"] == "I_trap" for c in cases) >= 6
+    for category in CATEGORIES:
+        assert sum(c["category"] == category for c in cases) >= 2, category
     dev_replies = {c["reply"] for c in _load("dev.json")}
     assert not any(c["reply"] in dev_replies for c in cases)
