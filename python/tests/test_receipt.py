@@ -3,6 +3,7 @@ import json
 from toolreceipt.claims import Claim
 from toolreceipt.diff import diff
 from toolreceipt.ledger import Ledger, LedgerEntry
+from toolreceipt.receipt import render_summary
 
 
 def test_empty_reply_empty_ledger_is_clean():
@@ -11,7 +12,7 @@ def test_empty_reply_empty_ledger_is_clean():
     assert json.dumps(r.to_dict())
     assert set(r.to_dict()) == {
         "confirmed", "claimed_but_never_ran", "unmatched", "ran_but_unreported",
-        "verdict", "ok", "summary", "ledger", "known_tools",
+        "suspected", "verdict", "ok", "summary", "ledger", "known_tools",
     }
 
 
@@ -62,3 +63,48 @@ def test_to_dict_ok_and_ledger_are_json_safe_for_fabricated():
     assert d["ok"] is False and d["ledger"][0]["status"] == "error"
     assert d["claimed_but_never_ran"][0]["reason"] == "tool_failed"
     json.dumps(d)
+
+
+def test_summary_forms_with_suspected():
+    s = Claim(
+        text="check your inbox", verb="other", candidates=["send_email"], tool="send_email",
+        reason="not_called", source="llm",
+    )
+    assert render_summary("clean", [], [], [s], confirmed_count=2) == (
+        '2 claims confirmed; 1 suspected (LLM only): send_email ("check your inbox").'
+    )
+    assert render_summary("clean", [], [], [s], confirmed_count=0) == (
+        'No claims; 1 suspected (LLM only): send_email ("check your inbox").'
+    )
+    assert render_summary("clean", [], [], [], confirmed_count=1) == "All claims confirmed."
+    lookup = LedgerEntry(tool="lookup_order")
+    assert render_summary("unreported", [], [lookup], [s], confirmed_count=2) == (
+        "2 claims confirmed; 1 tool ran unreported: lookup_order; "
+        '1 suspected (LLM only): send_email ("check your inbox").'
+    )
+    assert render_summary("unreported", [], [lookup], [], confirmed_count=2) == (
+        "All claims confirmed; 1 tool ran unreported: lookup_order."
+    )
+    never = Claim(
+        text="I have emailed you", verb="send", candidates=["send_email"], tool="send_email",
+        reason="not_called",
+    )
+    assert render_summary("fabricated", [never], [], [s]) == (
+        '1 claimed action never ran: send_email ("I have emailed you"); 1 more suspected.'
+    )
+    assert render_summary("fabricated", [never], [], [s, s]) == (
+        '1 claimed action never ran: send_email ("I have emailed you"); 2 more suspected.'
+    )
+
+
+def test_claim_source_defaults_and_roundtrips():
+    c = Claim(text="x", verb="send")
+    assert c.source == "rules" and c.to_dict()["source"] == "rules"
+    assert Claim.from_dict({"text": "x", "verb": "send"}).source == "rules"
+    assert Claim.from_dict({"text": "x", "verb": "other", "source": "llm"}).source == "llm"
+
+
+def test_receipt_to_dict_has_suspected_after_unmatched():
+    keys = list(diff([], Ledger()).to_dict())
+    assert keys[keys.index("unmatched") + 1] == "suspected"
+    assert diff([], Ledger()).suspected == []

@@ -5,7 +5,7 @@ from toolreceipt.claims import RuleExtractor, normalize_tool_specs
 
 CASES = load_cases("extractor")
 # Keys compared when present in a fixture's expected claim.
-COMPARED = ("verb", "object", "count", "text", "candidates", "confidence")
+COMPARED = ("verb", "object", "count", "text", "candidates", "confidence", "source")
 
 
 def test_fixture_count():

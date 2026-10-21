@@ -5,6 +5,7 @@ def test_claim_to_dict_exact_fields():
     c = Claim(text="I sent it", verb="send")
     assert set(c.to_dict()) == {
         "text", "verb", "object", "count", "candidates", "tool", "confidence", "reason",
+        "source",
     }
     assert Claim.from_dict(c.to_dict()) == c
 

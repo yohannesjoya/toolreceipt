@@ -14,6 +14,7 @@ from typing import Any, Literal, NamedTuple, Protocol
 
 Confidence = Literal["high", "medium"]
 Reason = Literal["tool_failed", "not_called"]
+Source = Literal["rules", "llm"]
 
 
 class ToolSpec(NamedTuple):
@@ -41,6 +42,7 @@ class Claim:
     tool: str | None = None
     confidence: Confidence | None = None
     reason: Reason | None = None
+    source: Source = "rules"
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -52,6 +54,7 @@ class Claim:
             "tool": self.tool,
             "confidence": self.confidence,
             "reason": self.reason,
+            "source": self.source,
         }
 
     def __post_init__(self) -> None:
@@ -73,6 +76,7 @@ class Claim:
             tool=data.get("tool"),
             confidence=data.get("confidence"),
             reason=data.get("reason"),
+            source=data.get("source", "rules"),
         )
 
 
