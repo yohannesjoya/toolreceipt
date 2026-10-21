@@ -49,10 +49,14 @@ def _check(
     known: list[ToolSpec],
     ignore_tools: Collection[str],
     extractor: ClaimExtractor | None,
+    llm_blocks: bool = False,
 ) -> Receipt:
     specs = _merge_tools(known, (ToolSpec(name, "") for name in sorted(ledger.tools())))
     claims = (extractor or RuleExtractor()).extract(reply, specs)
-    return diff(claims, ledger, known_tools=[s.name for s in specs], ignore_tools=ignore_tools)
+    return diff(
+        claims, ledger, known_tools=[s.name for s in specs], ignore_tools=ignore_tools,
+        llm_blocks=llm_blocks,
+    )
 
 
 def check(
@@ -62,9 +66,16 @@ def check(
     known_tools: Iterable[ToolLike] = (),
     ignore_tools: Collection[str] = (),
     extractor: ClaimExtractor | None = None,
+    llm_blocks: bool = False,
 ) -> Receipt:
-    """Framework-free check of ``reply`` against ``ledger``."""
-    return _check(reply, ledger, normalize_tool_specs(known_tools), ignore_tools, extractor)
+    """Framework-free check of ``reply`` against ``ledger``.
+
+    ``llm_blocks``: let claims found only by an LLM extractor make the verdict ``fabricated``;
+    by default they are reported in ``Receipt.suspected``.
+    """
+    return _check(
+        reply, ledger, normalize_tool_specs(known_tools), ignore_tools, extractor, llm_blocks
+    )
 
 
 class Receipts:
@@ -78,8 +89,10 @@ class Receipts:
         ignore_tools: Collection[str] = (),
         capture_results: bool = True,
         max_result_chars: int = 2000,
+        llm_blocks: bool = False,
     ) -> None:
         self._extractor = extractor
+        self._llm_blocks = llm_blocks
         self._known_tools = normalize_tool_specs(known_tools)
         self._ignore_tools = set(ignore_tools)
         self._capture_results = capture_results
@@ -120,4 +133,6 @@ class Receipts:
             )
         if not self._capture_results:
             ledger = Ledger(replace(e, args={}, result=None) for e in ledger.entries)
-        return _check(reply, ledger, known, self._ignore_tools, self._extractor)
+        return _check(
+            reply, ledger, known, self._ignore_tools, self._extractor, self._llm_blocks
+        )

@@ -1,0 +1,40 @@
+{
+  "claims": [
+    {
+      "text": "check your inbox",
+      "verb": "other",
+      "candidates": [
+        "send_email"
+      ],
+      "confidence": "medium",
+      "source": "llm"
+    }
+  ],
+  "ledger": [
+    {
+      "tool": "send_email",
+      "status": "ok"
+    }
+  ],
+  "known_tools": [
+    "send_email",
+    "lookup_order",
+    "issue_refund"
+  ],
+  "ignore_tools": [],
+  "expected": {
+    "verdict": "clean",
+    "ok": true,
+    "confirmed": [
+      {
+        "tool": "send_email",
+        "source": "llm"
+      }
+    ],
+    "claimed_but_never_ran": [],
+    "unmatched": [],
+    "suspected": [],
+    "ran_but_unreported": [],
+    "summary": "All claims confirmed."
+  }
+}
