@@ -178,6 +178,18 @@ def _normalize(text: str) -> str:
     )
 
 
+_ODD_SPACES = str.maketrans({" ": " ", " ": " ", " ": " ", " ": " "})
+
+
+def normalize_loose(text: str) -> str:
+    """Lower-case, straight-quoted, single-spaced text for containment tests.
+
+    Unlike ``_normalize`` it does not keep character positions: non-breaking and narrow
+    spaces become spaces and whitespace runs collapse.
+    """
+    return _WHITESPACE.sub(" ", _normalize(text).translate(_ODD_SPACES)).strip().lower()
+
+
 def _tokens(text: str) -> list[str]:
     low = _normalize(text).lower()
     for short, full in _CONTRACTIONS:
@@ -318,10 +330,17 @@ def _subject_kind(action: _Action, clause: str, lexicon: Mapping[str, Any]) -> s
     elif last == "you" and "been" not in aux:
         return "state"  # "you were charged"
     # Passive or headline with no first-person agent.
-    timed = any(re.search(p, _normalize(clause).lower()) for p in lexicon.get("time_markers", ()))
-    if timed or _by_other_agent(clause, lexicon):
+    if _state_marked(clause, lexicon):
         return "state"
     return "passive"
+
+
+def _state_marked(clause: str, lexicon: Mapping[str, Any]) -> bool:
+    """A time marker ("on the 1st", "yesterday") or a non-agent ``by`` phrase: the clause
+    describes a state of affairs, not the agent's own action."""
+    low = _normalize(clause).lower()
+    timed = any(re.search(p, low) for p in lexicon.get("time_markers", ()))
+    return timed or _by_other_agent(clause, lexicon)
 
 
 def _verbless_other_subject(clause: str, lexicon: Mapping[str, Any]) -> bool | None:
@@ -343,22 +362,31 @@ def _verbless_other_subject(clause: str, lexicon: Mapping[str, Any]) -> bool | N
     return None
 
 
-def _lexically_filtered(clause: str, lexicon: Mapping[str, Any]) -> bool:
+def _lexically_filtered(
+    clause: str, lexicon: Mapping[str, Any], *, future_advice: bool = True
+) -> bool:
+    """Question mark, ``negation`` and ``other_subject`` phrases; with ``future_advice``
+    (the rules' setting) also the ``future`` and ``advice`` lists."""
     if clause.strip().endswith("?"):
         return True
     low = _normalize(clause).lower()
     if any(_contains_any(low, lexicon.get(k, ())) for k in ("negation", "other_subject")):
         return True
+    if not future_advice:
+        return False
     # "I can confirm ..." / "Please note ..." are not future or advice.
     for phrase in lexicon.get("filter_exempt", ()):
         low = re.sub(_phrase(phrase), " ", low)
     return any(_contains_any(low, lexicon.get(k, ())) for k in ("future", "advice"))
 
 
-def is_filtered(clause: str, lexicon: Mapping[str, Any]) -> bool:
+def is_filtered(clause: str, lexicon: Mapping[str, Any], *, future_advice: bool = True) -> bool:
     """True when the clause is negated, future/conditional, a question, advice, or the
-    action belongs to someone other than the agent (other subject or a state description)."""
-    if _lexically_filtered(clause, lexicon):
+    action belongs to someone other than the agent (other subject or a state description).
+
+    ``future_advice=False`` skips the future and advice lists (the LLM guards use this).
+    """
+    if _lexically_filtered(clause, lexicon, future_advice=future_advice):
         return True
     action = _scan(clause, lexicon)
     return action is not None and _subject_kind(action, clause, lexicon) in {"other", "state"}
