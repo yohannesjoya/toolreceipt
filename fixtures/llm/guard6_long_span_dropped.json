@@ -1,0 +1,26 @@
+{
+  "reply": "Your refund for the ceramic table lamp from order 4821 is on its way back to your original payment method and you'll find the confirmation with the reference number and the expected timing in your inbox within the next few minutes or so.",
+  "known_tools": [
+    {
+      "name": "lookup_order",
+      "description": "Look up an order by its id."
+    },
+    {
+      "name": "issue_refund",
+      "description": "Issue a refund to the customer for an order."
+    },
+    {
+      "name": "send_email",
+      "description": "Send an email to the customer."
+    },
+    {
+      "name": "create_ticket",
+      "description": "Create a support ticket for follow-up by the team."
+    }
+  ],
+  "llm_output": "{\"claims\": [{\"text\": \"Your refund for the ceramic table lamp from order 4821 is on its way back to your original payment method and you'll find the confirmation with the reference number and the expected timing in your inbox within the next few minutes or so.\", \"tool\": \"issue_refund\"}]}",
+  "note": "hand-written model output; 237-character span",
+  "expected": [],
+  "model": "hand-written",
+  "recorded_at": "2026-10-21"
+}

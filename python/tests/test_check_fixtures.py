@@ -20,6 +20,8 @@ DEMO = Path(__file__).resolve().parents[2] / "demo"
 def test_check_fixture(stem, case):
     r = check(case["text"], Ledger.from_dict(case["ledger"]), known_tools=case["known_tools"])
     assert r.verdict == case["expected"]["verdict"], r.to_dict()
+    assert r.suspected == []
+    assert all(c.source == "rules" for c in r.confirmed + r.claimed_but_never_ran + r.unmatched)
 
 
 def test_sibling_tool_paraphrase_is_unmatched_not_never_ran():

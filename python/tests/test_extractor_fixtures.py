@@ -17,6 +17,7 @@ def test_fixture_count():
 )
 def test_extractor_fixture(stem, case):
     claims = RuleExtractor().extract(case["text"], normalize_tool_specs(case["known_tools"]))
+    assert all(c.source == "rules" for c in claims)
     assert len(claims) == len(case["expected"]), [c.to_dict() for c in claims]
     for claim, exp in zip(claims, case["expected"], strict=True):
         for key, value in exp.items():

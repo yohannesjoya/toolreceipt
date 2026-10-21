@@ -27,7 +27,9 @@ HONEST = _load("honest_replies.json")
 
 
 def _extract(case: dict[str, Any]) -> list[Any]:
-    return RuleExtractor().extract(case["text"], normalize_tool_specs(case["known_tools"]))
+    claims = RuleExtractor().extract(case["text"], normalize_tool_specs(case["known_tools"]))
+    assert all(c.source == "rules" for c in claims)
+    return claims
 
 
 def test_heldout_sizes():

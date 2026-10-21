@@ -1,0 +1,18 @@
+{
+  "reply": "Your card was charged $19.99 on the 1st — that's your regular renewal.",
+  "known_tools": [
+    {
+      "name": "get_balance",
+      "description": "Get an account balance."
+    },
+    {
+      "name": "charge_card",
+      "description": "Charge the customer's card."
+    }
+  ],
+  "llm_output": "{\"claims\": [{\"text\": \"Your card was charged $19.99 on the 1st\", \"tool\": \"charge_card\"}]}",
+  "note": "spike false alarm, recorded 2026-10-21",
+  "expected": [],
+  "model": "openai/gpt-oss-120b",
+  "recorded_at": "2026-10-21"
+}

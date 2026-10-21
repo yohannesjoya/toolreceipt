@@ -18,7 +18,23 @@ import re
 from collections.abc import Callable, Mapping, Sequence
 from typing import Any, Literal
 
-from toolreceipt.claims import Claim, RuleExtractor, ToolSpec, _default_lexicon
+from toolreceipt.claims import (
+    Claim,
+    RuleExtractor,
+    ToolSpec,
+    _default_lexicon,
+    _lexically_filtered,
+    _normalize,
+    _scan,
+    _state_marked,
+    _stem,
+    _subject_kind,
+    _verbless_other_subject,
+    normalize_loose,
+    split_clauses,
+    split_sentences,
+    tokenize_tool_name,
+)
 
 log = logging.getLogger("toolreceipt.llm")
 
@@ -171,13 +187,141 @@ class LLMExtractor:
                 raise
             log.warning("LLM extractor fell back to rules: %s", type(exc).__name__)
             return rules
-        llm_claims = [self._claim(span, tool) for span, tool in pairs]
-        return rules + llm_claims
+        names = {t.name for t in known_tools}
+        guarded = [_guard(span, tool, text, names, self._lexicon) for span, tool in pairs]
+        llm_claims = [c for c in guarded if c is not None]
+        loose_reply = normalize_loose(text)
+        llm_claims.sort(key=lambda c: loose_reply.find(normalize_loose(c.text)))
+        return _merge(rules, llm_claims)
 
-    def _claim(self, span: str, tool: str | None) -> Claim:
-        claim = Claim(
-            text=span, verb="other", candidates=[tool] if tool else [], confidence="medium",
-            source="llm",
+
+# ---------------------------------------------------------------------------
+# Guards (PRD 02 §7.3): applied to every model claim, in order; the first failing one wins.
+# ---------------------------------------------------------------------------
+
+MAX_SPAN_CHARS = 200
+
+
+def _guard(
+    span: str, tool: str | None, reply: str, names: set[str], lexicon: Mapping[str, Any]
+) -> Claim | None:
+    """The model claim as a ``Claim``, or ``None`` when a guard drops it."""
+    span = span.strip()
+    loose_span, loose_reply = normalize_loose(span), normalize_loose(reply)
+    if not loose_span or loose_span not in loose_reply:
+        return None  # 1. not a verbatim span of the reply
+    if tool is not None and tool not in names:
+        tool = None  # 2. unknown tool: the claim survives as unmatched
+    if tool is not None and _read_tool(tool, lexicon):
+        tool = None  # 3. read-only tool: unmatched, as the rules treat read verbs
+    if _quoted_everywhere(loose_span, loose_reply):
+        return None  # 4. quoted, drafted or code
+    if _clause_filtered(_first_clause(loose_span, reply), lexicon):
+        return None  # 5. negated, question, other subject or state description
+    if len(loose_span) > MAX_SPAN_CHARS:
+        return None  # 6. a paragraph, not a claim
+    claim = Claim(
+        text=span, verb="other", candidates=[tool] if tool else [], confidence="medium",
+        source="llm",
+    )
+    claim._object_matched = True
+    return claim
+
+
+def _read_tool(name: str, lexicon: Mapping[str, Any]) -> bool:
+    reads = {_stem(v) for v in lexicon.get("read_verbs", ())}
+    return bool(reads & set(tokenize_tool_name(name)))
+
+
+def _quoted_everywhere(span: str, reply: str) -> bool:
+    """True when every occurrence of ``span`` in ``reply`` sits inside double quotes,
+    backticks or a fenced code block (both strings already ``normalize_loose``d)."""
+    start = reply.find(span)
+    if start < 0:
+        return False
+    while start >= 0:
+        before = reply[:start]
+        fenced = before.count("```") % 2 == 1
+        ticked = before.replace("```", "").count("`") % 2 == 1
+        quoted = before.count('"') % 2 == 1
+        if not (fenced or ticked or quoted):
+            return False
+        start = reply.find(span, start + 1)
+    return True
+
+
+def _first_clause(loose_span: str, reply: str) -> str:
+    """The reply clause (split as the rules split) holding the span's first five words;
+    the span itself when none does."""
+    key = " ".join(loose_span.split()[:5])
+    for sentence in split_sentences(_normalize(reply)):
+        for clause in split_clauses(sentence):
+            if key in normalize_loose(clause):
+                return clause
+    return loose_span
+
+
+def _clause_filtered(clause: str, lexicon: Mapping[str, Any]) -> bool:
+    """``is_filtered`` minus its future/advice half, so outcome claims survive: question
+    mark, negation and other-subject lists; then an ``other`` or ``state`` subject, and the
+    time-marker/by-agent test for implicit and verbless subjects (never for ``I``/``we``)."""
+    if _lexically_filtered(clause, lexicon, future_advice=False):
+        return True
+    action = _scan(clause, lexicon)
+    if action is None:
+        other = _verbless_other_subject(clause, lexicon)
+        return other is not False and _state_marked(clause, lexicon)
+    kind = _subject_kind(action, clause, lexicon)
+    if kind in {"other", "state"}:
+        return True
+    return kind == "implicit" and _state_marked(clause, lexicon)
+
+
+# ---------------------------------------------------------------------------
+# Merge (PRD 02 §7.4): rules first and winning on overlap; the model fills gaps and
+# resolves unmatched rule claims (which never block, so replacing one is safe). A rule claim
+# with candidates is never replaced or re-evidenced.
+# ---------------------------------------------------------------------------
+
+
+def _overlaps(rule: Claim, llm: Claim) -> bool:
+    a, b = normalize_loose(rule.text), normalize_loose(llm.text)
+    return a in b or b in a
+
+
+def _merge(rules: list[Claim], llm: list[Claim]) -> list[Claim]:
+    kept: list[Claim] = []
+    replaced: list[int] = []  # unmatched rule claims the model resolved (row 2)
+    for claim in llm:
+        overlapping = [r for r in rules if _overlaps(r, claim)]
+        if not overlapping:
+            kept.append(claim)
+        elif any(r.candidates and r._object_matched is not False for r in overlapping):
+            continue  # the rule claim stands
+        elif not claim.candidates:
+            continue  # neither side resolved it; the rule claim is already unmatched
+        elif unmatched := [r for r in overlapping if not r.candidates]:
+            r = unmatched[0]  # the model resolved what the rules could not
+            resolved = Claim(
+                text=r.text, verb=r.verb, object=r.object, count=r.count,
+                candidates=list(claim.candidates), confidence="medium", source="llm",
+            )
+            resolved._object_matched = True
+            replaced.append(id(r))
+            kept.append(resolved)
+        else:
+            kept.append(claim)  # family-alone rule claim: keep both, the diff decides
+    rule_sets = {frozenset(r.candidates) for r in rules if r.candidates}
+    seen: set[tuple[str, Any]] = set()
+    out: list[Claim] = []
+    for claim in kept:
+        if claim.candidates and frozenset(claim.candidates) in rule_sets:
+            continue  # the same tool is already claimed by the rules
+        key: tuple[str, Any] = (
+            ("tools", frozenset(claim.candidates)) if claim.candidates
+            else ("text", normalize_loose(claim.text))
         )
-        claim._object_matched = True
-        return claim
+        if key not in seen:
+            seen.add(key)
+            out.append(claim)
+    return [r for r in rules if id(r) not in replaced] + out

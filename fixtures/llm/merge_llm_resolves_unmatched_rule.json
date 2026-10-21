@@ -1,0 +1,24 @@
+{
+  "reply": "I've booked your appointment at 3pm.",
+  "known_tools": [
+    {
+      "name": "create_event",
+      "description": "Create a calendar event."
+    }
+  ],
+  "llm_output": "{\"claims\": [{\"text\": \"booked your appointment\", \"tool\": \"create_event\"}]}",
+  "note": "hand-written model output",
+  "expected": [
+    {
+      "text": "I've booked your appointment at 3pm",
+      "verb": "schedule",
+      "object": "appointment at 3pm",
+      "candidates": [
+        "create_event"
+      ],
+      "source": "llm"
+    }
+  ],
+  "model": "hand-written",
+  "recorded_at": "2026-10-21"
+}
