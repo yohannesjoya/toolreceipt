@@ -136,6 +136,31 @@ guards must drop has `"expected": []` (or only the rule claims). An optional `le
 the test check that `ok` agrees with the rules-only receipt under that ledger. Hand-written
 `llm_output` is fine for guard cases; say so in a `note`.
 
+## Probe sets and recordings
+
+`fixtures/probe/dev.json` (114 cases, used to tune the prompt and guards) and
+`fixtures/probe/heldout.json` (30 cases, labelled before any tuning) measure the LLM path.
+A case is `{id, category, domain, reply, known_tools, ledger, expected_tools}`;
+`expected_tools` lists the tools the reply claims, `[]` for a trap, and
+`python/tests/test_probe_sets.py` checks the shape. Never edit a held-out case to fit the
+code; add a dev case instead.
+
+The model output for every case is committed as `fixtures/probe/<set>.recorded.json`
+(`prompt_version`, `model`, `recorded_at`, `cases[].llm_output`), and
+`python/tests/test_probe_replay.py` replays it with no network and gates on it. A change to
+the prompt bumps `PROMPT_VERSION` in `python/toolreceipt/llm.py` and needs a re-record:
+
+```bash
+cd python
+GROQ_API_KEY=... ../demo/.venv/bin/python scripts/eval_llm.py --set dev
+../demo/.venv/bin/python scripts/eval_llm.py --set heldout
+../demo/.venv/bin/python scripts/eval_llm.py --set v01
+../demo/.venv/bin/python scripts/eval_llm.py --set dev --replay   # table from the recording only
+```
+
+Guard and lexicon changes need no re-record: the replay test re-runs the guards on the
+recorded output. Copy the printed tables into the README's "LLM extractor numbers".
+
 ## Add or extend a lexicon family
 
 `python/toolreceipt/lexicon.json` holds the verb families (`send`, `create`, `update`,

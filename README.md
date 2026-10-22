@@ -38,10 +38,12 @@ advice ("you can create a ticket"), conditionals and offers are not claims.
   ledger. Raise, or return an error `ToolMessage`.
 - **Argument mismatches.** "I emailed Bob" passes if `send_email` ran, whatever `to` was.
 - **Quantities.** "Updated 3 rows" against one call is recorded as a count on the claim, never judged.
-- **Non-English replies.** English only.
+- **Non-English replies.** The default extractor is English only. `LLMExtractor` reads
+  other languages, but its guards are English only (see below).
 - **Streaming and mid-run checks.** Only the final reply is checked.
-- **Tool names without a verb.** A tool called `email_customer` never matches, so claims
-  about it land in `unmatched` (informational, they never affect the verdict).
+- **Tool names without a verb.** With the default extractor a tool called `email_customer`
+  never matches, so claims about it land in `unmatched` (informational, they never affect
+  the verdict). `LLMExtractor` can name it, since the model matches on the description.
 - **Loose tool matching.** A claim maps to a tool only when the tool name shares the
   claim's action verb family (`send`, `create`, `update`, `delete`, `refund`, ...).
 - **Loose paraphrases of an action done with a different tool.** "I've raised this with our
@@ -102,6 +104,7 @@ temperature 0, recorded 2026-10-22 and replayed offline by `tests/test_probe_rep
 | dev (114) | rules only | 34 / 113 (30%) | 0.94 | 14 / 67 (21%) | 2 / 23 |
 | dev (114) | rules + LLM, default (`suspected`) | 101 / 113 (89%) | 0.97 | 60 / 67 (90%) | 2 / 23 (0 added by the LLM) |
 | dev (114) | rules + LLM, `llm_blocks=True` | 101 / 113 (89%) | 0.97 | 60 / 67 (90%) | 2 / 23 (0 added by the LLM) |
+| held-out (30) | rules only | 4 / 35 (11%) | 1.00 | 1 / 18 (6%) | 0 / 7 |
 | held-out (30) | rules + LLM, default (`suspected`) | 31 / 35 (89%) | 0.97 | 15 / 18 (83%) | 1 / 7 |
 | held-out (30) | rules + LLM, `llm_blocks=True` | 31 / 35 (89%) | 0.97 | 15 / 18 (83%) | 1 / 7 |
 
@@ -173,8 +176,8 @@ falls back to the rules (`on_error="raise"` to surface it instead).
 
 Every LLM claim must be a verbatim span of the reply, and only a claim naming a listed tool
 is judged (the rest stay in `unmatched`). Each one goes through the lexicon's negation,
-other-subject and state checks before it counts, so the LLM path is held to the same "do not
-cry wolf" bar as the rules. Those checks are English-only:
+conditional, other-subject and state checks before it counts, so the LLM path is held to the
+same "do not cry wolf" bar as the rules. Those checks are English-only:
 on a non-English span only the prompt's exclusions apply. A reply can talk the model out of
 reporting a claim, but never out of a rule claim: the LLM path only adds. `check()` now waits
 on one model round trip (one to three seconds on Groq).

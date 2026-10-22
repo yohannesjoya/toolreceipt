@@ -34,7 +34,7 @@ from toolreceipt import Ledger, LLMExtractor, check  # noqa: E402
 from toolreceipt.claims import normalize_tool_specs  # noqa: E402
 from toolreceipt.llm import PROMPT_VERSION  # noqa: E402
 
-DEFAULT_MODEL = "openai/gpt-oss-120b"
+DEFAULT_MODEL = "openai/gpt-oss-20b"  # the model behind the committed recordings
 SETS = ("dev", "heldout", "v01")
 
 
@@ -87,27 +87,32 @@ def truth_fabricated(case: dict[str, Any]) -> bool:
     return any(t not in ok for t in case["expected_tools"])
 
 
-def evaluate(case: dict[str, Any], llm_output: str | None, *, llm_blocks: bool) -> dict[str, Any]:
-    """Resolved tools and the caught/false-alarm outcome for one case under one setting."""
-    receipt = check(
-        case["reply"], Ledger.from_dict(case["ledger"]), known_tools=case["known_tools"],
+def evaluate(
+    case: dict[str, Any], llm_output: str | None, *, llm_blocks: bool, rules_only: bool = False
+) -> dict[str, Any]:
+    """Resolved tools and the caught/false-alarm outcome for one case under one setting.
+    ``rules_only`` scores the default extractor alone (the README's "rules only" row)."""
+    ledger = Ledger.from_dict(case["ledger"])
+    rules = check(case["reply"], ledger, known_tools=case["known_tools"])
+    receipt = rules if rules_only else check(
+        case["reply"], ledger, known_tools=case["known_tools"],
         extractor=replay_extractor(llm_output), llm_blocks=llm_blocks,
-    )
-    rules_only = check(
-        case["reply"], Ledger.from_dict(case["ledger"]), known_tools=case["known_tools"]
     )
     judged = receipt.confirmed + receipt.claimed_but_never_ran + receipt.suspected
     resolved = {c.tool for c in judged if c.tool}
     caught = receipt.verdict == "fabricated" or bool(receipt.suspected)
     return {
         "resolved": sorted(resolved), "verdict": receipt.verdict, "caught": caught,
-        "rules_caught": rules_only.verdict == "fabricated",
+        "rules_caught": rules.verdict == "fabricated",
         "suspected": [c.tool for c in receipt.suspected],
-        "want_fab": truth_fabricated(case), "fallback": llm_output is None,
+        "want_fab": truth_fabricated(case),
+        "fallback": llm_output is None and not rules_only,
     }
 
 
-def score(cases: list[dict[str, Any]], *, llm_blocks: bool) -> dict[str, dict[str, int]]:
+def score(
+    cases: list[dict[str, Any]], *, llm_blocks: bool, rules_only: bool = False
+) -> dict[str, dict[str, int]]:
     """Per-category and ``TOTAL`` counts: claims, hit, spur, fab, caught, false_alarm,
     llm_false_alarm, fallbacks.
 
@@ -119,7 +124,9 @@ def score(cases: list[dict[str, Any]], *, llm_blocks: bool) -> dict[str, dict[st
     """
     stats: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
     for case in cases:
-        r = evaluate(case, case.get("llm_output"), llm_blocks=llm_blocks)
+        r = evaluate(
+            case, case.get("llm_output"), llm_blocks=llm_blocks, rules_only=rules_only
+        )
         want = set(case["expected_tools"])
         got = set(r["resolved"])
         for key in (case["category"], "TOTAL"):
@@ -159,7 +166,9 @@ def render_table(stats: dict[str, dict[str, int]]) -> str:
 
 
 def summary_tables(cases: list[dict[str, Any]]) -> str:
-    out = []
+    """The three README rows for one set: rules only, rules + LLM under the default, and
+    rules + LLM under ``llm_blocks=True``."""
+    out = [f"== rules only\n{render_table(score(cases, llm_blocks=False, rules_only=True))}"]
     for llm_blocks in (False, True):
         label = "llm_blocks=True" if llm_blocks else "default (suspected)"
         out.append(f"== {label}\n{render_table(score(cases, llm_blocks=llm_blocks))}")

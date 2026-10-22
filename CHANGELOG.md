@@ -15,7 +15,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   any chat model for the claims they cannot see (outcome phrasing, synonyms, passive voice,
   status lines, other languages). Takes a plain `complete(prompt) -> str` callable, or any
   LangChain chat model through `LLMExtractor.from_chat_model(model)`. Six precision guards
-  reuse the rule lexicon; on any provider error it falls back to the rules (`on_error`).
+  reuse the rule lexicon, including its sentence-level drops (conditional sentences, a
+  subject inherited from the previous clause); on any provider error it falls back to the
+  rules (`on_error`).
   No new dependency, no new extra; nothing changes without constructing one.
 - `Receipt.suspected`: claims found only by the LLM whose tool never ran. Reported, never
   blocking by default. `summary` gains a suffix when it is non-empty.
