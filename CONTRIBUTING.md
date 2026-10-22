@@ -100,6 +100,40 @@ never be `fabricated`, and for fabrications that must stay caught.
 }
 ```
 
+## Add an LLM fixture
+
+Fixtures in `fixtures/llm/*.json` replay recorded model output through `LLMExtractor` with no
+network (`python/tests/test_llm_fixtures.py`). They pin the precision guards and the merge
+with the rule claims. Record one from a real run:
+
+```python
+extractor = LLMExtractor(complete=my_call)
+extractor.extract(reply, known_tools)
+print(extractor.last_raw)   # paste into "llm_output"
+```
+
+```json
+{
+  "reply": "Your refund is on its way and you'll find the confirmation in your inbox.",
+  "known_tools": [
+    {"name": "issue_refund", "description": "Issue a refund to the customer for an order."},
+    {"name": "send_email", "description": "Send an email to the customer."}
+  ],
+  "llm_output": "{\"claims\": [{\"text\": \"Your refund is on its way\", \"tool\": \"issue_refund\"}]}",
+  "expected": [
+    {"text": "Your refund is on its way", "verb": "other", "candidates": ["issue_refund"], "source": "llm"}
+  ],
+  "model": "openai/gpt-oss-120b",
+  "recorded_at": "2026-10-21"
+}
+```
+
+`expected` lists every claim the extractor returns, rule claims first (`"source": "rules"`),
+then LLM claims; compare any of the extractor-fixture keys plus `source`. A model output the
+guards must drop has `"expected": []` (or only the rule claims). An optional `ledger` makes
+the test check that `ok` agrees with the rules-only receipt under that ledger. Hand-written
+`llm_output` is fine for guard cases; say so in a `note`.
+
 ## Add or extend a lexicon family
 
 `python/toolreceipt/lexicon.json` holds the verb families (`send`, `create`, `update`,

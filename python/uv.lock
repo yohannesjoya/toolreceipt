@@ -1346,7 +1346,7 @@ wheels = [
 
 [[package]]
 name = "toolreceipt"
-version = "0.1.1"
+version = "0.2.0"
 source = { editable = "." }
 
 [package.optional-dependencies]

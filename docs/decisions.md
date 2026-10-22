@@ -72,3 +72,31 @@ the claim goes to `unmatched`. `tool_failed` is unchanged. The verb-stem evidenc
 the `refund` of `issue_refund`) marks a claim as object-matched but never adds to the score, so a
 sibling `refund_payment` cannot outrank the tool that ran. "case" is not a ticket synonym either
 ("opened a case with our specialist team" after `escalate_ticket`).
+
+## LLM-only claims are suspected, not fabricated
+
+`LLMExtractor` (0.2) adds claims the rules cannot see: outcome phrasing, synonyms, passive
+voice, status lines, other languages. A claim only the model found whose tool never ran lands
+in `Receipt.suspected`, not `claimed_but_never_ran`, so `ok` and whether the verdict is
+`fabricated` still come from the deterministic rule claims alone. Two runs of the same reply
+block or pass the same way even though the model's output varies (temperature 0 on Groq was
+not reproducible: 3 of 11 replies differed between two runs). `clean` versus `unreported` may
+move, because an LLM claim that confirms a tool removes it from `ran_but_unreported`; leaving
+a confirmed tool listed as unreported would make the receipt contradict itself. Callers who
+accept probabilistic blocking set `llm_blocks=True`, which also turns on a sibling demotion
+by tool-name verb token (`send_email` ran, the claim names `send_sms`: unmatched, not
+blocking), since precision matters most when the model can block.
+
+## Rules win on overlap; family-alone claims are kept beside the LLM claim
+
+The extractor runs the rules first and merges the model's claims in. Where a model claim
+overlaps a rule claim that already has candidates matched on an object word, the rule claim
+stands. Where the rule claim is unmatched, the model's tool resolves it (an unmatched claim
+never blocks, so replacing it is safe). Where the rule claim matched on the verb family
+alone, both claims are kept: the merge never sees the ledger, so it cannot know whether the
+rule candidate failed, and replacing it would turn a `tool_failed` block into `suspected`.
+Nothing in the merge writes `_object_matched` into a rule claim. The rules' `_dedupe` does not
+run over the merged list for the same reason; instead a model claim whose candidate set equals
+a surviving rule claim's is dropped. The guards reuse the rule lexicon's negation, other-subject
+and state checks but not its future or advice lists, because outcome claims ("you'll find the
+confirmation in your inbox") are the largest measured gap and those lists would delete them.

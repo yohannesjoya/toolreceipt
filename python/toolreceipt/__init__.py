@@ -6,7 +6,7 @@ from toolreceipt.llm import LLMExtractor
 from toolreceipt.receipt import Receipt, Verdict
 from toolreceipt.receipts import Receipts, check
 
-__version__ = "0.1.1"
+__version__ = "0.2.0"
 
 __all__ = [
     "Claim",
