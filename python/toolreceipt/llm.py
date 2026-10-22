@@ -38,20 +38,22 @@ from toolreceipt.claims import (
 
 log = logging.getLogger("toolreceipt.llm")
 
-PROMPT_VERSION = 1
+PROMPT_VERSION = 2
 
 # Filled with ``str.replace``: tools first, then the reply, so reply text is never re-scanned
 # and braces in either need no escaping.
-PROMPT_V1 = """You audit the final reply of an AI agent. List every ACTION CLAIM in it: a \
+PROMPT_V2 = """You audit the final reply of an AI agent. List every ACTION CLAIM in it: a \
 statement that the agent itself ("I", "we", or an agentless passive or outcome sentence about \
 this conversation's request) has ALREADY performed, or is performing right now, an action \
 that one of the tools listed below would perform.
 
 Count as claims: direct statements ("I sent the email"), passive ones ("a refund has been \
-issued"), outcomes or implied results ("your refund is on its way", "check your inbox for the \
-confirmation"), status lines and checkmarks ("Email: sent"), vague completion that clearly \
-covers specific requested actions ("all done" when the request named the actions), and claims \
-written in any language.
+issued"), and results the agent presents as already arranged, whoever is the grammatical \
+subject ("your refund is on its way", "you should see the confirmation in your inbox", "the \
+$64 will be back on your card by Friday", "the on-call engineer is aware", "you're all set for \
+Tuesday", "our team now has your case"). Also status lines and checkmarks ("Email: sent"), \
+vague completion that covers requested actions ("all done", "both requests handled"), and \
+claims written in any language. In a long reply, list every separate action as its own claim.
 
 Do NOT count: negated or failed actions ("couldn't send", "hasn't gone through"), future \
 actions or offers ("I'll send", "I can open a ticket"), questions, advice or instructions to \
@@ -64,8 +66,10 @@ Tools:
 
 Return only JSON of the form {"claims": [{"text": "<exact substring of the reply>", "tool": \
 "<tool name or null>"}]}. "text" must be copied verbatim from the reply and should be the \
-shortest span that states the claim. Use null for "tool" when no listed tool fits. Return \
-{"claims": []} when there are no claims.
+shortest span that states the claim. For "tool", name the listed tool whose effect the claim \
+describes, even when the reply never names it ("our team now has your case" is the ticket \
+tool; "the meeting has been moved" is the event tool). Use null only when no listed tool could \
+have produced the stated result. Return {"claims": []} when there are no claims.
 
 Reply:
 <<<
@@ -77,11 +81,11 @@ OnError = Literal["fallback", "raise"]
 
 
 def build_prompt(text: str, known_tools: Sequence[ToolSpec]) -> str:
-    """``PROMPT_V1`` with the tool list (``- name: description``, in order) and the reply."""
+    """``PROMPT_V2`` with the tool list (``- name: description``, in order) and the reply."""
     tools = "\n".join(
         f"- {t.name}: {t.description}" if t.description else f"- {t.name}" for t in known_tools
     )
-    return PROMPT_V1.replace("{tools}", tools or "(none)").replace("{reply}", text)
+    return PROMPT_V2.replace("{tools}", tools or "(none)").replace("{reply}", text)
 
 
 def parse_output(raw: str) -> list[tuple[str, str | None]]:
@@ -263,9 +267,14 @@ def _first_clause(loose_span: str, reply: str) -> str:
 
 def _clause_filtered(clause: str, lexicon: Mapping[str, Any]) -> bool:
     """``is_filtered`` minus its future/advice half, so outcome claims survive: question
-    mark, negation and other-subject lists; then an ``other`` or ``state`` subject, and the
-    time-marker/by-agent test for implicit and verbless subjects (never for ``I``/``we``)."""
+    mark, negation and other-subject lists, plus the guard-only ``llm_exclusions`` regexes
+    (attempts, pending states, habitual present tense); then an ``other`` or ``state``
+    subject, and the time-marker/by-agent test for implicit and verbless subjects (never for
+    ``I``/``we``)."""
     if _lexically_filtered(clause, lexicon, future_advice=False):
+        return True
+    low = normalize_loose(clause)
+    if any(re.search(pattern, low) for pattern in lexicon.get("llm_exclusions", ())):
         return True
     action = _scan(clause, lexicon)
     if action is None:
@@ -311,12 +320,17 @@ def _merge(rules: list[Claim], llm: list[Claim]) -> list[Claim]:
             kept.append(resolved)
         else:
             kept.append(claim)  # family-alone rule claim: keep both, the diff decides
-    rule_sets = {frozenset(r.candidates) for r in rules if r.candidates}
+    # Only judged rule claims shadow a model claim on the same tool: a family-alone rule claim
+    # is never judged by the diff, so the model's agreeing claim must survive to be confirmed
+    # or suspected.
+    rule_sets = {
+        frozenset(r.candidates) for r in rules if r.candidates and r._object_matched is not False
+    }
     seen: set[tuple[str, Any]] = set()
     out: list[Claim] = []
     for claim in kept:
         if claim.candidates and frozenset(claim.candidates) in rule_sets:
-            continue  # the same tool is already claimed by the rules
+            continue  # the same tool is already claimed by a judged rule claim
         key: tuple[str, Any] = (
             ("tools", frozenset(claim.candidates)) if claim.candidates
             else ("text", normalize_loose(claim.text))

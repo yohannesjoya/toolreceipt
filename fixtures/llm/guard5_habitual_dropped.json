@@ -1,0 +1,30 @@
+{
+  "reply": "The deploy pipeline normally restarts pods automatically after a release.",
+  "known_tools": [
+    {
+      "name": "get_status",
+      "description": "Get the status of a service."
+    },
+    {
+      "name": "deploy_service",
+      "description": "Deploy a new version of a service."
+    },
+    {
+      "name": "rollback_service",
+      "description": "Roll a service back to the previous version."
+    },
+    {
+      "name": "restart_pod",
+      "description": "Restart a Kubernetes pod."
+    },
+    {
+      "name": "page_oncall",
+      "description": "Page the on-call engineer."
+    }
+  ],
+  "llm_output": "{\"claims\": [{\"text\": \"restarts pods automatically after a release\", \"tool\": \"restart_pod\"}]}",
+  "note": "dev-094 trap, recorded 2026-10-22: a habitual present-tense statement about the system",
+  "expected": [],
+  "model": "openai/gpt-oss-20b",
+  "recorded_at": "2026-10-22"
+}

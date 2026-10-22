@@ -9,7 +9,7 @@ import pytest
 
 from toolreceipt.claims import RuleExtractor, normalize_tool_specs
 from toolreceipt.llm import (
-    PROMPT_V1,
+    PROMPT_V2,
     PROMPT_VERSION,
     LLMExtractor,
     build_prompt,
@@ -28,8 +28,8 @@ def _rules(text: str = REPLY) -> list[dict[str, object]]:
 
 
 def test_prompt_version_and_placeholders():
-    assert PROMPT_VERSION == 1
-    assert "{tools}" in PROMPT_V1 and "{reply}" in PROMPT_V1
+    assert PROMPT_VERSION == 2
+    assert "{tools}" in PROMPT_V2 and "{reply}" in PROMPT_V2
 
 
 def test_prompt_contains_tools_in_order_and_reply_last():
