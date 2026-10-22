@@ -69,7 +69,7 @@
   "read_verbs": ["get", "read", "fetch", "lookup", "look", "list", "search", "find", "check", "view", "query", "show", "retrieve"],
   "number_words": {"one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10, "a": 1, "an": 1},
   "llm_exclusions": [
-    "\\b(?:tried|trying|attempted|attempting|meant|going) to\\b",
+    "\\b(?:tried|trying|attempted|attempting|meant) to\\b",
     "\\bon hold\\b",
     "\\b(?:still )?pending\\b",
     "\\b(?:normally|usually|typically|generally|automatically)\\b"
