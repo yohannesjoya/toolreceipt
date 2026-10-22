@@ -1,0 +1,43 @@
+{
+  "claims": [
+    {
+      "text": "I looked up order 4821",
+      "verb": "other",
+      "candidates": [
+        "lookup_order"
+      ],
+      "confidence": "medium",
+      "source": "llm"
+    }
+  ],
+  "ledger": [
+    {
+      "tool": "lookup_order",
+      "status": "ok"
+    }
+  ],
+  "known_tools": [
+    "send_email",
+    "lookup_order",
+    "issue_refund"
+  ],
+  "ignore_tools": [
+    "lookup_order"
+  ],
+  "expected": {
+    "verdict": "clean",
+    "ok": true,
+    "confirmed": [],
+    "claimed_but_never_ran": [],
+    "unmatched": [
+      {
+        "candidates": [],
+        "tool": null,
+        "source": "llm"
+      }
+    ],
+    "suspected": [],
+    "ran_but_unreported": [],
+    "summary": "All claims confirmed."
+  }
+}

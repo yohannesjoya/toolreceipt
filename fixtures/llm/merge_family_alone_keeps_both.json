@@ -1,0 +1,45 @@
+{
+  "reply": "I've raised this with our team.",
+  "known_tools": [
+    {
+      "name": "create_ticket",
+      "description": "Create a support ticket for follow-up by the team."
+    },
+    {
+      "name": "escalate_ticket",
+      "description": "Escalate a ticket to a specialist team."
+    }
+  ],
+  "llm_output": "{\"claims\": [{\"text\": \"I've raised this with our team\", \"tool\": \"escalate_ticket\"}]}",
+  "ledger": [
+    {
+      "tool": "escalate_ticket",
+      "status": "ok"
+    }
+  ],
+  "note": "hand-written model output",
+  "expected": [
+    {
+      "text": "I've raised this with our team",
+      "verb": "create",
+      "candidates": [
+        "create_ticket"
+      ],
+      "confidence": "high",
+      "source": "rules"
+    },
+    {
+      "text": "I've raised this with our team",
+      "verb": "other",
+      "object": null,
+      "count": null,
+      "candidates": [
+        "escalate_ticket"
+      ],
+      "confidence": "medium",
+      "source": "llm"
+    }
+  ],
+  "model": "hand-written",
+  "recorded_at": "2026-10-21"
+}

@@ -14,6 +14,7 @@ from typing import Any, Literal, NamedTuple, Protocol
 
 Confidence = Literal["high", "medium"]
 Reason = Literal["tool_failed", "not_called"]
+Source = Literal["rules", "llm"]
 
 
 class ToolSpec(NamedTuple):
@@ -41,6 +42,7 @@ class Claim:
     tool: str | None = None
     confidence: Confidence | None = None
     reason: Reason | None = None
+    source: Source = "rules"
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -52,6 +54,7 @@ class Claim:
             "tool": self.tool,
             "confidence": self.confidence,
             "reason": self.reason,
+            "source": self.source,
         }
 
     def __post_init__(self) -> None:
@@ -73,6 +76,7 @@ class Claim:
             tool=data.get("tool"),
             confidence=data.get("confidence"),
             reason=data.get("reason"),
+            source=data.get("source", "rules"),
         )
 
 
@@ -172,6 +176,18 @@ def _normalize(text: str) -> str:
         text.replace("’", "'").replace("‘", "'")
         .replace("“", '"').replace("”", '"')
     )
+
+
+_ODD_SPACES = str.maketrans({" ": " ", " ": " ", " ": " ", " ": " "})
+
+
+def normalize_loose(text: str) -> str:
+    """Lower-case, straight-quoted, single-spaced text for containment tests.
+
+    Unlike ``_normalize`` it does not keep character positions: non-breaking and narrow
+    spaces become spaces and whitespace runs collapse.
+    """
+    return _WHITESPACE.sub(" ", _normalize(text).translate(_ODD_SPACES)).strip().lower()
 
 
 def _tokens(text: str) -> list[str]:
@@ -314,10 +330,17 @@ def _subject_kind(action: _Action, clause: str, lexicon: Mapping[str, Any]) -> s
     elif last == "you" and "been" not in aux:
         return "state"  # "you were charged"
     # Passive or headline with no first-person agent.
-    timed = any(re.search(p, _normalize(clause).lower()) for p in lexicon.get("time_markers", ()))
-    if timed or _by_other_agent(clause, lexicon):
+    if _state_marked(clause, lexicon):
         return "state"
     return "passive"
+
+
+def _state_marked(clause: str, lexicon: Mapping[str, Any]) -> bool:
+    """A time marker ("on the 1st", "yesterday") or a non-agent ``by`` phrase: the clause
+    describes a state of affairs, not the agent's own action."""
+    low = _normalize(clause).lower()
+    timed = any(re.search(p, low) for p in lexicon.get("time_markers", ()))
+    return timed or _by_other_agent(clause, lexicon)
 
 
 def _verbless_other_subject(clause: str, lexicon: Mapping[str, Any]) -> bool | None:
@@ -339,12 +362,49 @@ def _verbless_other_subject(clause: str, lexicon: Mapping[str, Any]) -> bool | N
     return None
 
 
-def _lexically_filtered(clause: str, lexicon: Mapping[str, Any]) -> bool:
+def _conditional_lead(sentence: str, lexicon: Mapping[str, Any]) -> bool:
+    """The sentence opens with a ``conditional_lead`` phrase ("If ...", "Once ...")."""
+    low = _normalize(sentence).lower().lstrip(" \"'(*_")
+    return any(re.match(_phrase(lead), low) for lead in lexicon.get("conditional_lead", ()))
+
+
+def _carry_other(prev_other: bool, clause: str, lexicon: Mapping[str, Any]) -> bool:
+    """``prev_other`` after a clause with no lexicon verb: updated when the clause names a
+    subject, unchanged when it does not."""
+    other = _verbless_other_subject(clause, lexicon)
+    return prev_other if other is None else other
+
+
+def _inherits_other_subject(clauses: Sequence[str], lexicon: Mapping[str, Any]) -> bool:
+    """The last clause is subject-less and the clauses before it leave a non-agent subject in
+    force ("The carrier processed the return and refunded the shipping fee")."""
+    prev_other = False
+    for clause in clauses[:-1]:
+        action = _scan(clause, lexicon)
+        if action is None:
+            prev_other = _carry_other(prev_other, clause, lexicon)
+            continue
+        kind = _subject_kind(action, clause, lexicon)
+        if kind != "implicit":
+            prev_other = kind == "other"
+    if not prev_other or not clauses:
+        return False
+    action = _scan(clauses[-1], lexicon)
+    return action is not None and _subject_kind(action, clauses[-1], lexicon) == "implicit"
+
+
+def _lexically_filtered(
+    clause: str, lexicon: Mapping[str, Any], *, future_advice: bool = True
+) -> bool:
+    """Question mark, ``negation`` and ``other_subject`` phrases; with ``future_advice``
+    (the rules' setting) also the ``future`` and ``advice`` lists."""
     if clause.strip().endswith("?"):
         return True
     low = _normalize(clause).lower()
     if any(_contains_any(low, lexicon.get(k, ())) for k in ("negation", "other_subject")):
         return True
+    if not future_advice:
+        return False
     # "I can confirm ..." / "Please note ..." are not future or advice.
     for phrase in lexicon.get("filter_exempt", ()):
         low = re.sub(_phrase(phrase), " ", low)
@@ -655,10 +715,7 @@ class RuleExtractor:
         self._lexicon: Mapping[str, Any] = _default_lexicon() if lexicon is None else lexicon
 
     def _sentence_filtered(self, sentence: str) -> bool:
-        low = _normalize(sentence).lower().lstrip(" \"'(*_")
-        return any(
-            re.match(_phrase(lead), low) for lead in self._lexicon.get("conditional_lead", ())
-        )
+        return _conditional_lead(sentence, self._lexicon)
 
     def extract(self, text: str, known_tools: Sequence[ToolSpec]) -> list[Claim]:
         lex = self._lexicon
@@ -670,9 +727,7 @@ class RuleExtractor:
             for clause in split_clauses(sentence):
                 action = _scan(clause, lex)
                 if action is None:
-                    other = _verbless_other_subject(clause, lex)
-                    if other is not None:
-                        prev_other = other
+                    prev_other = _carry_other(prev_other, clause, lex)
                     continue
                 kind = _subject_kind(action, clause, lex)
                 # A subject-less clause carries the previous clause's non-agent subject

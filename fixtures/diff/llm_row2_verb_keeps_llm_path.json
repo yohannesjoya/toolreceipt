@@ -1,0 +1,42 @@
+{
+  "claims": [
+    {
+      "text": "I've sent it",
+      "verb": "send",
+      "candidates": [
+        "send_email"
+      ],
+      "confidence": "medium",
+      "source": "llm"
+    }
+  ],
+  "ledger": [
+    {
+      "tool": "send_sms",
+      "status": "ok"
+    }
+  ],
+  "known_tools": [
+    "send_email",
+    "send_sms"
+  ],
+  "ignore_tools": [],
+  "expected": {
+    "verdict": "unreported",
+    "ok": true,
+    "confirmed": [],
+    "claimed_but_never_ran": [],
+    "unmatched": [],
+    "suspected": [
+      {
+        "tool": "send_email",
+        "reason": "not_called",
+        "source": "llm"
+      }
+    ],
+    "ran_but_unreported": [
+      "send_sms"
+    ],
+    "summary": "No claims; 1 tool ran unreported: send_sms; 1 suspected (LLM only): send_email (\"I've sent it\")."
+  }
+}

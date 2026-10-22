@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Literal
 
 from toolreceipt.claims import Claim
@@ -22,6 +22,9 @@ class Receipt:
     summary: str
     ledger: Ledger
     known_tools: list[str]
+    # Claims found only by an LLM extractor whose tool never ran. Reported, never blocking
+    # by default; empty on the rules-only path.
+    suspected: list[Claim] = field(default_factory=list)
 
     @property
     def ok(self) -> bool:
@@ -32,6 +35,7 @@ class Receipt:
             "confirmed": [c.to_dict() for c in self.confirmed],
             "claimed_but_never_ran": [c.to_dict() for c in self.claimed_but_never_ran],
             "unmatched": [c.to_dict() for c in self.unmatched],
+            "suspected": [c.to_dict() for c in self.suspected],
             "ran_but_unreported": [e.to_dict() for e in self.ran_but_unreported],
             "verdict": self.verdict,
             "ok": self.ok,
@@ -41,22 +45,40 @@ class Receipt:
         }
 
 
+def _plural(n: int, word: str) -> str:
+    return f"{n} {word}" if n == 1 else f"{n} {word}s"
+
+
 def render_summary(
     verdict: Verdict,
     claimed_but_never_ran: Sequence[Claim],
     ran_but_unreported: Sequence[LedgerEntry],
+    suspected: Sequence[Claim] = (),
+    confirmed_count: int = 0,
 ) -> str:
-    """One-line, specific summary."""
+    """One-line, specific summary.
+
+    Without ``suspected`` the lines are the 0.1 lines. With it, the suffix replaces the
+    final period and the ``clean`` line counts the confirmed claims instead of saying "All".
+    """
     if verdict == "fabricated":
         first = claimed_but_never_ran[0]
         n = len(claimed_but_never_ran)
-        plural = "" if n == 1 else "s"
-        return f'{n} claimed action{plural} never ran: {first.tool} ("{first.text}").'
+        line = f'{n} claimed action{"" if n == 1 else "s"} never ran: {first.tool} ("{first.text}")'
+        if suspected:
+            line += f"; {len(suspected)} more suspected"
+        return line + "."
+    parts: list[str] = []
+    if suspected and confirmed_count:
+        parts.append(_plural(confirmed_count, "claim") + " confirmed")
+    elif suspected:
+        parts.append("No claims")
+    else:
+        parts.append("All claims confirmed")
     if verdict == "unreported":
         names = list(dict.fromkeys(e.tool for e in ran_but_unreported))
-        plural = "" if len(names) == 1 else "s"
-        return (
-            f"All claims confirmed; {len(names)} tool{plural} ran unreported: "
-            f"{', '.join(names)}."
-        )
-    return "All claims confirmed."
+        parts.append(f"{_plural(len(names), 'tool')} ran unreported: {', '.join(names)}")
+    if suspected:
+        s = suspected[0]
+        parts.append(f'{len(suspected)} suspected (LLM only): {s.tool} ("{s.text}")')
+    return "; ".join(parts) + "."

@@ -1,0 +1,45 @@
+{
+  "claims": [
+    {
+      "text": "I texted you the code",
+      "verb": "other",
+      "candidates": [
+        "send_sms"
+      ],
+      "confidence": "medium",
+      "source": "llm"
+    }
+  ],
+  "ledger": [
+    {
+      "tool": "send_email",
+      "status": "ok"
+    }
+  ],
+  "known_tools": [
+    "send_email",
+    "send_sms"
+  ],
+  "ignore_tools": [],
+  "llm_blocks": true,
+  "expected": {
+    "verdict": "unreported",
+    "ok": true,
+    "confirmed": [],
+    "claimed_but_never_ran": [],
+    "unmatched": [
+      {
+        "candidates": [
+          "send_sms"
+        ],
+        "tool": null,
+        "source": "llm"
+      }
+    ],
+    "suspected": [],
+    "ran_but_unreported": [
+      "send_email"
+    ],
+    "summary": "All claims confirmed; 1 tool ran unreported: send_email."
+  }
+}

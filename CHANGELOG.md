@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-22
+
+### Added
+
+- `LLMExtractor` (`toolreceipt.llm`): an opt-in extractor that runs the rules first and asks
+  any chat model for the claims they cannot see (outcome phrasing, synonyms, passive voice,
+  status lines, other languages). Takes a plain `complete(prompt) -> str` callable, or any
+  LangChain chat model through `LLMExtractor.from_chat_model(model)`. Six precision guards
+  reuse the rule lexicon, including its sentence-level drops (conditional sentences, a
+  subject inherited from the previous clause); on any provider error it falls back to the
+  rules (`on_error`).
+  No new dependency, no new extra; nothing changes without constructing one.
+- `Receipt.suspected`: claims found only by the LLM whose tool never ran. Reported, never
+  blocking by default. `summary` gains a suffix when it is non-empty.
+- `Claim.source` (`"rules"` or `"llm"`); `from_dict()` defaults it, so existing fixtures load.
+- `llm_blocks=` on `check()`, `Receipts()` and `diff()`: let LLM-only claims make the verdict
+  `fabricated`. Under it, a never-called candidate whose sibling tool ran (shared verb token)
+  is `unmatched` rather than blocking.
+- Probe sets under `fixtures/probe/` (114-case dev set, 30-case held-out set written before
+  tuning) with committed model recordings replayed offline by `tests/test_probe_replay.py`,
+  and `scripts/eval_llm.py` to re-record them; `fixtures/llm/` pins the guards and the merge.
+
+### Changed
+
+- `Claim.to_dict()` emits `source` and `Receipt.to_dict()` emits `suspected` (additive).
+  Rules-only behaviour is otherwise byte-identical to 0.1.1.
+
 ## [0.1.1] - 2026-10-20
 
 ### Fixed

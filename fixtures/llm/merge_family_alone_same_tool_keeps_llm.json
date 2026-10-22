@@ -1,0 +1,46 @@
+{
+  "reply": "I've cancelled your 3pm meeting.",
+  "known_tools": [
+    {
+      "name": "find_slots",
+      "description": "Find free time slots in a calendar."
+    },
+    {
+      "name": "create_event",
+      "description": "Create a calendar event."
+    },
+    {
+      "name": "cancel_event",
+      "description": "Cancel a calendar event."
+    }
+  ],
+  "llm_output": "{\"claims\": [{\"text\": \"I've cancelled your 3pm meeting.\", \"tool\": \"cancel_event\"}]}",
+  "ledger": [
+    {
+      "tool": "cancel_event",
+      "status": "ok"
+    }
+  ],
+  "note": "recorded from the dev set (dev-003); the rules match cancel_event on the verb family alone, so the LLM claim must survive the dedupe for the tool to be confirmed",
+  "expected": [
+    {
+      "text": "I've cancelled your 3pm meeting",
+      "verb": "delete",
+      "candidates": [
+        "cancel_event"
+      ],
+      "source": "rules"
+    },
+    {
+      "text": "I've cancelled your 3pm meeting.",
+      "verb": "other",
+      "candidates": [
+        "cancel_event"
+      ],
+      "confidence": "medium",
+      "source": "llm"
+    }
+  ],
+  "model": "openai/gpt-oss-120b",
+  "recorded_at": "2026-10-21"
+}

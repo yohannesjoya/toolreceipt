@@ -1,6 +1,6 @@
 import pytest
 
-from toolreceipt import Ledger, LedgerEntry, Receipts, check
+from toolreceipt import Claim, Ledger, LedgerEntry, Receipts, check
 
 REPLY = "Refund issued and I have emailed you the confirmation."
 
@@ -138,3 +138,18 @@ def test_known_tools_accepts_langchain_tools():
 def test_known_tools_rejects_unknown_shapes():
     with pytest.raises(TypeError, match="known_tools"):
         check(REPLY, Ledger(), known_tools=[42])  # type: ignore[list-item]
+
+
+def test_llm_blocks_passes_through_check_and_receipts():
+    class Llm:
+        def extract(self, text, known_tools):
+            return [Claim(text=text, verb="other", candidates=["send_email"], source="llm")]
+
+    r = check("check your inbox", Ledger(), known_tools=["send_email"], extractor=Llm())
+    assert r.ok and [c.tool for c in r.suspected] == ["send_email"]
+    r = check(
+        "check your inbox", Ledger(), known_tools=["send_email"], extractor=Llm(), llm_blocks=True
+    )
+    assert not r.ok and r.claimed_but_never_ran[0].reason == "not_called"
+    rc = Receipts(extractor=Llm(), known_tools=["send_email"], llm_blocks=True)
+    assert not rc.check("check your inbox", Ledger()).ok

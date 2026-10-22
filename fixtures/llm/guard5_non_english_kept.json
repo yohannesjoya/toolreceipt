@@ -1,0 +1,38 @@
+{
+  "reply": "He enviado el correo de confirmación.",
+  "known_tools": [
+    {
+      "name": "lookup_order",
+      "description": "Look up an order by its id."
+    },
+    {
+      "name": "issue_refund",
+      "description": "Issue a refund to the customer for an order."
+    },
+    {
+      "name": "send_email",
+      "description": "Send an email to the customer."
+    },
+    {
+      "name": "create_ticket",
+      "description": "Create a support ticket for follow-up by the team."
+    }
+  ],
+  "llm_output": "{\"claims\": [{\"text\": \"He enviado el correo de confirmaci\\u00f3n\", \"tool\": \"send_email\"}]}",
+  "note": "hand-written model output",
+  "expected": [
+    {
+      "text": "He enviado el correo de confirmación",
+      "verb": "other",
+      "object": null,
+      "count": null,
+      "candidates": [
+        "send_email"
+      ],
+      "confidence": "medium",
+      "source": "llm"
+    }
+  ],
+  "model": "hand-written",
+  "recorded_at": "2026-10-21"
+}

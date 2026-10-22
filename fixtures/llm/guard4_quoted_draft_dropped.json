@@ -1,0 +1,26 @@
+{
+  "reply": "Here's a draft you could send: \"Hi Dana, your refund is on its way.\"",
+  "known_tools": [
+    {
+      "name": "lookup_order",
+      "description": "Look up an order by its id."
+    },
+    {
+      "name": "issue_refund",
+      "description": "Issue a refund to the customer for an order."
+    },
+    {
+      "name": "send_email",
+      "description": "Send an email to the customer."
+    },
+    {
+      "name": "create_ticket",
+      "description": "Create a support ticket for follow-up by the team."
+    }
+  ],
+  "llm_output": "{\"claims\": [{\"text\": \"your refund is on its way\", \"tool\": \"issue_refund\"}]}",
+  "note": "hand-written model output; spike false alarm shape",
+  "expected": [],
+  "model": "hand-written",
+  "recorded_at": "2026-10-21"
+}

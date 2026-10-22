@@ -1,0 +1,26 @@
+{
+  "reply": "I've booked your appointment at 3pm.",
+  "known_tools": [
+    {
+      "name": "create_event",
+      "description": "Create a calendar event."
+    }
+  ],
+  "llm_output": "{\"claims\": [{\"text\": \"I've booked your appointment at 3pm\", \"tool\": \"create_event\"}]}",
+  "note": "hand-written model output; rules give an unmatched schedule claim, merge row 2 resolves it",
+  "expected": [
+    {
+      "text": "I've booked your appointment at 3pm",
+      "verb": "schedule",
+      "object": "appointment at 3pm",
+      "count": null,
+      "candidates": [
+        "create_event"
+      ],
+      "confidence": "medium",
+      "source": "llm"
+    }
+  ],
+  "model": "hand-written",
+  "recorded_at": "2026-10-21"
+}

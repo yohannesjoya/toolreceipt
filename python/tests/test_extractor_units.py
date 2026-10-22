@@ -5,11 +5,14 @@ import pytest
 from toolreceipt.claims import (
     RuleExtractor,
     ToolSpec,
+    _lexically_filtered,
+    _state_marked,
     extract_object,
     find_action,
     is_filtered,
     load_lexicon,
     match_tools,
+    normalize_loose,
     score_tool,
     split_clauses,
     split_sentences,
@@ -425,3 +428,25 @@ def test_subject_phrase_stops_at_prepositions():
 )
 def test_noun_tokens_alone_never_make_a_candidate(text, names):
     assert _cands(text, names) == [([], None)]
+
+
+def test_lexically_filtered_without_future_advice_keeps_outcome_claims():
+    outcome = "you'll find the confirmation in your inbox"
+    assert _lexically_filtered(outcome, LEX)
+    assert not _lexically_filtered(outcome, LEX, future_advice=False)
+    assert _lexically_filtered("I couldn't send the email", LEX, future_advice=False)
+    assert _lexically_filtered("Is the refund issued?", LEX, future_advice=False)
+    advice = "you can create a ticket from the portal"
+    assert not _lexically_filtered(advice, LEX, future_advice=False)
+    assert is_filtered("The customer has cancelled the order", LEX)
+
+
+def test_state_marked():
+    assert _state_marked("Your card was charged $19.99 on the 1st", LEX)
+    assert _state_marked("issued automatically by the carrier insurance", LEX)
+    assert not _state_marked("Your refund has been issued", LEX)
+    assert not _state_marked("sent by email", LEX)
+
+
+def test_normalize_loose():
+    assert normalize_loose("I\u2019ve  sent\u202fit\n now\u00a0") == "i've sent it now"

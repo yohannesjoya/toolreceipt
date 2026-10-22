@@ -38,10 +38,12 @@ advice ("you can create a ticket"), conditionals and offers are not claims.
   ledger. Raise, or return an error `ToolMessage`.
 - **Argument mismatches.** "I emailed Bob" passes if `send_email` ran, whatever `to` was.
 - **Quantities.** "Updated 3 rows" against one call is recorded as a count on the claim, never judged.
-- **Non-English replies.** English only.
+- **Non-English replies.** The default extractor is English only. `LLMExtractor` reads
+  other languages, but its guards are English only (see below).
 - **Streaming and mid-run checks.** Only the final reply is checked.
-- **Tool names without a verb.** A tool called `email_customer` never matches, so claims
-  about it land in `unmatched` (informational, they never affect the verdict).
+- **Tool names without a verb.** With the default extractor a tool called `email_customer`
+  never matches, so claims about it land in `unmatched` (informational, they never affect
+  the verdict). `LLMExtractor` can name it, since the model matches on the description.
 - **Loose tool matching.** A claim maps to a tool only when the tool name shares the
   claim's action verb family (`send`, `create`, `update`, `delete`, `refund`, ...).
 - **Loose paraphrases of an action done with a different tool.** "I've raised this with our
@@ -88,6 +90,33 @@ phrasing ("I've issued a $64 refund ... and sent a confirmation email"), so this
 figure is weak evidence. `fixtures/check/` adds hand-written honest replies with more varied
 phrasing. The recorded runs in `demo/replays/` back the demo's Replay button.
 
+### LLM extractor numbers (0.2)
+
+Measured on two hand-labelled probe sets across 11 tool domains (support, calendar, devops,
+git, CRM, payments, files, messaging, database, travel, and tools with meaningless names):
+a 114-case dev set used to tune the prompt and guards, and a 30-case held-out set written
+and labelled before any tuning and never tuned against. Model `openai/gpt-oss-20b` on Groq,
+temperature 0, recorded 2026-10-22 and replayed offline by `tests/test_probe_replay.py`
+(`fixtures/probe/*.recorded.json`); re-record with `python/scripts/eval_llm.py`.
+
+| Set | Extractor | Claims found | Precision | Fabrications caught | False alarms on traps |
+|---|---|---|---|---|---|
+| dev (114) | rules only | 34 / 113 (30%) | 0.94 | 14 / 67 (21%) | 2 / 23 |
+| dev (114) | rules + LLM, default (`suspected`) | 101 / 113 (89%) | 0.97 | 60 / 67 (90%) | 2 / 23 (0 added by the LLM) |
+| dev (114) | rules + LLM, `llm_blocks=True` | 101 / 113 (89%) | 0.97 | 60 / 67 (90%) | 2 / 23 (0 added by the LLM) |
+| held-out (30) | rules only | 4 / 35 (11%) | 1.00 | 1 / 18 (6%) | 0 / 7 |
+| held-out (30) | rules + LLM, default (`suspected`) | 31 / 35 (89%) | 0.97 | 15 / 18 (83%) | 1 / 7 |
+| held-out (30) | rules + LLM, `llm_blocks=True` | 31 / 35 (89%) | 0.97 | 15 / 18 (83%) | 1 / 7 |
+
+"Caught" means the receipt flags a labelled fabrication: `verdict == "fabricated"`, or a
+non-empty `suspected` under the default. The two dev trap alarms are the rules' own (a quoted
+draft and "refunded in March"), unchanged from 0.1. The held-out alarm is the model reading
+"the refund bounced" as a refund; the misses are vague replies ("Both of those are sorted
+now") the model leaves unresolved, which is the intended behaviour. On the 0.1 held-out
+honest replies the LLM path adds no spurious tool (20 of 20 claims, 0 extra). The release
+gate is offline: at most one LLM-added false alarm on the 23 dev traps and no extra tool on
+the honest replies; the held-out numbers are reported, not gated.
+
 ## Install
 
 ```bash
@@ -118,6 +147,41 @@ if not receipt.ok:
 `Receipts` per run. Your tools and graph stay unchanged, apart from
 `ToolNode(tools, handle_tool_errors=True)`.
 
+## With an LLM extractor
+
+The default extractor is rules only: no key, no network, deterministic. It reads direct
+claims well ("I've issued the refund") and misses outcome phrasing ("your refund is on its
+way"), synonyms outside its lexicon, status lines and other languages. Opt in to an LLM for
+those:
+
+```python
+from langchain_groq import ChatGroq
+from toolreceipt import Receipts
+from toolreceipt.langgraph import final_reply
+from toolreceipt.llm import LLMExtractor
+
+extractor = LLMExtractor.from_chat_model(ChatGroq(model="openai/gpt-oss-120b", temperature=0))
+rc = Receipts(extractor=extractor)
+receipt = rc.check(final_reply(result))
+receipt.suspected   # claims only the LLM found, whose tool never ran
+```
+
+`from_chat_model` takes any LangChain chat model; `LLMExtractor(complete=fn)` takes any
+`fn(prompt: str) -> str` for other SDKs. The rules still run first and still decide `ok`:
+a claim only the LLM found lands in `receipt.suspected`, reported but not blocking, so two
+runs of the same reply block or pass the same way even though model output varies. Pass
+`llm_blocks=True` to `Receipts()` or `check()` to let those claims make the verdict
+`fabricated`. On a provider error or unparsable output the extractor logs one warning and
+falls back to the rules (`on_error="raise"` to surface it instead).
+
+Every LLM claim must be a verbatim span of the reply, and only a claim naming a listed tool
+is judged (the rest stay in `unmatched`). Each one goes through the lexicon's negation,
+conditional, other-subject and state checks before it counts, so the LLM path is held to the
+same "do not cry wolf" bar as the rules. Those checks are English-only:
+on a non-English span only the prompt's exclusions apply. A reply can talk the model out of
+reporting a claim, but never out of a rule claim: the LLM path only adds. `check()` now waits
+on one model round trip (one to three seconds on Groq).
+
 ## Vocabulary
 
 | Term | Meaning |
@@ -131,10 +195,11 @@ if not receipt.ok:
 `Claim.text` is the clause after normalisation (curly quotes straightened, runs of whitespace
 folded), so it can differ from the raw substring of the reply.
 
-A receipt has four lists: `confirmed` (a successful entry exists for the claim),
+A receipt has five lists: `confirmed` (a successful entry exists for the claim),
 `claimed_but_never_ran`, `unmatched` (no known tool fits the claim closely enough to judge
-it, informational) and
-`ran_but_unreported`. Every type has `to_dict()`, and every field is JSON-safe.
+it, informational), `suspected` (found only by an `LLMExtractor`, tool never ran; empty on
+the rules-only path) and `ran_but_unreported`. Each claim carries its `source`, `rules` or
+`llm`. Every type has `to_dict()`, and every field is JSON-safe.
 
 ## Architecture
 
@@ -172,11 +237,12 @@ Without LangGraph, build a `Ledger` of `LedgerEntry` objects yourself and call `
 
 ```python
 rc = Receipts(
-    extractor=None,          # any ClaimExtractor; default RuleExtractor()
+    extractor=None,          # any ClaimExtractor; default RuleExtractor(), or an LLMExtractor
     known_tools=(),          # extra tools to match claims against
     ignore_tools=(),         # tools never reported as ran_but_unreported (e.g. lookups)
     capture_results=True,    # False: ledger keeps no args or results
     max_result_chars=2000,   # truncate result and error text in the ledger
+    llm_blocks=False,        # True: claims only the LLM found can make the verdict fabricated
 )
 ```
 
@@ -205,13 +271,17 @@ text and returns a verdict against the tools that actually ran.
 ## Privacy
 
 The ledger can contain personal data: email bodies, order details, whatever your tools take
-and return. Receipts are for your own logs and your own code. Nothing is sent anywhere, and
-the library makes no network calls. Use `capture_results=False` to drop args and results,
-and `max_result_chars` to bound what is kept.
+and return. Receipts are for your own logs and your own code. With the default extractor nothing is
+sent anywhere and the library makes no network calls. With `LLMExtractor`, the reply text and
+the tool names and descriptions are sent to whatever model your `complete` callable or chat
+model calls; the ledger (arguments, results, errors) is never sent. Use
+`capture_results=False` to drop args and results, and `max_result_chars` to bound what is
+kept.
 
 ## Roadmap
 
-- LLM-backed extractor behind the existing `ClaimExtractor` protocol
+Done in 0.2: LLM-backed extractor behind the existing `ClaimExtractor` protocol.
+
 - TypeScript port, sharing the JSON fixtures as the contract
 - Adapters: Mastra, CrewAI, Vercel AI SDK
 - Argument check ("emailed Bob" against `to="alice"`)

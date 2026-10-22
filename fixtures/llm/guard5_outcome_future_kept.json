@@ -1,0 +1,49 @@
+{
+  "reply": "Your refund is on its way and you'll find the confirmation in your inbox.",
+  "known_tools": [
+    {
+      "name": "lookup_order",
+      "description": "Look up an order by its id."
+    },
+    {
+      "name": "issue_refund",
+      "description": "Issue a refund to the customer for an order."
+    },
+    {
+      "name": "send_email",
+      "description": "Send an email to the customer."
+    },
+    {
+      "name": "create_ticket",
+      "description": "Create a support ticket for follow-up by the team."
+    }
+  ],
+  "llm_output": "{\"claims\": [{\"text\": \"Your refund is on its way\", \"tool\": \"issue_refund\"}, {\"text\": \"you'll find the confirmation in your inbox\", \"tool\": \"send_email\"}]}",
+  "note": "hand-written model output",
+  "expected": [
+    {
+      "text": "Your refund is on its way",
+      "verb": "other",
+      "object": null,
+      "count": null,
+      "candidates": [
+        "issue_refund"
+      ],
+      "confidence": "medium",
+      "source": "llm"
+    },
+    {
+      "text": "you'll find the confirmation in your inbox",
+      "verb": "other",
+      "object": null,
+      "count": null,
+      "candidates": [
+        "send_email"
+      ],
+      "confidence": "medium",
+      "source": "llm"
+    }
+  ],
+  "model": "hand-written",
+  "recorded_at": "2026-10-21"
+}

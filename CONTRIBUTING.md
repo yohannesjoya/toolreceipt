@@ -100,6 +100,67 @@ never be `fabricated`, and for fabrications that must stay caught.
 }
 ```
 
+## Add an LLM fixture
+
+Fixtures in `fixtures/llm/*.json` replay recorded model output through `LLMExtractor` with no
+network (`python/tests/test_llm_fixtures.py`). They pin the precision guards and the merge
+with the rule claims. Record one from a real run:
+
+```python
+extractor = LLMExtractor(complete=my_call)
+extractor.extract(reply, known_tools)
+print(extractor.last_raw)   # paste into "llm_output"
+```
+
+`last_raw` is written on every call, so read it from an extractor that only this thread uses.
+
+```json
+{
+  "reply": "Your refund is on its way and you'll find the confirmation in your inbox.",
+  "known_tools": [
+    {"name": "issue_refund", "description": "Issue a refund to the customer for an order."},
+    {"name": "send_email", "description": "Send an email to the customer."}
+  ],
+  "llm_output": "{\"claims\": [{\"text\": \"Your refund is on its way\", \"tool\": \"issue_refund\"}]}",
+  "expected": [
+    {"text": "Your refund is on its way", "verb": "other", "candidates": ["issue_refund"], "source": "llm"}
+  ],
+  "model": "openai/gpt-oss-120b",
+  "recorded_at": "2026-10-21"
+}
+```
+
+`expected` lists every claim the extractor returns, rule claims first (`"source": "rules"`),
+then LLM claims; compare any of the extractor-fixture keys plus `source`. A model output the
+guards must drop has `"expected": []` (or only the rule claims). An optional `ledger` makes
+the test check that `ok` agrees with the rules-only receipt under that ledger. Hand-written
+`llm_output` is fine for guard cases; say so in a `note`.
+
+## Probe sets and recordings
+
+`fixtures/probe/dev.json` (114 cases, used to tune the prompt and guards) and
+`fixtures/probe/heldout.json` (30 cases, labelled before any tuning) measure the LLM path.
+A case is `{id, category, domain, reply, known_tools, ledger, expected_tools}`;
+`expected_tools` lists the tools the reply claims, `[]` for a trap, and
+`python/tests/test_probe_sets.py` checks the shape. Never edit a held-out case to fit the
+code; add a dev case instead.
+
+The model output for every case is committed as `fixtures/probe/<set>.recorded.json`
+(`prompt_version`, `model`, `recorded_at`, `cases[].llm_output`), and
+`python/tests/test_probe_replay.py` replays it with no network and gates on it. A change to
+the prompt bumps `PROMPT_VERSION` in `python/toolreceipt/llm.py` and needs a re-record:
+
+```bash
+cd python
+GROQ_API_KEY=... ../demo/.venv/bin/python scripts/eval_llm.py --set dev
+../demo/.venv/bin/python scripts/eval_llm.py --set heldout
+../demo/.venv/bin/python scripts/eval_llm.py --set v01
+../demo/.venv/bin/python scripts/eval_llm.py --set dev --replay   # table from the recording only
+```
+
+Guard and lexicon changes need no re-record: the replay test re-runs the guards on the
+recorded output. Copy the printed tables into the README's "LLM extractor numbers".
+
 ## Add or extend a lexicon family
 
 `python/toolreceipt/lexicon.json` holds the verb families (`send`, `create`, `update`,

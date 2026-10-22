@@ -1,0 +1,36 @@
+{
+  "claims": [
+    {
+      "text": "check your inbox",
+      "verb": "other",
+      "candidates": [
+        "send_email"
+      ],
+      "confidence": "medium",
+      "source": "llm"
+    }
+  ],
+  "ledger": [],
+  "known_tools": [
+    "send_email",
+    "lookup_order",
+    "issue_refund"
+  ],
+  "ignore_tools": [],
+  "expected": {
+    "verdict": "clean",
+    "ok": true,
+    "confirmed": [],
+    "claimed_but_never_ran": [],
+    "unmatched": [],
+    "suspected": [
+      {
+        "tool": "send_email",
+        "reason": "not_called",
+        "source": "llm"
+      }
+    ],
+    "ran_but_unreported": [],
+    "summary": "No claims; 1 suspected (LLM only): send_email (\"check your inbox\")."
+  }
+}
