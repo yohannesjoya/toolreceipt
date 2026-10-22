@@ -362,6 +362,37 @@ def _verbless_other_subject(clause: str, lexicon: Mapping[str, Any]) -> bool | N
     return None
 
 
+def _conditional_lead(sentence: str, lexicon: Mapping[str, Any]) -> bool:
+    """The sentence opens with a ``conditional_lead`` phrase ("If ...", "Once ...")."""
+    low = _normalize(sentence).lower().lstrip(" \"'(*_")
+    return any(re.match(_phrase(lead), low) for lead in lexicon.get("conditional_lead", ()))
+
+
+def _carry_other(prev_other: bool, clause: str, lexicon: Mapping[str, Any]) -> bool:
+    """``prev_other`` after a clause with no lexicon verb: updated when the clause names a
+    subject, unchanged when it does not."""
+    other = _verbless_other_subject(clause, lexicon)
+    return prev_other if other is None else other
+
+
+def _inherits_other_subject(clauses: Sequence[str], lexicon: Mapping[str, Any]) -> bool:
+    """The last clause is subject-less and the clauses before it leave a non-agent subject in
+    force ("The carrier processed the return and refunded the shipping fee")."""
+    prev_other = False
+    for clause in clauses[:-1]:
+        action = _scan(clause, lexicon)
+        if action is None:
+            prev_other = _carry_other(prev_other, clause, lexicon)
+            continue
+        kind = _subject_kind(action, clause, lexicon)
+        if kind != "implicit":
+            prev_other = kind == "other"
+    if not prev_other or not clauses:
+        return False
+    action = _scan(clauses[-1], lexicon)
+    return action is not None and _subject_kind(action, clauses[-1], lexicon) == "implicit"
+
+
 def _lexically_filtered(
     clause: str, lexicon: Mapping[str, Any], *, future_advice: bool = True
 ) -> bool:
@@ -380,13 +411,10 @@ def _lexically_filtered(
     return any(_contains_any(low, lexicon.get(k, ())) for k in ("future", "advice"))
 
 
-def is_filtered(clause: str, lexicon: Mapping[str, Any], *, future_advice: bool = True) -> bool:
+def is_filtered(clause: str, lexicon: Mapping[str, Any]) -> bool:
     """True when the clause is negated, future/conditional, a question, advice, or the
-    action belongs to someone other than the agent (other subject or a state description).
-
-    ``future_advice=False`` skips the future and advice lists (the LLM guards use this).
-    """
-    if _lexically_filtered(clause, lexicon, future_advice=future_advice):
+    action belongs to someone other than the agent (other subject or a state description)."""
+    if _lexically_filtered(clause, lexicon):
         return True
     action = _scan(clause, lexicon)
     return action is not None and _subject_kind(action, clause, lexicon) in {"other", "state"}
@@ -687,10 +715,7 @@ class RuleExtractor:
         self._lexicon: Mapping[str, Any] = _default_lexicon() if lexicon is None else lexicon
 
     def _sentence_filtered(self, sentence: str) -> bool:
-        low = _normalize(sentence).lower().lstrip(" \"'(*_")
-        return any(
-            re.match(_phrase(lead), low) for lead in self._lexicon.get("conditional_lead", ())
-        )
+        return _conditional_lead(sentence, self._lexicon)
 
     def extract(self, text: str, known_tools: Sequence[ToolSpec]) -> list[Claim]:
         lex = self._lexicon
@@ -702,9 +727,7 @@ class RuleExtractor:
             for clause in split_clauses(sentence):
                 action = _scan(clause, lex)
                 if action is None:
-                    other = _verbless_other_subject(clause, lex)
-                    if other is not None:
-                        prev_other = other
+                    prev_other = _carry_other(prev_other, clause, lex)
                     continue
                 kind = _subject_kind(action, clause, lex)
                 # A subject-less clause carries the previous clause's non-agent subject

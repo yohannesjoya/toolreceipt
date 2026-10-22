@@ -436,8 +436,9 @@ def test_lexically_filtered_without_future_advice_keeps_outcome_claims():
     assert not _lexically_filtered(outcome, LEX, future_advice=False)
     assert _lexically_filtered("I couldn't send the email", LEX, future_advice=False)
     assert _lexically_filtered("Is the refund issued?", LEX, future_advice=False)
-    assert not is_filtered("you can create a ticket from the portal", LEX, future_advice=False)
-    assert is_filtered("The customer has cancelled the order", LEX, future_advice=False)
+    advice = "you can create a ticket from the portal"
+    assert not _lexically_filtered(advice, LEX, future_advice=False)
+    assert is_filtered("The customer has cancelled the order", LEX)
 
 
 def test_state_marked():

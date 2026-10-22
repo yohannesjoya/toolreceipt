@@ -1,0 +1,30 @@
+{
+  "reply": "If the refund has been issued, you'll see it on your statement.",
+  "known_tools": [
+    {
+      "name": "lookup_order",
+      "description": "Look up an order by its id."
+    },
+    {
+      "name": "issue_refund",
+      "description": "Issue a refund to the customer for an order."
+    },
+    {
+      "name": "send_email",
+      "description": "Send an email to the customer."
+    },
+    {
+      "name": "create_ticket",
+      "description": "Create a support ticket for follow-up by the team."
+    },
+    {
+      "name": "cancel_order",
+      "description": "Cancel an order."
+    }
+  ],
+  "llm_output": "{\"claims\": [{\"text\": \"the refund has been issued\", \"tool\": \"issue_refund\"}]}",
+  "note": "hand-written model output; the sentence opens with a conditional_lead phrase, which the rules drop whole",
+  "expected": [],
+  "model": "hand-written",
+  "recorded_at": "2026-10-22"
+}

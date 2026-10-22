@@ -22,7 +22,9 @@ from toolreceipt.claims import (
     Claim,
     RuleExtractor,
     ToolSpec,
+    _conditional_lead,
     _default_lexicon,
+    _inherits_other_subject,
     _lexically_filtered,
     _normalize,
     _scan,
@@ -153,7 +155,8 @@ class LLMExtractor:
     model, temperature, timeout and retries inside it. ``on_error="fallback"`` (default)
     returns the rule claims alone on any exception or unparsable output, after one warning
     on the ``toolreceipt.llm`` logger; ``"raise"`` re-raises. One ``lexicon`` drives both
-    the rules and the guards. ``extract()`` keeps its results in locals, so one extractor can
+    the rules and the guards (the diff's sibling demotion under ``llm_blocks`` uses the
+    packaged lexicon). ``extract()`` keeps its results in locals, so one extractor can
     serve many ``Receipts`` and threads; ``last_raw`` and ``last_error`` are debugging aids
     written on every call (last writer wins), so read them from an extractor one thread owns.
     """
@@ -195,9 +198,11 @@ class LLMExtractor:
             log.warning("LLM extractor fell back to rules: %s", type(exc).__name__)
             return rules
         names = {t.name for t in known_tools}
-        guarded = [_guard(span, tool, text, names, self._lexicon) for span, tool in pairs]
-        llm_claims = [c for c in guarded if c is not None]
         loose_reply = normalize_loose(text)
+        guarded = [
+            _guard(span, tool, text, loose_reply, names, self._lexicon) for span, tool in pairs
+        ]
+        llm_claims = [c for c in guarded if c is not None]
         llm_claims.sort(key=lambda c: loose_reply.find(normalize_loose(c.text)))
         return _merge(rules, llm_claims)
 
@@ -210,24 +215,32 @@ MAX_SPAN_CHARS = 200
 
 
 def _guard(
-    span: str, tool: str | None, reply: str, names: set[str], lexicon: Mapping[str, Any]
+    span: str,
+    tool: str | None,
+    reply: str,
+    loose_reply: str,
+    names: set[str],
+    lexicon: Mapping[str, Any],
 ) -> Claim | None:
-    """The model claim as a ``Claim``, or ``None`` when a guard drops it."""
+    """The model claim as a ``Claim``, or ``None`` when a guard drops it. ``loose_reply`` is
+    ``normalize_loose(reply)``, computed once per reply by the caller."""
     span = span.strip()
-    loose_span, loose_reply = normalize_loose(span), normalize_loose(reply)
+    loose_span = normalize_loose(span)
     if not loose_span or loose_span not in loose_reply:
         return None  # 1. not a verbatim span of the reply
+    if len(loose_span) > MAX_SPAN_CHARS:
+        return None  # 6. a paragraph, not a claim (cheap, so checked before the scans)
     if tool is not None and tool not in names:
         tool = None  # 2. unknown tool: the claim survives as unmatched
     if tool is not None and _read_tool(tool, lexicon):
         tool = None  # 3. read-only tool: unmatched, as the rules treat read verbs
     if _quoted_everywhere(loose_span, loose_reply):
         return None  # 4. quoted, drafted or code
+    if _sentence_filtered(loose_span, reply, lexicon):
+        return None  # 5a. conditional sentence, or the clause inherits another subject
     clauses = [_first_clause(loose_span, reply), *split_clauses(span)]
     if any(_clause_filtered(clause, lexicon) for clause in clauses):
-        return None  # 5. negated, question, other subject or state description
-    if len(loose_span) > MAX_SPAN_CHARS:
-        return None  # 6. a paragraph, not a claim
+        return None  # 5b. negated, question, other subject or state description
     claim = Claim(
         text=span, verb="other", candidates=[tool] if tool else [], confidence="medium",
         source="llm",
@@ -258,15 +271,35 @@ def _quoted_everywhere(span: str, reply: str) -> bool:
     return True
 
 
-def _first_clause(loose_span: str, reply: str) -> str:
-    """The reply clause (split as the rules split) holding the span's first five words;
-    the span itself when none does."""
+def _locate(loose_span: str, reply: str) -> tuple[str, list[str], int] | None:
+    """The reply sentence holding the span's first five words, its clauses (split as the
+    rules split) and the index of the clause that holds them; ``None`` when no clause does."""
     key = " ".join(loose_span.split()[:5])
     for sentence in split_sentences(_normalize(reply)):
-        for clause in split_clauses(sentence):
+        clauses = split_clauses(sentence)
+        for i, clause in enumerate(clauses):
             if key in normalize_loose(clause):
-                return clause
-    return loose_span
+                return sentence, clauses, i
+    return None
+
+
+def _first_clause(loose_span: str, reply: str) -> str:
+    """The reply clause holding the span's first five words; the span itself when none does."""
+    located = _locate(loose_span, reply)
+    return loose_span if located is None else located[1][located[2]]
+
+
+def _sentence_filtered(loose_span: str, reply: str, lexicon: Mapping[str, Any]) -> bool:
+    """The two sentence-level drops the rules apply before looking at a clause: a leading
+    ``conditional_lead`` phrase ("If the refund has been issued, ...") and a subject-less
+    clause after a non-agent subject ("The carrier processed the return and refunded ...")."""
+    located = _locate(loose_span, reply)
+    if located is None:
+        return False
+    sentence, clauses, i = located
+    return _conditional_lead(sentence, lexicon) or _inherits_other_subject(
+        clauses[: i + 1], lexicon
+    )
 
 
 def _clause_filtered(clause: str, lexicon: Mapping[str, Any]) -> bool:

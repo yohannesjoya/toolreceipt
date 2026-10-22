@@ -1,0 +1,30 @@
+{
+  "reply": "Your refund is pending approval.",
+  "known_tools": [
+    {
+      "name": "lookup_order",
+      "description": "Look up an order by its id."
+    },
+    {
+      "name": "issue_refund",
+      "description": "Issue a refund to the customer for an order."
+    },
+    {
+      "name": "send_email",
+      "description": "Send an email to the customer."
+    },
+    {
+      "name": "create_ticket",
+      "description": "Create a support ticket for follow-up by the team."
+    },
+    {
+      "name": "cancel_order",
+      "description": "Cancel an order."
+    }
+  ],
+  "llm_output": "{\"claims\": [{\"text\": \"Your refund is pending approval\", \"tool\": \"issue_refund\"}]}",
+  "note": "hand-written model output; llm_exclusions pending",
+  "expected": [],
+  "model": "hand-written",
+  "recorded_at": "2026-10-22"
+}

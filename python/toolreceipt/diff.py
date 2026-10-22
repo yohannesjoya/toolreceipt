@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from collections.abc import Collection, Iterable, Mapping, Sequence
+from collections.abc import Collection, Iterable, Sequence
 from dataclasses import replace
+from functools import lru_cache
 from typing import Any
 
 from toolreceipt.claims import (
@@ -25,16 +26,21 @@ def _copy(claim: Claim, **changes: Any) -> Claim:
     return out
 
 
-def _sibling_ran(
-    candidate: str, ok_tools: Iterable[str], lexicon: Mapping[str, Any] | None = None
-) -> bool:
-    """True when a tool that ran ok shares a lexicon verb token with ``candidate``'s name
-    (``send_email`` ran, the claim names ``send_sms``)."""
-    lex = _default_lexicon() if lexicon is None else lexicon
-    all_verbs: set[str] = set()
+@lru_cache(maxsize=1)
+def _all_verb_tokens() -> frozenset[str]:
+    """Every verb token of every family in the packaged lexicon. The diff has no extractor
+    lexicon in hand, so sibling demotion always uses the packaged families."""
+    lex = _default_lexicon()
+    tokens: set[str] = set()
     for family in lex["families"]:
-        all_verbs |= _verb_tokens(family, lex)
-    verbs = set(tokenize_tool_name(candidate)) & all_verbs
+        tokens |= _verb_tokens(family, lex)
+    return frozenset(tokens)
+
+
+def _sibling_ran(candidate: str, ok_tools: Iterable[str]) -> bool:
+    """True when a tool that ran ok shares a packaged-lexicon verb token with ``candidate``'s
+    name (``send_email`` ran, the claim names ``send_sms``)."""
+    verbs = set(tokenize_tool_name(candidate)) & _all_verb_tokens()
     return bool(verbs) and any(verbs & set(tokenize_tool_name(t)) for t in ok_tools)
 
 
@@ -50,7 +56,8 @@ def diff(
 
     Matching is set membership: entries are never consumed. Input claims are not mutated.
     A claim with ``source == "llm"`` whose tool never ran lands in ``suspected`` unless
-    ``llm_blocks`` is set; then it blocks like a rule claim.
+    ``llm_blocks`` is set; then it blocks like a rule claim, except that a sibling tool of
+    the same action (by the packaged lexicon's verb tokens) having run makes it ``unmatched``.
     """
     ok_tools = ledger.ok_tools()
     error_tools = ledger.error_tools()

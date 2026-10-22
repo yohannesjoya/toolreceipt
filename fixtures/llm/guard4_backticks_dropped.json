@@ -1,0 +1,30 @@
+{
+  "reply": "Run `issue_refund(order_id)` from the console to refund the order yourself.",
+  "known_tools": [
+    {
+      "name": "lookup_order",
+      "description": "Look up an order by its id."
+    },
+    {
+      "name": "issue_refund",
+      "description": "Issue a refund to the customer for an order."
+    },
+    {
+      "name": "send_email",
+      "description": "Send an email to the customer."
+    },
+    {
+      "name": "create_ticket",
+      "description": "Create a support ticket for follow-up by the team."
+    },
+    {
+      "name": "cancel_order",
+      "description": "Cancel an order."
+    }
+  ],
+  "llm_output": "{\"claims\": [{\"text\": \"issue_refund(order_id)\", \"tool\": \"issue_refund\"}]}",
+  "note": "hand-written model output; inline code",
+  "expected": [],
+  "model": "hand-written",
+  "recorded_at": "2026-10-22"
+}
