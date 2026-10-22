@@ -171,9 +171,10 @@ runs of the same reply block or pass the same way even though model output varie
 `fabricated`. On a provider error or unparsable output the extractor logs one warning and
 falls back to the rules (`on_error="raise"` to surface it instead).
 
-Every LLM claim must be a verbatim span of the reply naming a listed tool, and it goes
-through the lexicon's negation, other-subject and state checks before it counts, so the LLM
-path is held to the same "do not cry wolf" bar as the rules. Those checks are English-only:
+Every LLM claim must be a verbatim span of the reply, and only a claim naming a listed tool
+is judged (the rest stay in `unmatched`). Each one goes through the lexicon's negation,
+other-subject and state checks before it counts, so the LLM path is held to the same "do not
+cry wolf" bar as the rules. Those checks are English-only:
 on a non-English span only the prompt's exclusions apply. A reply can talk the model out of
 reporting a claim, but never out of a rule claim: the LLM path only adds. `check()` now waits
 on one model round trip (one to three seconds on Groq).

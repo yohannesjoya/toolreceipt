@@ -112,6 +112,8 @@ extractor.extract(reply, known_tools)
 print(extractor.last_raw)   # paste into "llm_output"
 ```
 
+`last_raw` is written on every call, so read it from an extractor that only this thread uses.
+
 ```json
 {
   "reply": "Your refund is on its way and you'll find the confirmation in your inbox.",
