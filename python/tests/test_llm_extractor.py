@@ -39,6 +39,14 @@ def test_prompt_contains_tools_in_order_and_reply_last():
     assert p.count("Done {reply}") == 1
 
 
+def test_prompt_placeholders_in_descriptions_are_not_expanded():
+    tools = normalize_tool_specs([("odd_tool", "Issue {reply} refund }{ and {tools}")])
+    p = build_prompt("MY REPLY", tools)
+    assert p.count("MY REPLY") == 1
+    assert "- odd_tool: Issue {reply} refund }{ and {tools}" in p
+    assert p.rstrip().endswith("MY REPLY\n>>>")
+
+
 def test_parse_output_tolerates_fences_and_prose():
     raw = 'Sure:\n```json\n{"claims": [{"text": "I sent it", "tool": "send_email"}]}\n```'
     assert parse_output(raw) == [("I sent it", "send_email")]

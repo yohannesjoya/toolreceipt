@@ -40,8 +40,8 @@ log = logging.getLogger("toolreceipt.llm")
 
 PROMPT_VERSION = 2
 
-# Filled with ``str.replace``: tools first, then the reply, so reply text is never re-scanned
-# and braces in either need no escaping.
+# Filled by one regex pass over the two placeholders, so neither the tool list nor the reply
+# is ever re-scanned and braces in either need no escaping.
 PROMPT_V2 = """You audit the final reply of an AI agent. List every ACTION CLAIM in it: a \
 statement that the agent itself ("I", "we", or an agentless passive or outcome sentence about \
 this conversation's request) has ALREADY performed, or is performing right now, an action \
@@ -77,6 +77,7 @@ Reply:
 >>>"""
 
 _FENCE = re.compile(r"^```[a-zA-Z]*\s*$|^```\s*$", re.MULTILINE)
+_PLACEHOLDER = re.compile(r"\{(tools|reply)\}")
 OnError = Literal["fallback", "raise"]
 
 
@@ -85,7 +86,8 @@ def build_prompt(text: str, known_tools: Sequence[ToolSpec]) -> str:
     tools = "\n".join(
         f"- {t.name}: {t.description}" if t.description else f"- {t.name}" for t in known_tools
     )
-    return PROMPT_V2.replace("{tools}", tools or "(none)").replace("{reply}", text)
+    values = {"tools": tools or "(none)", "reply": text}
+    return _PLACEHOLDER.sub(lambda m: values[m.group(1)], PROMPT_V2)
 
 
 def parse_output(raw: str) -> list[tuple[str, str | None]]:
@@ -151,8 +153,9 @@ class LLMExtractor:
     model, temperature, timeout and retries inside it. ``on_error="fallback"`` (default)
     returns the rule claims alone on any exception or unparsable output, after one warning
     on the ``toolreceipt.llm`` logger; ``"raise"`` re-raises. One ``lexicon`` drives both
-    the rules and the guards. The extractor holds no per-run state and may be shared across
-    ``Receipts`` and threads; ``last_raw`` and ``last_error`` are debugging aids only.
+    the rules and the guards. ``extract()`` keeps its results in locals, so one extractor can
+    serve many ``Receipts`` and threads; ``last_raw`` and ``last_error`` are debugging aids
+    written on every call (last writer wins), so read them from an extractor one thread owns.
     """
 
     def __init__(
@@ -220,7 +223,8 @@ def _guard(
         tool = None  # 3. read-only tool: unmatched, as the rules treat read verbs
     if _quoted_everywhere(loose_span, loose_reply):
         return None  # 4. quoted, drafted or code
-    if _clause_filtered(_first_clause(loose_span, reply), lexicon):
+    clauses = [_first_clause(loose_span, reply), *split_clauses(span)]
+    if any(_clause_filtered(clause, lexicon) for clause in clauses):
         return None  # 5. negated, question, other subject or state description
     if len(loose_span) > MAX_SPAN_CHARS:
         return None  # 6. a paragraph, not a claim
