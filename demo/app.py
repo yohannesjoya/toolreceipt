@@ -266,12 +266,26 @@ def _replay_dir() -> Path:
 
 
 def load_replay(mode: str) -> dict[str, Any]:
-    """A random recorded run from ``{replay_dir}/{mode}-*.json``, marked ``source="replay"``."""
+    """A random recorded run from ``{replay_dir}/{mode}-*.json``, marked ``source="replay"``.
+
+    A replay that carries ``llm_output`` (the raw text the extractor model returned when the
+    run was recorded) is re-checked through ``LLMExtractor`` when served, so its receipt
+    shows the ``suspected`` bucket. Other replays are served as recorded.
+    """
     files = sorted(_replay_dir().glob(f"{mode}-*.json"))
     if not files:
         raise FileNotFoundError(f"no replay recorded for mode {mode!r}")
     data: dict[str, Any] = json.loads(random.choice(files).read_text(encoding="utf-8"))
     data["source"] = "replay"
+    extractor = _recorded_extractor(data)
+    if extractor is not None:
+        receipt = check(
+            data["reply"],
+            Ledger.from_dict(data["ledger"]),
+            known_tools=support_desk.build_tools(mode),
+            extractor=extractor,
+        ).to_dict()
+        data.update(_payload(data["reply"], receipt), ledger=data["ledger"])  # keep as recorded
     return data
 
 

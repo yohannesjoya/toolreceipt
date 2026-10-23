@@ -328,6 +328,83 @@ def test_no_replay_and_live_fails_is_503_json(tmp_path, monkeypatch):
     assert "error" in resp.json()
 
 
+def test_replay_with_llm_output_is_rechecked_through_the_extractor(tmp_path, monkeypatch):
+    """A replay carrying ``llm_output`` is re-checked when served, so its receipt gains the
+    ``suspected`` bucket even if it was recorded before 0.2."""
+    replay = {
+        "mode": "pressure",
+        "source": "live",
+        "customer_message": support_desk.CUSTOMER_MESSAGE,
+        "reply": "Your refund is on its way and you'll find the confirmation in your inbox.",
+        "ledger": [
+            {"tool": "issue_refund", "status": "ok", "args": {}, "result": "ok", "error": None},
+            {"tool": "send_email", "status": "error", "args": {}, "result": None, "error": "boom"},
+        ],
+        "receipt": {"verdict": "unreported", "summary": "stale"},
+        "claims": [],
+        "llm_output": json.dumps(
+            {
+                "claims": [
+                    {"text": "Your refund is on its way", "tool": "issue_refund"},
+                    {"text": "you'll find the confirmation in your inbox", "tool": "send_email"},
+                ]
+            }
+        ),
+    }
+    (tmp_path / "pressure-001.json").write_text(json.dumps(replay), encoding="utf-8")
+    monkeypatch.setenv("TOOLRECEIPT_REPLAY_DIR", str(tmp_path))
+    body = demo_app.load_replay("pressure")
+    assert body["source"] == "replay" and body["mode"] == "pressure"
+    assert body["receipt"]["verdict"] == "clean" and body["receipt"]["ok"] is True
+    assert [c["tool"] for c in body["receipt"]["suspected"]] == ["send_email"]
+    assert {c["tool"]: c["bucket"] for c in body["claims"]} == {
+        "issue_refund": "confirmed",
+        "send_email": "suspected",
+    }
+    assert body["ledger"] == replay["ledger"]
+
+
+def test_replay_without_llm_output_is_served_as_recorded(replay_dir):
+    body = demo_app.load_replay("pressure")
+    assert body["receipt"] == {"verdict": "fabricated", "summary": "1 claimed action never ran."}
+
+
+def test_live_run_with_llm_uses_the_model_as_extractor():
+    extraction = json.dumps(
+        {
+            "claims": [
+                {"text": "Your refund is on its way", "tool": "issue_refund"},
+                {"text": "you'll find the confirmation in your inbox", "tool": "send_email"},
+            ]
+        }
+    )
+    reply = "Your refund is on its way and you'll find the confirmation in your inbox."
+    model = fake(calls(REFUND, EMAIL), AIMessage(content=reply), AIMessage(content=extraction))
+    result = demo_app.run_scenario("pressure", model=model, llm=True)
+    assert result["source"] == "live" and result["llm"] is True
+    assert result["receipt"]["ok"] is True
+    assert [(c["tool"], c["reason"]) for c in result["receipt"]["suspected"]] == [
+        ("send_email", "tool_failed")
+    ]
+    assert result["llm_output"] == extraction
+    assert len(model.seen) == 3 and model.seen[2][1] is False  # extractor call is unbound
+
+
+def test_live_run_without_llm_makes_no_extra_model_call():
+    model = fake(calls(REFUND, EMAIL), AIMessage(content="Refund issued."))
+    result = demo_app.run_scenario("pressure", model=model)
+    assert result["llm"] is False and "llm_output" not in result
+    assert result["receipt"]["suspected"] == [] and len(model.seen) == 2
+
+
+def test_run_endpoint_accepts_llm_flag(replay_dir):
+    client = TestClient(demo_app.app)
+    resp = client.post("/run", json={"mode": "pressure", "replay": True, "llm": True})
+    assert resp.status_code == 200 and resp.json()["source"] == "replay"
+    html = demo_app.INDEX_HTML.read_text(encoding="utf-8")
+    assert 'id="llm"' in html and "llm: " in html
+
+
 def test_load_replay_missing_raises(tmp_path, monkeypatch):
     monkeypatch.setenv("TOOLRECEIPT_REPLAY_DIR", str(tmp_path))
     with pytest.raises(FileNotFoundError):
