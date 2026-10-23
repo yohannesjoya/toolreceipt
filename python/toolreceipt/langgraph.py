@@ -87,6 +87,10 @@ class ReceiptCallbackHandler(BaseCallbackHandler):
     Entries are appended to the ledger when they close (tool end, tool error or ``flush``).
     """
 
+    # Async callers would otherwise pay one default-executor hop per event; the handler's
+    # work is microseconds under its own lock, and sync ``invoke`` is unaffected.
+    run_inline = True
+
     def __init__(
         self, ledger: Ledger, *, capture_results: bool = True, max_result_chars: int = 2000
     ) -> None:

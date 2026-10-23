@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib
+import inspect
 from collections.abc import Collection, Iterable, Mapping
 from dataclasses import replace
 from typing import Any, Protocol
@@ -59,6 +60,27 @@ def _check(
     )
 
 
+async def _acheck(
+    reply: str,
+    ledger: Ledger,
+    known: list[ToolSpec],
+    ignore_tools: Collection[str],
+    extractor: ClaimExtractor | None,
+    llm_blocks: bool = False,
+) -> Receipt:
+    """``_check`` that awaits an extractor's ``aextract`` coroutine when it has one."""
+    specs = _merge_tools(known, (ToolSpec(name, "") for name in sorted(ledger.tools())))
+    aextract = getattr(extractor, "aextract", None)
+    if inspect.iscoroutinefunction(aextract):
+        claims = await aextract(reply, specs)
+    else:
+        claims = (extractor or RuleExtractor()).extract(reply, specs)
+    return diff(
+        claims, ledger, known_tools=[s.name for s in specs], ignore_tools=ignore_tools,
+        llm_blocks=llm_blocks,
+    )
+
+
 def check(
     reply: str,
     ledger: Ledger,
@@ -74,6 +96,23 @@ def check(
     by default they are reported in ``Receipt.suspected``.
     """
     return _check(
+        reply, ledger, normalize_tool_specs(known_tools), ignore_tools, extractor, llm_blocks
+    )
+
+
+async def acheck(
+    reply: str,
+    ledger: Ledger,
+    *,
+    known_tools: Iterable[ToolLike] = (),
+    ignore_tools: Collection[str] = (),
+    extractor: ClaimExtractor | None = None,
+    llm_blocks: bool = False,
+) -> Receipt:
+    """``check()`` for async code: the same receipt, with an extractor's ``aextract``
+    awaited when it defines one (``LLMExtractor`` runs its model call on a thread). With
+    the rules alone there is no I/O and the result equals ``check()``."""
+    return await _acheck(
         reply, ledger, normalize_tool_specs(known_tools), ignore_tools, extractor, llm_blocks
     )
 
@@ -120,8 +159,7 @@ class Receipts:
     def ledger(self) -> Ledger | None:
         return self._handler.ledger if self._handler is not None else None
 
-    def check(self, reply: str, ledger: Ledger | None = None) -> Receipt:
-        """Check ``reply``; with no ``ledger``, use the most recent ``config()`` run's."""
+    def _resolve(self, ledger: Ledger | None) -> tuple[Ledger, list[ToolSpec]]:
         known = list(self._known_tools)
         if ledger is None:
             if self._handler is None:
@@ -133,6 +171,20 @@ class Receipts:
             )
         if not self._capture_results:
             ledger = Ledger(replace(e, args={}, result=None) for e in ledger.entries)
+        return ledger, known
+
+    def check(self, reply: str, ledger: Ledger | None = None) -> Receipt:
+        """Check ``reply``; with no ``ledger``, use the most recent ``config()`` run's."""
+        ledger, known = self._resolve(ledger)
         return _check(
+            reply, ledger, known, self._ignore_tools, self._extractor, self._llm_blocks
+        )
+
+    async def acheck(self, reply: str, ledger: Ledger | None = None) -> Receipt:
+        """``check()`` for async code; see the module-level ``acheck``. One ``Receipts`` per
+        run: ``config()`` binds the ledger to this instance, so concurrent runs need their
+        own instances."""
+        ledger, known = self._resolve(ledger)
+        return await _acheck(
             reply, ledger, known, self._ignore_tools, self._extractor, self._llm_blocks
         )

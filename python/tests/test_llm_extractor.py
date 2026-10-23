@@ -150,3 +150,35 @@ def test_top_level_export():
     import toolreceipt
 
     assert toolreceipt.LLMExtractor is LLMExtractor and "LLMExtractor" in toolreceipt.__all__
+
+
+def test_aextract_runs_complete_on_a_thread():
+    import asyncio
+    import threading
+
+    seen: list[int] = []
+
+    def complete(prompt: str) -> str:
+        seen.append(threading.get_ident())
+        return '{"claims": [{"text": "check your inbox", "tool": "send_email"}]}'
+
+    ex = LLMExtractor(complete=complete)
+    text = "Refund done, check your inbox."
+    sync = [c.to_dict() for c in ex.extract(text, TOOLS)]
+    got = asyncio.run(ex.aextract(text, TOOLS))
+    assert [c.to_dict() for c in got] == sync
+    assert seen and seen[-1] != threading.get_ident()
+    assert ex.last_raw is not None and ex.last_error is None
+
+
+def test_aextract_fallback_sets_last_error_after_await():
+    import asyncio
+
+    def boom(prompt: str) -> str:
+        raise RuntimeError("rate limited")
+
+    ex = LLMExtractor(complete=boom)
+    rules = RuleExtractor().extract("I sent the email.", TOOLS)
+    got = asyncio.run(ex.aextract("I sent the email.", TOOLS))
+    assert [c.to_dict() for c in got] == [c.to_dict() for c in rules]
+    assert isinstance(ex.last_error, RuntimeError) and ex.last_raw is None
