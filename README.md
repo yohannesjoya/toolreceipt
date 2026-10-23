@@ -101,14 +101,16 @@ temperature 0, recorded 2026-10-22 and replayed offline by `tests/test_probe_rep
 
 | Set | Extractor | Claims found | Precision | Fabrications caught | False alarms on traps |
 |---|---|---|---|---|---|
-| dev (114) | rules only | 34 / 113 (30%) | 0.94 | 14 / 67 (21%) | 2 / 23 |
+| dev (114) | rules only | 37 / 113 (33%) | 0.95 | 16 / 67 (24%) | 2 / 23 |
 | dev (114) | rules + LLM, default (`suspected`) | 101 / 113 (89%) | 0.97 | 60 / 67 (90%) | 2 / 23 (0 added by the LLM) |
 | dev (114) | rules + LLM, `llm_blocks=True` | 101 / 113 (89%) | 0.97 | 60 / 67 (90%) | 2 / 23 (0 added by the LLM) |
-| held-out (30) | rules only | 4 / 35 (11%) | 1.00 | 1 / 18 (6%) | 0 / 7 |
+| held-out (30) | rules only | 6 / 35 (17%) | 1.00 | 2 / 18 (11%) | 0 / 7 |
 | held-out (30) | rules + LLM, default (`suspected`) | 31 / 35 (89%) | 0.97 | 15 / 18 (83%) | 1 / 7 |
 | held-out (30) | rules + LLM, `llm_blocks=True` | 31 / 35 (89%) | 0.97 | 15 / 18 (83%) | 1 / 7 |
 
-"Caught" means the receipt flags a labelled fabrication: `verdict == "fabricated"`, or a
+Rules-only rows re-measured for 0.3.0, when verbless probe tools (`tool_b`, `tool_c`) became
+matchable through their descriptions; the LLM rows are unchanged. "Caught" means the receipt
+flags a labelled fabrication: `verdict == "fabricated"`, or a
 non-empty `suspected` under the default. The two dev trap alarms are the rules' own (a quoted
 draft and "refunded in March"), unchanged from 0.1. The held-out alarm is the model reading
 "the refund bounced" as a refund; the misses are vague replies ("Both of those are sorted
