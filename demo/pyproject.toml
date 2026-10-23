@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Support desk demo for toolreceipt: a LangGraph agent on Groq, checked against its own tool ledger."
 requires-python = ">=3.10"
 dependencies = [
-    "toolreceipt[langgraph]==0.2.0",
+    "toolreceipt[langgraph]==0.3.0",
     "fastapi",
     "uvicorn[standard]",
     "langchain-groq>=1.1",
