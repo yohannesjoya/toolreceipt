@@ -214,10 +214,12 @@ def make_model() -> BaseChatModel:
     )
 
 
-def _run_live(mode: str, model: BaseChatModel, deadline: float) -> dict[str, Any]:
+def _run_live(mode: str, model: BaseChatModel, deadline: float, llm: bool) -> dict[str, Any]:
     tools = support_desk.build_tools(mode)
     graph = build_graph(model, tools, support_desk.SYSTEM_PROMPTS[mode], deadline=deadline)
-    receipts = Receipts()
+    # With ``llm`` the same model also extracts claims (one more call, after the run).
+    extractor = LLMExtractor.from_chat_model(model, on_error="raise") if llm else None
+    receipts = Receipts(extractor=extractor)
     result = graph.invoke(
         {"messages": [HumanMessage(support_desk.CUSTOMER_MESSAGE)]},
         config=receipts.config({"recursion_limit": RECURSION_LIMIT}),
@@ -226,11 +228,18 @@ def _run_live(mode: str, model: BaseChatModel, deadline: float) -> dict[str, Any
     if not reply.strip():
         raise RuntimeError("the agent produced no reply")
     receipt = receipts.check(reply).to_dict()
-    return {"mode": mode, "source": "live", **_payload(reply, receipt)}
+    out = {"mode": mode, "source": "live", "llm": llm, **_payload(reply, receipt)}
+    if extractor is not None and extractor.last_raw is not None:
+        out["llm_output"] = extractor.last_raw  # lets the run be saved as a replay
+    return out
 
 
-def run_scenario(mode: str, *, model: BaseChatModel | None = None) -> dict[str, Any]:
+def run_scenario(
+    mode: str, *, model: BaseChatModel | None = None, llm: bool = False
+) -> dict[str, Any]:
     """Run the support desk agent live; on any failure serve a replay instead.
+
+    ``llm`` also runs ``LLMExtractor`` on the reply with the same model (one extra call).
 
     Without an injected ``model`` the run uses Groq: a missing ``GROQ_API_KEY`` serves a
     replay without using a live slot, and once ``LIVE_RUNS_PER_MINUTE`` is spent a replay is
@@ -248,7 +257,7 @@ def run_scenario(mode: str, *, model: BaseChatModel | None = None) -> dict[str, 
     deadline = time.monotonic() + RUN_DEADLINE_SECONDS
     try:
         live_model = model if model is not None else make_model()
-        future = _executor.submit(_run_live, mode, live_model, deadline)
+        future = _executor.submit(_run_live, mode, live_model, deadline, llm)
         try:
             return future.result(timeout=RUN_DEADLINE_SECONDS)
         except FutureTimeout:
@@ -277,6 +286,7 @@ def load_replay(mode: str) -> dict[str, Any]:
         raise FileNotFoundError(f"no replay recorded for mode {mode!r}")
     data: dict[str, Any] = json.loads(random.choice(files).read_text(encoding="utf-8"))
     data["source"] = "replay"
+    data.setdefault("llm", False)
     extractor = _recorded_extractor(data)
     if extractor is not None:
         receipt = check(
@@ -378,6 +388,7 @@ app = FastAPI(title="toolreceipt demo", docs_url=None, redoc_url=None)
 class RunRequest(BaseModel):
     mode: Literal["honest", "pressure"]
     replay: bool = False
+    llm: bool = False  # also run the LLM extractor on the reply (live runs only)
 
 
 @app.get("/", include_in_schema=False)
@@ -398,7 +409,9 @@ def run(body: RunRequest, request: Request) -> dict[str, Any] | JSONResponse:
             status_code=429,
         )
     try:
-        return load_replay(body.mode) if body.replay else run_scenario(body.mode)
+        if body.replay:
+            return load_replay(body.mode)
+        return run_scenario(body.mode, llm=body.llm)
     except Exception as exc:  # no replay to fall back on, or an unreadable one
         log.warning("run unavailable (%s)", type(exc).__name__)
         return JSONResponse(

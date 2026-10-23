@@ -100,6 +100,8 @@ button.primary { background: var(--accent); border-color: var(--accent); color: 
 button:disabled { opacity: 0.55; cursor: progress; }
 button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .actions .note { color: var(--muted); font-size: 0.9rem; }
+.actions .opt { display: inline-flex; align-items: center; gap: 6px; font-size: 0.9rem; color: var(--muted); cursor: pointer; }
+.actions .opt input { accent-color: var(--accent); margin: 0; }
 
 /* Stages */
 .stages { display: grid; gap: 28px; margin-top: 32px; }
@@ -230,6 +232,7 @@ footer { margin-top: 40px; color: var(--muted); font-size: 0.88rem; display: fle
     <div class="actions">
       <button class="primary" id="run" type="button">Run it live</button>
       <button id="replay" type="button">Another recorded run</button>
+      <label class="opt"><input type="checkbox" id="llm"> also run the LLM extractor</label>
       <span class="note" id="status" role="status" aria-live="polite">Loading the example…</span>
     </div>
   </section>
@@ -548,7 +551,7 @@ receipt = rc.check(final_reply(result))
   }
 
   function sourceNote(d) {
-    if (d.source === "live") return "Live run finished.";
+    if (d.source === "live") return d.llm ? "Live run finished; the LLM extractor read the reply." : "Live run finished.";
     if (d.source === "replay") return "Showing a recorded run.";
     return BY_KEY[current].group === "live" ? "Recorded run of the real model." : "Hand-written reply, checked by toolreceipt.";
   }
@@ -557,6 +560,7 @@ receipt = rc.check(final_reply(result))
     var ex = BY_KEY[current];
     $("run").disabled = busy || !ex.live;
     $("replay").disabled = busy || !ex.live;
+    $("llm").disabled = busy || !ex.live;
     $("run").title = ex.live ? "" : "Only the two scenarios marked “can run live” call the model.";
   }
 
@@ -582,9 +586,10 @@ receipt = rc.check(final_reply(result))
 
   function run(replay) {
     busy = true; syncButtons();
-    setStatus(replay ? "Loading another recorded run…" : "Running the agent on gpt-oss-120b. This takes 5 to 15 seconds…", false);
+    var llm = !replay && $("llm").checked;
+    setStatus(replay ? "Loading another recorded run…" : "Running the agent on gpt-oss-120b" + (llm ? ", then the LLM extractor" : "") + ". This takes 5 to 15 seconds…", false);
     ["s1", "s2", "s3"].forEach(function (id) { $(id).classList.add("pending"); });
-    request("/run", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ mode: current, replay: replay }) })
+    request("/run", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ mode: current, replay: replay, llm: llm }) })
       .then(function (d) {
         render(d, !replay);
         setStatus(d.source === "replay" && !replay ? "The live model is busy right now, so this is a recorded run." : sourceNote(d), false);
