@@ -169,6 +169,10 @@ receipt = await rc.acheck(final_reply(result))
 `LLMExtractor` the model call runs on a thread so the event loop stays free. `astream` is
 recorded the same way, and a cancelled run closes its open tool call as an error.
 
+On Python 3.10, LangGraph does not pass the run config into async nodes implicitly. Call
+your model with the node's `config` argument there, or the tools it binds are not recorded
+as known.
+
 ## With an LLM extractor
 
 The default extractor is rules only: no key, no network, deterministic. It reads direct
