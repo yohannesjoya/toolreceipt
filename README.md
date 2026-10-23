@@ -41,9 +41,14 @@ advice ("you can create a ticket"), conditionals and offers are not claims.
 - **Non-English replies.** The default extractor is English only. `LLMExtractor` reads
   other languages, but its guards are English only (see below).
 - **Streaming and mid-run checks.** Only the final reply is checked.
-- **Tool names without a verb.** With the default extractor a tool called `email_customer`
-  never matches, so claims about it land in `unmatched` (informational, they never affect
-  the verdict). `LLMExtractor` can name it, since the model matches on the description.
+- **Tool names without a verb, when the description does not lead with one.** A tool
+  called `jira` or `email_customer` is matched through the first verb of its description
+  ("Create a ticket in Jira", "Email the customer"). A description that opens with
+  something else ("Helps the customer by creating a ticket"), names two actions, or is in
+  another language leaves the tool unmatched, and claims about it land in `unmatched`
+  (informational, they never affect the verdict). Put the verb first, or use
+  `LLMExtractor`, which matches on the whole description. On the post-hoc path, pass
+  `known_tools` with descriptions: a ledger alone carries none.
 - **Loose tool matching.** A claim maps to a tool only when the tool name shares the
   claim's action verb family (`send`, `create`, `update`, `delete`, `refund`, ...).
 - **Loose paraphrases of an action done with a different tool.** "I've raised this with our
@@ -149,6 +154,18 @@ if not receipt.ok:
 `Receipts` per run. Your tools and graph stay unchanged, apart from
 `ToolNode(tools, handle_tool_errors=True)`.
 
+Async graphs work the same way:
+
+```python
+rc = Receipts()  # one per run: config() binds the ledger to this instance
+result = await graph.ainvoke(inputs, config=rc.config())
+receipt = await rc.acheck(final_reply(result))
+```
+
+`acheck` returns the same receipt as `check`. With the rules alone it does no I/O; with an
+`LLMExtractor` the model call runs on a thread so the event loop stays free. `astream` is
+recorded the same way, and a cancelled run closes its open tool call as an error.
+
 ## With an LLM extractor
 
 The default extractor is rules only: no key, no network, deterministic. It reads direct
@@ -229,8 +246,9 @@ no result is recorded as an error. Timestamps are `None` on this path.
 
 Pass `known_tools`. A ledger only knows the tools that ran, so without `known_tools` a claim
 about a tool that was never called ("I emailed you" when `send_email` never ran) has nothing
-to match and cannot be flagged. Names are enough; `(name, description)` pairs and
-OpenAI-style tool dicts also work. In a live run (`Receipts.config()`), bound tools are
+to match and cannot be flagged. Names are enough for verb-named tools; `(name, description)`
+pairs and OpenAI-style tool dicts also work, and a tool whose name has no verb (`jira`) is
+matched only when its description is given. In a live run (`Receipts.config()`), bound tools are
 discovered automatically.
 
 Without LangGraph, build a `Ledger` of `LedgerEntry` objects yourself and call `check()`.
@@ -282,12 +300,13 @@ kept.
 
 ## Roadmap
 
-Done in 0.2: LLM-backed extractor behind the existing `ClaimExtractor` protocol.
+Done in 0.2: LLM-backed extractor behind the existing `ClaimExtractor` protocol. Done in
+0.3: async API; verbless tool names matched through their descriptions.
 
 - TypeScript port, sharing the JSON fixtures as the contract
 - Adapters: Mastra, CrewAI, Vercel AI SDK
 - Argument check ("emailed Bob" against `to="alice"`)
-- Async API
+- Framework-free message input (OpenAI-style message lists)
 
 ## Contributing
 

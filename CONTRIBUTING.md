@@ -22,6 +22,13 @@ A guard that cries wolf gets removed. A reply that is not a clear claim of a com
 must not produce a claim. A new negative fixture that produces a claim is a bug. When in
 doubt, add the negative fixture first.
 
+## Add a description to the lead-verb sample
+
+`fixtures/descriptions/sample.json` lists real tool descriptions with the family their first
+verb names (`"create"`, `"send"`, ... or `null`). `python/tests/test_description_family.py`
+replays it. Add an entry when a description you use is matched wrongly, then adjust the
+lexicon's `description_lead_skip` or `description_lead_nouns` so the whole sample passes.
+
 ## Add an extractor fixture
 
 Fixtures live in `fixtures/extractor/*.json` and are picked up automatically by

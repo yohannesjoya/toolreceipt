@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "toolreceipt"
-version = "0.2.0"
+version = "0.3.0"
 description = "Catch LLM agents claiming actions they never took. Ledger + claim extraction + receipt for LangGraph."
 readme = "README.md"
 license = "MIT"
