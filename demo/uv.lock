@@ -1297,11 +1297,11 @@ wheels = [
 
 [[package]]
 name = "toolreceipt"
-version = "0.1.1"
+version = "0.2.0"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/7e/bf/dec00f42ce4e6530865569ae748d8461a5b013956551c16a26e7717bceb1/toolreceipt-0.1.1.tar.gz", hash = "sha256:f8f875cc24234163ba272251e0f8469a8a3b17c12304f2209fddc9f7db655e60", size = 23746, upload-time = "2026-10-20T20:50:40.332Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/cf/fc/fd5e66e11e9eaa87c927ff6d0879c4fc8d97b1561db621b021127342c7b5/toolreceipt-0.2.0.tar.gz", hash = "sha256:6f9405c628c8b78f0281e5f40420e46797772be8fba0e550f239ca5760efb8b7", size = 36578, upload-time = "2026-10-22T16:18:08.053Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/52/dd/1b8469664df2a5287a91b00411ad5ae9ddbd8b144a4c13a016545ccec023/toolreceipt-0.1.1-py3-none-any.whl", hash = "sha256:af45028e5d6b6e90baf05997b0277dff1e79b060f62cfb5bb1d3c080cf17e33a", size = 27065, upload-time = "2026-10-20T20:50:38.814Z" },
+    { url = "https://files.pythonhosted.org/packages/83/4d/7213aca6703a1048a99dec2db3bfe0ad243e1ee54281320d3e4dce0064b6/toolreceipt-0.2.0-py3-none-any.whl", hash = "sha256:e61c88ec32da8bd07ae984ba34fb06b356f47901da9ea622ec60058ad1d1aa52", size = 36842, upload-time = "2026-10-22T16:18:06.915Z" },
 ]
 
 [package.optional-dependencies]
@@ -1334,7 +1334,7 @@ requires-dist = [
     { name = "fastapi" },
     { name = "langchain-groq", specifier = ">=1.1" },
     { name = "python-dotenv" },
-    { name = "toolreceipt", extras = ["langgraph"], specifier = "==0.1.1" },
+    { name = "toolreceipt", extras = ["langgraph"], specifier = "==0.2.0" },
     { name = "uvicorn", extras = ["standard"] },
 ]
 

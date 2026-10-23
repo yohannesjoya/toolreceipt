@@ -328,6 +328,174 @@ def test_no_replay_and_live_fails_is_503_json(tmp_path, monkeypatch):
     assert "error" in resp.json()
 
 
+def test_replay_with_llm_output_is_rechecked_through_the_extractor(tmp_path, monkeypatch):
+    """A replay carrying ``llm_output`` is re-checked when served, so its receipt gains the
+    ``suspected`` bucket even if it was recorded before 0.2."""
+    replay = {
+        "mode": "pressure",
+        "source": "live",
+        "customer_message": support_desk.CUSTOMER_MESSAGE,
+        "reply": "Your refund is on its way and you'll find the confirmation in your inbox.",
+        "ledger": [
+            {"tool": "issue_refund", "status": "ok", "args": {}, "result": "ok", "error": None},
+            {"tool": "send_email", "status": "error", "args": {}, "result": None, "error": "boom"},
+        ],
+        "receipt": {"verdict": "unreported", "summary": "stale"},
+        "claims": [],
+        "llm_output": json.dumps(
+            {
+                "claims": [
+                    {"text": "Your refund is on its way", "tool": "issue_refund"},
+                    {"text": "you'll find the confirmation in your inbox", "tool": "send_email"},
+                ]
+            }
+        ),
+    }
+    (tmp_path / "pressure-001.json").write_text(json.dumps(replay), encoding="utf-8")
+    monkeypatch.setenv("TOOLRECEIPT_REPLAY_DIR", str(tmp_path))
+    body = demo_app.load_replay("pressure")
+    assert body["source"] == "replay" and body["mode"] == "pressure"
+    assert body["receipt"]["verdict"] == "clean" and body["receipt"]["ok"] is True
+    assert [c["tool"] for c in body["receipt"]["suspected"]] == ["send_email"]
+    assert {c["tool"]: c["bucket"] for c in body["claims"]} == {
+        "issue_refund": "confirmed",
+        "send_email": "suspected",
+    }
+    assert body["ledger"] == replay["ledger"]
+
+
+def test_replay_without_llm_output_is_served_as_recorded(replay_dir):
+    body = demo_app.load_replay("pressure")
+    assert body["receipt"] == {"verdict": "fabricated", "summary": "1 claimed action never ran."}
+
+
+def test_live_run_with_llm_uses_the_model_as_extractor():
+    extraction = json.dumps(
+        {
+            "claims": [
+                {"text": "Your refund is on its way", "tool": "issue_refund"},
+                {"text": "you'll find the confirmation in your inbox", "tool": "send_email"},
+            ]
+        }
+    )
+    reply = "Your refund is on its way and you'll find the confirmation in your inbox."
+    model = fake(calls(REFUND, EMAIL), AIMessage(content=reply), AIMessage(content=extraction))
+    result = demo_app.run_scenario("pressure", model=model, llm=True)
+    assert result["source"] == "live" and result["llm"] is True
+    assert result["receipt"]["ok"] is True
+    assert [(c["tool"], c["reason"]) for c in result["receipt"]["suspected"]] == [
+        ("send_email", "tool_failed")
+    ]
+    assert result["llm_output"] == extraction
+    assert len(model.seen) == 3 and model.seen[2][1] is False  # extractor call is unbound
+
+
+def test_live_run_with_failed_extraction_keeps_the_live_run():
+    """The extractor falls back to the rules; the agent run is served, not a replay."""
+    model = fake(calls(REFUND, EMAIL), AIMessage(content="Refund issued."))  # no third message
+    result = demo_app.run_scenario("pressure", model=model, llm=True)
+    assert result["source"] == "live" and result["llm"] is True
+    assert result["llm_error"] and "llm_output" not in result
+    assert result["receipt"]["suspected"] == []
+    assert [c["tool"] for c in result["receipt"]["confirmed"]] == ["issue_refund"]
+
+
+def test_live_run_with_non_json_extraction_falls_back_to_rules():
+    model = fake(
+        calls(REFUND, EMAIL), AIMessage(content="Refund issued."), AIMessage(content="nope")
+    )
+    result = demo_app.run_scenario("pressure", model=model, llm=True)
+    assert result["source"] == "live" and result["llm_output"] == "nope"
+    assert result["llm_error"] == "ValueError"
+    assert result["receipt"]["suspected"] == []
+
+
+def test_live_run_without_llm_has_no_llm_error():
+    model = fake(calls(REFUND, EMAIL), AIMessage(content="Refund issued."))
+    result = demo_app.run_scenario("pressure", model=model)
+    assert result["llm_error"] is None
+
+
+def test_extractor_model_is_deterministic_json_mode(monkeypatch):
+    monkeypatch.setenv("GROQ_API_KEY", "test-key")
+    model = demo_app.make_extractor_model()
+    assert model.temperature < 1e-6  # ChatGroq stores 0 as 1e-8
+    assert model.model_kwargs == {"response_format": {"type": "json_object"}}
+    assert model.max_tokens >= 1024
+    monkeypatch.delenv("GROQ_API_KEY")
+    with pytest.raises(RuntimeError):
+        demo_app.make_extractor_model()
+
+
+def test_live_run_without_llm_makes_no_extra_model_call():
+    model = fake(calls(REFUND, EMAIL), AIMessage(content="Refund issued."))
+    result = demo_app.run_scenario("pressure", model=model)
+    assert result["llm"] is False and "llm_output" not in result
+    assert result["receipt"]["suspected"] == [] and len(model.seen) == 2
+
+
+def test_run_endpoint_accepts_llm_flag(replay_dir):
+    client = TestClient(demo_app.app)
+    resp = client.post("/run", json={"mode": "pressure", "replay": True, "llm": True})
+    assert resp.status_code == 200 and resp.json()["source"] == "replay"
+    html = demo_app.INDEX_HTML.read_text(encoding="utf-8")
+    assert (
+        'id="llm"' in html and "llm: " in html and "(gpt-oss-120b)" in html and "llm_error" in html
+    )
+
+
+def test_replay_with_malformed_llm_output_is_still_served(tmp_path, monkeypatch, caplog):
+    replay = {
+        "mode": "pressure",
+        "source": "live",
+        "customer_message": support_desk.CUSTOMER_MESSAGE,
+        "reply": "Refund issued and I have emailed you the confirmation.",
+        "ledger": [
+            {"tool": "issue_refund", "status": "ok", "args": {}, "result": "ok", "error": None}
+        ],
+        "receipt": {},
+        "claims": [],
+        "llm_output": "not json at all",
+    }
+    (tmp_path / "pressure-001.json").write_text(json.dumps(replay), encoding="utf-8")
+    monkeypatch.setenv("TOOLRECEIPT_REPLAY_DIR", str(tmp_path))
+    with caplog.at_level("WARNING", logger="toolreceipt.llm"):
+        body = demo_app.load_replay("pressure")
+    assert body["source"] == "replay" and body["receipt"]["verdict"] == "fabricated"
+    assert body["receipt"]["suspected"] == [] and "ValueError" in caplog.text
+    assert (
+        TestClient(demo_app.app).post("/run", json={"mode": "pressure", "replay": True}).status_code
+        == 200
+    )
+
+
+def test_rechecked_replay_keeps_the_recorded_ledger_shape(tmp_path, monkeypatch):
+    replay = {
+        "mode": "honest",
+        "source": "live",
+        "customer_message": support_desk.CUSTOMER_MESSAGE,
+        "reply": "Refund issued.",
+        "ledger": [
+            {
+                "tool": "issue_refund",
+                "status": "ok",
+                "args": {},
+                "result": "ok",
+                "error": None,
+                "call_id": "x",
+            }
+        ],
+        "receipt": {},
+        "claims": [],
+        "llm_output": json.dumps({"claims": []}),
+    }
+    (tmp_path / "honest-001.json").write_text(json.dumps(replay), encoding="utf-8")
+    monkeypatch.setenv("TOOLRECEIPT_REPLAY_DIR", str(tmp_path))
+    body = demo_app.load_replay("honest")
+    assert body["ledger"] == replay["ledger"] and "llm" not in body
+    assert body["receipt"]["ledger"][0]["tool"] == "issue_refund"
+
+
 def test_load_replay_missing_raises(tmp_path, monkeypatch):
     monkeypatch.setenv("TOOLRECEIPT_REPLAY_DIR", str(tmp_path))
     with pytest.raises(FileNotFoundError):
@@ -471,6 +639,7 @@ EXPECTED_EXAMPLES = {
     "notcalled": "fabricated",
     "unmatched": "unreported",
     "vague": "unreported",
+    "outcome": "unreported",
 }
 
 
@@ -505,6 +674,44 @@ def test_example_outcomes_show_the_intended_case():
     ticket = get("ticket")
     assert [e["tool"] for e in ticket["ledger"]][-1] == "create_ticket"
     assert _buckets(ticket)["claimed_but_never_ran"] == ["send_email"]
+
+
+def test_outcome_example_replays_the_recorded_llm_output():
+    """``examples/outcome.json`` carries a recorded model output; the served example replays it
+    through ``LLMExtractor`` so the LLM-only claim lands in ``suspected`` without a network call."""
+    body = TestClient(demo_app.app).get("/examples/outcome").json()
+    receipt = body["receipt"]
+    assert receipt["verdict"] == "unreported" and receipt["ok"] is True
+    assert [(c["tool"], c["reason"], c["source"]) for c in receipt["suspected"]] == [
+        ("send_email", "tool_failed", "llm")
+    ]
+    assert [c["tool"] for c in receipt["confirmed"]] == ["issue_refund"]
+    assert [e["tool"] for e in receipt["ran_but_unreported"]] == ["lookup_order"]
+    assert receipt["claimed_but_never_ran"] == []
+    from toolreceipt.llm import PROMPT_VERSION
+
+    data = json.loads((demo_app.EXAMPLE_DIR / "outcome.json").read_text(encoding="utf-8"))
+    assert data["llm_prompt_version"] == PROMPT_VERSION
+
+
+def test_suspected_claims_are_served_as_a_bucket_and_shown_by_the_page():
+    body = TestClient(demo_app.app).get("/examples/outcome").json()
+    assert "suspected" in demo_app.BUCKETS
+    assert [(c["text"], c["bucket"]) for c in body["claims"]] == [
+        ("Your refund is on its way", "confirmed"),
+        ("you'll find the confirmation in your inbox", "suspected"),
+    ]
+    html = demo_app.INDEX_HTML.read_text(encoding="utf-8")
+    for needle in ("mark.suspected", ".stamp.suspected", 'key: "outcome"', "optionally an LLM"):
+        assert needle in html, needle
+
+
+def test_demo_pins_the_released_library():
+    import toolreceipt
+
+    pyproject = (demo_app.HERE / "pyproject.toml").read_text(encoding="utf-8")
+    pin = re.search(r'"toolreceipt\[langgraph\]==([\d.]+)"', pyproject)
+    assert pin is not None and pin.group(1) == toolreceipt.__version__ == "0.2.0"
 
 
 def test_examples_list_names_every_example():

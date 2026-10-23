@@ -31,7 +31,7 @@ from langgraph.graph import START, MessagesState, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 from langgraph.prebuilt import ToolNode, tools_condition
 from pydantic import BaseModel
-from toolreceipt import Ledger, Receipts, check
+from toolreceipt import Ledger, LLMExtractor, Receipts, check
 from toolreceipt.langgraph import final_reply
 
 from scenarios import support_desk
@@ -41,15 +41,16 @@ INDEX_HTML = HERE / "static" / "index.html"
 DEFAULT_REPLAY_DIR = HERE / "replays"
 EXAMPLE_DIR = HERE / "examples"
 
-# Fixed runs the page shows on demand: three recorded live runs and five hand-written replies
-# (see examples/). Each is re-checked by the installed toolreceipt when served.
+# Fixed runs the page shows on demand: three recorded live runs and six hand-written replies
+# (see examples/). Each is re-checked by the installed toolreceipt when served. An example
+# with an ``llm_output`` key replays that recorded model text through ``LLMExtractor``.
 EXAMPLES: dict[str, Path] = {
     "pressure": DEFAULT_REPLAY_DIR / "pressure-001.json",
     "ticket": DEFAULT_REPLAY_DIR / "pressure-002.json",
     "honest": DEFAULT_REPLAY_DIR / "honest-001.json",
     **{
         name: EXAMPLE_DIR / f"{name}.json"
-        for name in ("clean", "admits", "notcalled", "unmatched", "vague")
+        for name in ("clean", "admits", "notcalled", "unmatched", "vague", "outcome")
     },
 }
 
@@ -86,7 +87,7 @@ LIVE_RUNS_PER_MINUTE = int(_env_number("LIVE_RUNS_PER_MINUTE", 10))
 MAX_FAILED_ROUNDS = 2
 MAX_TOOL_ROUNDS = 6
 RECURSION_LIMIT = 2 * MAX_TOOL_ROUNDS + 4
-BUCKETS = ("confirmed", "claimed_but_never_ran", "unmatched")
+BUCKETS = ("confirmed", "claimed_but_never_ran", "unmatched", "suspected")
 
 _executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="live-run")
 
@@ -213,10 +214,32 @@ def make_model() -> BaseChatModel:
     )
 
 
-def _run_live(mode: str, model: BaseChatModel, deadline: float) -> dict[str, Any]:
+EXTRACTOR_MAX_TOKENS = 1024
+
+
+def make_extractor_model() -> BaseChatModel:
+    """The Groq model behind the live LLM extractor: temperature 0 and JSON mode, as the
+    README's probe numbers were recorded. Raises ``RuntimeError`` without ``GROQ_API_KEY``."""
+    if not os.environ.get("GROQ_API_KEY"):
+        raise RuntimeError("GROQ_API_KEY is not set")
+    from langchain_groq import ChatGroq
+
+    return ChatGroq(
+        model=GROQ_MODEL,
+        temperature=0,
+        max_tokens=EXTRACTOR_MAX_TOKENS,
+        max_retries=1,
+        timeout=GROQ_TIMEOUT_SECONDS,
+        model_kwargs={"response_format": {"type": "json_object"}},
+    )
+
+
+def _run_live(
+    mode: str, model: BaseChatModel, deadline: float, extractor: LLMExtractor | None
+) -> dict[str, Any]:
     tools = support_desk.build_tools(mode)
     graph = build_graph(model, tools, support_desk.SYSTEM_PROMPTS[mode], deadline=deadline)
-    receipts = Receipts()
+    receipts = Receipts(extractor=extractor)
     result = graph.invoke(
         {"messages": [HumanMessage(support_desk.CUSTOMER_MESSAGE)]},
         config=receipts.config({"recursion_limit": RECURSION_LIMIT}),
@@ -224,12 +247,30 @@ def _run_live(mode: str, model: BaseChatModel, deadline: float) -> dict[str, Any
     reply = final_reply(result)
     if not reply.strip():
         raise RuntimeError("the agent produced no reply")
-    receipt = receipts.check(reply).to_dict()
-    return {"mode": mode, "source": "live", **_payload(reply, receipt)}
+    receipt = receipts.check(reply).to_dict()  # a failed extraction falls back to the rules
+    out = {
+        "mode": mode,
+        "source": "live",
+        "llm": extractor is not None,
+        "llm_error": None,
+        **_payload(reply, receipt),
+    }
+    if extractor is not None:
+        if extractor.last_raw is not None:
+            out["llm_output"] = extractor.last_raw  # lets the run be saved as a replay
+        if extractor.last_error is not None:
+            out["llm_error"] = type(extractor.last_error).__name__
+    return out
 
 
-def run_scenario(mode: str, *, model: BaseChatModel | None = None) -> dict[str, Any]:
+def run_scenario(
+    mode: str, *, model: BaseChatModel | None = None, llm: bool = False
+) -> dict[str, Any]:
     """Run the support desk agent live; on any failure serve a replay instead.
+
+    ``llm`` also runs ``LLMExtractor`` on the reply: one extra model call, on a temperature-0
+    JSON-mode model (or the injected ``model`` in tests). If that call fails the run is still
+    served, with the rule claims only and ``llm_error`` set.
 
     Without an injected ``model`` the run uses Groq: a missing ``GROQ_API_KEY`` serves a
     replay without using a live slot, and once ``LIVE_RUNS_PER_MINUTE`` is spent a replay is
@@ -247,7 +288,11 @@ def run_scenario(mode: str, *, model: BaseChatModel | None = None) -> dict[str, 
     deadline = time.monotonic() + RUN_DEADLINE_SECONDS
     try:
         live_model = model if model is not None else make_model()
-        future = _executor.submit(_run_live, mode, live_model, deadline)
+        extractor = None
+        if llm:
+            extractor_model = model if model is not None else make_extractor_model()
+            extractor = LLMExtractor.from_chat_model(extractor_model)  # on_error="fallback"
+        future = _executor.submit(_run_live, mode, live_model, deadline, extractor)
         try:
             return future.result(timeout=RUN_DEADLINE_SECONDS)
         except FutureTimeout:
@@ -265,12 +310,30 @@ def _replay_dir() -> Path:
 
 
 def load_replay(mode: str) -> dict[str, Any]:
-    """A random recorded run from ``{replay_dir}/{mode}-*.json``, marked ``source="replay"``."""
+    """A random recorded run from ``{replay_dir}/{mode}-*.json``, marked ``source="replay"``.
+
+    A replay that carries ``llm_output`` (the raw text the extractor model returned when the
+    run was recorded) is re-checked through ``LLMExtractor`` when served, so its receipt
+    shows the ``suspected`` bucket. Other replays are served as recorded.
+    """
     files = sorted(_replay_dir().glob(f"{mode}-*.json"))
     if not files:
         raise FileNotFoundError(f"no replay recorded for mode {mode!r}")
     data: dict[str, Any] = json.loads(random.choice(files).read_text(encoding="utf-8"))
     data["source"] = "replay"
+    extractor = _recorded_extractor(data)
+    if extractor is not None:
+        receipt = check(
+            data["reply"],
+            Ledger.from_dict(data["ledger"]),
+            known_tools=support_desk.build_tools(mode),
+            extractor=extractor,
+        ).to_dict()
+        payload = _payload(data["reply"], receipt)
+        # The recorded ledger keeps its call ids and timestamps; the receipt's copy is the
+        # library's normalised view of the same entries.
+        payload.pop("ledger")
+        data.update(payload)
     return data
 
 
@@ -290,8 +353,25 @@ def load_example(name: str) -> dict[str, Any]:
     """The named example's reply and ledger, checked against the support desk's tools."""
     data = json.loads(EXAMPLES[name].read_text(encoding="utf-8"))
     tools = support_desk.build_tools("honest")
-    receipt = check(data["reply"], Ledger.from_dict(data["ledger"]), known_tools=tools).to_dict()
+    receipt = check(
+        data["reply"],
+        Ledger.from_dict(data["ledger"]),
+        known_tools=tools,
+        extractor=_recorded_extractor(data),
+    ).to_dict()
     return {"example": name, "source": "example", **_payload(data["reply"], receipt)}
+
+
+def _recorded_extractor(data: dict[str, Any]) -> LLMExtractor | None:
+    """Replay a recorded model output through ``LLMExtractor``; ``None`` without one.
+
+    A malformed recording falls back to the rule claims (logged by ``toolreceipt.llm``)
+    rather than failing the request.
+    """
+    raw = data.get("llm_output")
+    if not isinstance(raw, str):
+        return None
+    return LLMExtractor(complete=lambda _prompt: raw)
 
 
 # --- rate limit: one POST /run per client IP per RATE_LIMIT_SECONDS (in memory) ---
@@ -350,6 +430,7 @@ app = FastAPI(title="toolreceipt demo", docs_url=None, redoc_url=None)
 class RunRequest(BaseModel):
     mode: Literal["honest", "pressure"]
     replay: bool = False
+    llm: bool = False  # also run the LLM extractor on the reply (live runs only)
 
 
 @app.get("/", include_in_schema=False)
@@ -370,7 +451,9 @@ def run(body: RunRequest, request: Request) -> dict[str, Any] | JSONResponse:
             status_code=429,
         )
     try:
-        return load_replay(body.mode) if body.replay else run_scenario(body.mode)
+        if body.replay:
+            return load_replay(body.mode)
+        return run_scenario(body.mode, llm=body.llm)
     except Exception as exc:  # no replay to fall back on, or an unreadable one
         log.warning("run unavailable (%s)", type(exc).__name__)
         return JSONResponse(
