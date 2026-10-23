@@ -233,7 +233,7 @@ footer { margin-top: 40px; color: var(--muted); font-size: 0.88rem; display: fle
     <div class="actions">
       <button class="primary" id="run" type="button">Run it live</button>
       <button id="replay" type="button">Another recorded run</button>
-      <label class="opt"><input type="checkbox" id="llm"> also run the LLM extractor</label>
+      <label class="opt"><input type="checkbox" id="llm"> also run the LLM extractor (gpt-oss-120b)</label>
       <span class="note" id="status" role="status" aria-live="polite">Loading the example…</span>
     </div>
   </section>
@@ -553,7 +553,10 @@ receipt = rc.check(final_reply(result))
   }
 
   function sourceNote(d) {
-    if (d.source === "live") return d.llm ? "Live run finished; the LLM extractor read the reply." : "Live run finished.";
+    if (d.source === "live") {
+      if (d.llm && d.llm_error) return "Live run finished. The LLM extractor call failed (" + d.llm_error + "), so this receipt uses the rules only.";
+      return d.llm ? "Live run finished; the LLM extractor read the reply." : "Live run finished.";
+    }
     if (d.source === "replay") return "Showing a recorded run.";
     return BY_KEY[current].group === "live" ? "Recorded run of the real model." : "Hand-written reply, checked by toolreceipt.";
   }

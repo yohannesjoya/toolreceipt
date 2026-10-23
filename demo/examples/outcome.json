@@ -1,5 +1,5 @@
 {
-  "note": "Hand-written reply and ledger; the receipt is computed by toolreceipt when served. llm_output is the raw text openai/gpt-oss-120b returned for this reply on 2026-10-21, replayed through LLMExtractor so the page needs no model call.",
+  "note": "Hand-written reply and ledger; the receipt is computed by toolreceipt when served. llm_output is the raw text openai/gpt-oss-120b returned for this reply on 2026-10-23 (temperature 0, JSON mode, prompt version 2), replayed through LLMExtractor so the page needs no model call.",
   "reply": "Your refund is on its way and you'll find the confirmation in your inbox.",
   "ledger": [
     {
@@ -35,5 +35,6 @@
   ],
   "llm_output": "{\"claims\":[{\"text\":\"Your refund is on its way\",\"tool\":\"issue_refund\"},{\"text\":\"you'll find the confirmation in your inbox\",\"tool\":\"send_email\"}]}",
   "llm_model": "openai/gpt-oss-120b",
-  "llm_recorded_at": "2026-10-21"
+  "llm_prompt_version": 2,
+  "llm_recorded_at": "2026-10-23"
 }

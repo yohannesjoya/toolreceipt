@@ -214,11 +214,31 @@ def make_model() -> BaseChatModel:
     )
 
 
-def _run_live(mode: str, model: BaseChatModel, deadline: float, llm: bool) -> dict[str, Any]:
+EXTRACTOR_MAX_TOKENS = 1024
+
+
+def make_extractor_model() -> BaseChatModel:
+    """The Groq model behind the live LLM extractor: temperature 0 and JSON mode, as the
+    README's probe numbers were recorded. Raises ``RuntimeError`` without ``GROQ_API_KEY``."""
+    if not os.environ.get("GROQ_API_KEY"):
+        raise RuntimeError("GROQ_API_KEY is not set")
+    from langchain_groq import ChatGroq
+
+    return ChatGroq(
+        model=GROQ_MODEL,
+        temperature=0,
+        max_tokens=EXTRACTOR_MAX_TOKENS,
+        max_retries=1,
+        timeout=GROQ_TIMEOUT_SECONDS,
+        model_kwargs={"response_format": {"type": "json_object"}},
+    )
+
+
+def _run_live(
+    mode: str, model: BaseChatModel, deadline: float, extractor: LLMExtractor | None
+) -> dict[str, Any]:
     tools = support_desk.build_tools(mode)
     graph = build_graph(model, tools, support_desk.SYSTEM_PROMPTS[mode], deadline=deadline)
-    # With ``llm`` the same model also extracts claims (one more call, after the run).
-    extractor = LLMExtractor.from_chat_model(model, on_error="raise") if llm else None
     receipts = Receipts(extractor=extractor)
     result = graph.invoke(
         {"messages": [HumanMessage(support_desk.CUSTOMER_MESSAGE)]},
@@ -227,10 +247,19 @@ def _run_live(mode: str, model: BaseChatModel, deadline: float, llm: bool) -> di
     reply = final_reply(result)
     if not reply.strip():
         raise RuntimeError("the agent produced no reply")
-    receipt = receipts.check(reply).to_dict()
-    out = {"mode": mode, "source": "live", "llm": llm, **_payload(reply, receipt)}
-    if extractor is not None and extractor.last_raw is not None:
-        out["llm_output"] = extractor.last_raw  # lets the run be saved as a replay
+    receipt = receipts.check(reply).to_dict()  # a failed extraction falls back to the rules
+    out = {
+        "mode": mode,
+        "source": "live",
+        "llm": extractor is not None,
+        "llm_error": None,
+        **_payload(reply, receipt),
+    }
+    if extractor is not None:
+        if extractor.last_raw is not None:
+            out["llm_output"] = extractor.last_raw  # lets the run be saved as a replay
+        if extractor.last_error is not None:
+            out["llm_error"] = type(extractor.last_error).__name__
     return out
 
 
@@ -239,7 +268,9 @@ def run_scenario(
 ) -> dict[str, Any]:
     """Run the support desk agent live; on any failure serve a replay instead.
 
-    ``llm`` also runs ``LLMExtractor`` on the reply with the same model (one extra call).
+    ``llm`` also runs ``LLMExtractor`` on the reply: one extra model call, on a temperature-0
+    JSON-mode model (or the injected ``model`` in tests). If that call fails the run is still
+    served, with the rule claims only and ``llm_error`` set.
 
     Without an injected ``model`` the run uses Groq: a missing ``GROQ_API_KEY`` serves a
     replay without using a live slot, and once ``LIVE_RUNS_PER_MINUTE`` is spent a replay is
@@ -257,7 +288,11 @@ def run_scenario(
     deadline = time.monotonic() + RUN_DEADLINE_SECONDS
     try:
         live_model = model if model is not None else make_model()
-        future = _executor.submit(_run_live, mode, live_model, deadline, llm)
+        extractor = None
+        if llm:
+            extractor_model = model if model is not None else make_extractor_model()
+            extractor = LLMExtractor.from_chat_model(extractor_model)  # on_error="fallback"
+        future = _executor.submit(_run_live, mode, live_model, deadline, extractor)
         try:
             return future.result(timeout=RUN_DEADLINE_SECONDS)
         except FutureTimeout:
@@ -286,7 +321,6 @@ def load_replay(mode: str) -> dict[str, Any]:
         raise FileNotFoundError(f"no replay recorded for mode {mode!r}")
     data: dict[str, Any] = json.loads(random.choice(files).read_text(encoding="utf-8"))
     data["source"] = "replay"
-    data.setdefault("llm", False)
     extractor = _recorded_extractor(data)
     if extractor is not None:
         receipt = check(
@@ -295,7 +329,11 @@ def load_replay(mode: str) -> dict[str, Any]:
             known_tools=support_desk.build_tools(mode),
             extractor=extractor,
         ).to_dict()
-        data.update(_payload(data["reply"], receipt), ledger=data["ledger"])  # keep as recorded
+        payload = _payload(data["reply"], receipt)
+        # The recorded ledger keeps its call ids and timestamps; the receipt's copy is the
+        # library's normalised view of the same entries.
+        payload.pop("ledger")
+        data.update(payload)
     return data
 
 
@@ -325,11 +363,15 @@ def load_example(name: str) -> dict[str, Any]:
 
 
 def _recorded_extractor(data: dict[str, Any]) -> LLMExtractor | None:
-    """Replay a recorded model output through ``LLMExtractor``; ``None`` without one."""
+    """Replay a recorded model output through ``LLMExtractor``; ``None`` without one.
+
+    A malformed recording falls back to the rule claims (logged by ``toolreceipt.llm``)
+    rather than failing the request.
+    """
     raw = data.get("llm_output")
     if not isinstance(raw, str):
         return None
-    return LLMExtractor(complete=lambda _prompt: raw, on_error="raise")
+    return LLMExtractor(complete=lambda _prompt: raw)
 
 
 # --- rate limit: one POST /run per client IP per RATE_LIMIT_SECONDS (in memory) ---
