@@ -1,0 +1,21 @@
+{
+  "text": "I've emailed you.",
+  "known_tools": [
+    {
+      "name": "send_email",
+      "description": "Send an email to the customer"
+    },
+    {
+      "name": "slack",
+      "description": "Send a message to a Slack channel"
+    }
+  ],
+  "expected": [
+    {
+      "verb": "send",
+      "candidates": [
+        "send_email"
+      ]
+    }
+  ]
+}

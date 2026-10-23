@@ -11,7 +11,8 @@
       "verb": "create",
       "candidates": [
         "jira"
-      ]
+      ],
+      "confidence": "high"
     }
   ]
 }

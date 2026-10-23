@@ -1,0 +1,27 @@
+{
+  "text": "I've opened a ticket in Jira.",
+  "known_tools": [
+    {
+      "name": "create_ticket",
+      "description": "Create a support ticket"
+    },
+    {
+      "name": "jira",
+      "description": "Create a ticket in Jira"
+    }
+  ],
+  "ledger": [
+    {
+      "tool": "create_ticket",
+      "status": "error",
+      "error": "RuntimeError: ticket service down"
+    },
+    {
+      "tool": "jira",
+      "status": "ok"
+    }
+  ],
+  "expected": {
+    "verdict": "clean"
+  }
+}

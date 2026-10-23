@@ -680,9 +680,15 @@ def _score(
     fam_hits: set[int] = set().union(*(_occurs(t, name) for t in fam_terms))
     obj_hits: set[int] = set().union(*(_occurs(t, name) for t in obj_terms))
     object_matched = bool(obj_hits) and (not fam_hits or len(fam_hits | obj_hits) > 1)
-    score = (2 if fam_hits or by_description else 0) + (2 if object_matched else 0)
     desc = _words(spec.description)
-    if any(_occurs(t, desc) and not _occurs(t, name) for t in obj_terms):
+    desc_hit = any(_occurs(t, desc) and not _occurs(t, name) for t in obj_terms)
+    if by_description:
+        # PRD 03 §7.2 rule 3: the lead verb earns the family component; an object word in
+        # the name or the description earns the object component, once.
+        object_matched = bool(obj_hits) or desc_hit
+        return 2 + (2 if object_matched else 0), object_matched
+    score = (2 if fam_hits else 0) + (2 if object_matched else 0)
+    if desc_hit:
         score += 1
     # Evidence only, never score: a sibling ``<verb>_<stem>`` tool must not outrank the
     # tool that ran ("refunded you" vs ``issue_refund`` and ``refund_payment``).
@@ -714,13 +720,21 @@ def _match(
     words = _words(obj) if obj else []
     verbs = _verb_tokens(family, lexicon)
     scored: list[tuple[str, int, bool]] = []
+    described: list[ToolSpec] = []
     for spec in known_tools:
         tokens = tool_verb_tokens(spec, lexicon)
-        if verbs & tokens and not _conflicts(family, sorted(tokens), lexicon):
-            by_description = not _is_verb_named(tokenize_tool_name(spec.name), lexicon)
-            scored.append(
-                (spec.name, *_score(family, words, spec, lexicon, verb_stem, by_description))
-            )
+        if not (verbs & tokens) or _conflicts(family, sorted(tokens), lexicon):
+            continue
+        if _is_verb_named(tokenize_tool_name(spec.name), lexicon):
+            scored.append((spec.name, *_score(family, words, spec, lexicon, verb_stem)))
+        else:
+            described.append(spec)
+    # PRD 03 §7.2 rule 4: a description-eligible tool joins the scoring only when no
+    # verb-named tool scored, or when the claim's object names it ("a ticket in Jira").
+    named = any(score >= 2 for _, score, _ in scored)
+    for spec in described:
+        if not named or set(tokenize_tool_name(spec.name)) & set(words):
+            scored.append((spec.name, *_score(family, words, spec, lexicon, verb_stem, True)))
     best = max((score for _, score, _ in scored), default=0)
     if best < 2:
         return [], None, False
