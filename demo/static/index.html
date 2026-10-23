@@ -136,6 +136,7 @@ mark { color: inherit; padding: 1px 3px; border-radius: 4px; border-bottom: 2px 
 mark.confirmed { background: var(--ok-soft); border-color: var(--ok); }
 mark.never { background: var(--bad-soft); border-color: var(--bad); }
 mark.unmatched { background: var(--grey-soft); border-color: var(--muted); }
+mark.suspected { background: var(--warn-soft); border-color: var(--warn); border-bottom-style: dashed; }
 mark:focus-visible { outline: 2px solid var(--accent); }
 .claimnote { margin-top: 12px; font-size: 0.92rem; color: var(--muted); min-height: 2.8em; border-left: 3px solid var(--line); padding-left: 10px; }
 .claimnote b { color: var(--ink); }
@@ -159,6 +160,8 @@ mark:focus-visible { outline: 2px solid var(--accent); }
 .stamp.fabricated { color: #c2271d; }
 .stamp.unreported { color: #a35a00; }
 .stamp.clean { color: #157a3c; }
+.stamp.suspected { color: #a35a00; border-style: dashed; font-size: 1.05rem; margin-top: 10px; transform: rotate(3deg); }
+.paper .cap { text-align: center; opacity: .7; margin-top: 8px; font-size: 0.72rem; }
 .verdict-text h3 { font-size: 1.35rem; margin-bottom: 6px; }
 .verdict-text p { margin: 0 0 10px; }
 .verdict-text .muted { color: var(--muted); font-size: 0.95rem; }
@@ -203,7 +206,7 @@ footer { margin-top: 40px; color: var(--muted); font-size: 0.88rem; display: fle
     <p class="lede">LLM agents sometimes report actions that failed or never happened. toolreceipt records every tool call during a LangGraph run, reads the final reply, and flags each claim that has no successful call behind it.</p>
     <div class="how" aria-label="How it works">
       <div><span class="n">STEP 1</span><b>Record</b><small>A callback logs each tool call with its args and whether it succeeded.</small></div>
-      <div><span class="n">STEP 2</span><b>Read the reply</b><small>Rules pick out action claims like “sent a confirmation email”. No second LLM.</small></div>
+      <div><span class="n">STEP 2</span><b>Read the reply</b><small>Rules pick out action claims like “sent a confirmation email”, and optionally an LLM finds the phrasing the rules miss.</small></div>
       <div><span class="n">STEP 3</span><b>Compare</b><small>Each claim is matched to a call. Claims with no successful call are flagged.</small></div>
     </div>
   </header>
@@ -246,6 +249,7 @@ footer { margin-top: 40px; color: var(--muted); font-size: 0.88rem; display: fle
           <span><mark class="confirmed">green</mark> a successful call backs it</span>
           <span><mark class="never">red</mark> no successful call</span>
           <span><mark class="unmatched">grey</mark> no tool clearly matches, so not judged</span>
+          <span><mark class="suspected">dashed</mark> found only by the LLM extractor, verdict unchanged</span>
         </div>
       </div>
     </div>
@@ -282,7 +286,7 @@ receipt = rc.check(final_reply(result))
       <div style="display:grid;gap:10px">
         <h2>What it does not catch</h2>
         <ul class="limits">
-          <li>English replies only, matched by rules. Unusual phrasing can be missed.</li>
+          <li>The rules are English only, precise but narrow. The opt-in LLM extractor (0.2) finds outcome phrasing like “your refund is on its way”; what only it finds is reported as suspected and never changes the verdict by default.</li>
           <li>It checks that a call succeeded, not that its result was right.</li>
           <li>When it cannot tell which tool a claim means, it marks the claim grey and does not flag it. It would rather miss one than cry wolf.</li>
         </ul>
@@ -320,11 +324,14 @@ receipt = rc.check(final_reply(result))
       lesson: "The grey claim is listed so you can see it, but it does not change the verdict. Guessing which tool was meant would cause false alarms." },
     { key: "vague", group: "hand", title: "Too vague to check", expect: "unreported",
       blurb: "“I've taken care of everything.” No concrete action is named.",
-      lesson: "This is a known limit: a vague reply passes even if the work failed, because it makes no claim to check." }
+      lesson: "This is a known limit: a vague reply passes even if the work failed, because it makes no claim to check." },
+    { key: "outcome", group: "hand", llm: true, title: "Phrasing the rules miss", expect: "unreported",
+      blurb: "“Your refund is on its way and you'll find the confirmation in your inbox.” No verb the rules know. The email failed.",
+      lesson: "The rules find no claim here. The opt-in LLM extractor (toolreceipt 0.2) names both tools from a recorded model output; the failed email lands in <code>suspected</code>, dashed. The deterministic verdict is unchanged, so <code>receipt.ok</code> stays true unless you opt in with <code>llm_blocks=True</code>." }
   ];
   var BY_KEY = {};
   EXAMPLES.forEach(function (e) { BY_KEY[e.key] = e; });
-  var MARK = { confirmed: "confirmed", claimed_but_never_ran: "never", unmatched: "unmatched" };
+  var MARK = { confirmed: "confirmed", claimed_but_never_ran: "never", unmatched: "unmatched", suspected: "suspected" };
   var TAG = { fabricated: "bad", clean: "ok", unreported: "warn" };
   var REASONS = { not_called: "no call was made", tool_failed: "the call failed" };
   var $ = function (id) { return document.getElementById(id); };
@@ -447,6 +454,8 @@ receipt = rc.check(final_reply(result))
     });
     var calls = rows.map(function (r) { return "call " + (r + 1); }).join(" and "), line;
     if (c.bucket === "unmatched") line = "No tool clearly matches this claim, so it is not judged.";
+    else if (c.bucket === "suspected") line = "Found only by the LLM extractor: <code>" + esc(c.tool) + "</code> " +
+      (rows.length ? "failed (" + calls + "). Highlighted in step 1." : "never ran.") + " Reported as suspected; the verdict is unchanged unless <code>llm_blocks=True</code>.";
     else if (c.bucket === "confirmed") line = "Backed by <code>" + esc(c.tool) + "</code> (" + calls + " succeeded). Highlighted in step 1.";
     else if (!rows.length) line = "Not backed: <code>" + esc(c.tool) + "</code> never ran.";
     else line = "Not backed: <code>" + esc(c.tool) + "</code> failed (" + calls + "). Highlighted in step 1.";
@@ -458,7 +467,7 @@ receipt = rc.check(final_reply(result))
 
   function paperHTML(d) {
     var r = d.receipt, ok = d.ledger.filter(function (e) { return e.status === "ok"; }).length;
-    var unrep = (r.ran_but_unreported || []).map(function (e) { return e.tool; });
+    var unrep = (r.ran_but_unreported || []).map(function (e) { return e.tool; }), susp = r.suspected || [];
     return '<div class="hd">TOOL RECEIPT</div><div class="sub">support desk · order 4821</div><hr>' +
       '<div class="ln"><span>tool calls</span><span>' + d.ledger.length + '</span></div>' +
       '<div class="ln"><span>&nbsp;&nbsp;succeeded</span><span>' + ok + '</span></div>' +
@@ -471,15 +480,25 @@ receipt = rc.check(final_reply(result))
       '<div class="sec">NOT JUDGED · ' + r.unmatched.length + '</div>' +
       list(r.unmatched, function (c) { return '<div class="q">' + quote(c) + '</div>'; }) +
       '<div class="sec">RAN, UNREPORTED · ' + unrep.length + '</div>' +
-      '<div class="q">' + (esc(unrep.join(", ")) || "none") + '</div><hr>' +
-      '<div class="ln"><span>VERDICT</span><span>' + esc(r.verdict).toUpperCase() + '</span></div>' +
-      '<div class="stamp ' + esc(r.verdict) + '">' + esc(r.verdict) + '</div>';
+      '<div class="q">' + (esc(unrep.join(", ")) || "none") + '</div>' +
+      (susp.length ? '<div class="sec">SUSPECTED (LLM ONLY) · ' + susp.length + '</div>' +
+        list(susp, function (c) { return '<div class="q">' + quote(c) + ' → ' + esc(c.tool) + ' (' + (REASONS[c.reason] || esc(c.reason)) + ')</div>'; }) : '') +
+      '<hr><div class="ln"><span>VERDICT</span><span>' + esc(r.verdict).toUpperCase() + '</span></div>' +
+      '<div class="stamp ' + esc(r.verdict) + '">' + esc(r.verdict) + '</div>' +
+      (susp.length && r.verdict !== "fabricated" ? '<div class="stamp suspected">suspected</div>' +
+        '<div class="cap">Found by the LLM extractor; the deterministic verdict is unchanged.</div>' : '');
   }
 
   function explainHTML(d, ex) {
-    var r = d.receipt, v = r.verdict, head, body;
+    var r = d.receipt, v = r.verdict, head, body, susp = r.suspected || [];
     var unrep = (r.ran_but_unreported || []).map(function (e) { return "<code>" + esc(e.tool) + "</code>"; });
-    if (v === "fabricated") {
+    if (v !== "fabricated" && susp.length) {
+      var s = susp[0];
+      head = "The rules find nothing wrong. The LLM extractor suspects " + quote(s) + ".";
+      body = "<code>" + esc(s.tool) + "</code> " + (s.reason === "not_called" ? "was never called" : "failed") +
+        ", so the claim is reported as suspected, not fabricated: only rule-found claims change the verdict unless you opt in with <code>llm_blocks=True</code>.";
+      if (susp.length > 1) body += " " + (susp.length - 1) + " more suspected claim(s) are listed on the receipt.";
+    } else if (v === "fabricated") {
       var c = r.claimed_but_never_ran[0];
       head = "The reply says " + quote(c) + ". That did not happen.";
       body = c.reason === "not_called" ? "<code>" + esc(c.tool) + "</code> was never called." :
@@ -525,7 +544,7 @@ receipt = rc.check(final_reply(result))
   function card(e) {
     return '<label><input type="radio" name="example" id="ex-' + e.key + '" value="' + e.key + '"' + (e.key === current ? " checked" : "") + '>' +
       '<b>' + e.title + '</b><small>' + e.blurb + '</small><span class="expect">Verdict: <span class="tag ' + TAG[e.expect] + '">' + e.expect + '</span>' +
-      (e.live ? ' <span class="tag grey">can run live</span>' : '') + '</span></label>';
+      (e.live ? ' <span class="tag grey">can run live</span>' : '') + (e.llm ? ' <span class="tag warn">LLM extractor</span>' : '') + '</span></label>';
   }
 
   function sourceNote(d) {

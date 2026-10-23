@@ -87,7 +87,7 @@ LIVE_RUNS_PER_MINUTE = int(_env_number("LIVE_RUNS_PER_MINUTE", 10))
 MAX_FAILED_ROUNDS = 2
 MAX_TOOL_ROUNDS = 6
 RECURSION_LIMIT = 2 * MAX_TOOL_ROUNDS + 4
-BUCKETS = ("confirmed", "claimed_but_never_ran", "unmatched")
+BUCKETS = ("confirmed", "claimed_but_never_ran", "unmatched", "suspected")
 
 _executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="live-run")
 

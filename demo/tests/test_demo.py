@@ -522,6 +522,18 @@ def test_outcome_example_replays_the_recorded_llm_output():
     assert receipt["claimed_but_never_ran"] == []
 
 
+def test_suspected_claims_are_served_as_a_bucket_and_shown_by_the_page():
+    body = TestClient(demo_app.app).get("/examples/outcome").json()
+    assert "suspected" in demo_app.BUCKETS
+    assert [(c["text"], c["bucket"]) for c in body["claims"]] == [
+        ("Your refund is on its way", "confirmed"),
+        ("you'll find the confirmation in your inbox", "suspected"),
+    ]
+    html = demo_app.INDEX_HTML.read_text(encoding="utf-8")
+    for needle in ("mark.suspected", ".stamp.suspected", 'key: "outcome"', "optionally an LLM"):
+        assert needle in html, needle
+
+
 def test_demo_pins_the_released_library():
     import toolreceipt
 
