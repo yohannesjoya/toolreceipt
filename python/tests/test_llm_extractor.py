@@ -192,6 +192,16 @@ def test_aextract_fallback_sets_last_error_after_await():
     assert isinstance(ex.last_error, RuntimeError) and ex.last_raw is None
 
 
+def test_aextract_on_error_raise_propagates():
+    import asyncio
+
+    def boom(prompt: str) -> str:
+        raise RuntimeError("rate limited")
+
+    with pytest.raises(RuntimeError):
+        asyncio.run(LLMExtractor(complete=boom, on_error="raise").aextract("x", TOOLS))
+
+
 def test_none_completion_is_an_error_like_0_2():
     rules = RuleExtractor().extract("I sent the email.", TOOLS)
     ex = LLMExtractor(complete=lambda p: None)  # type: ignore[arg-type,return-value]

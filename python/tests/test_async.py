@@ -91,10 +91,9 @@ def test_cancelled_run_closes_open_entry():
         with pytest.raises(asyncio.CancelledError):
             await task
         r = await rc.acheck("I have emailed you.")
-        assert [(e.tool, e.status, e.error) for e in rc.ledger.entries][0][:2] == (
-            "slow_tool",
-            "error",
-        )
+        assert [(e.tool, e.status, e.error) for e in rc.ledger.entries] == [
+            ("slow_tool", "error", "no result")
+        ]
         assert r.verdict == "fabricated"
 
     asyncio.run(main())
@@ -154,3 +153,14 @@ def test_sync_aextract_is_ignored():
         acheck("I sent it.", Ledger(), known_tools=[ToolSpec("send_email", "")], extractor=Odd())
     )
     assert [c.tool for c in r.claimed_but_never_ran] == ["send_email"]
+
+
+def test_receipts_acheck_with_llm_extractor_equals_check():
+    from toolreceipt.llm import LLMExtractor
+
+    output = '{"claims": [{"text": "check your inbox", "tool": "send_email"}]}'
+    rc = Receipts(extractor=LLMExtractor(complete=lambda p: output), known_tools=["send_email"])
+    text = "Refund done, check your inbox."
+    a = asyncio.run(rc.acheck(text, Ledger()))
+    assert a.to_dict() == rc.check(text, Ledger()).to_dict()
+    assert [c.tool for c in a.suspected] == ["send_email"]
