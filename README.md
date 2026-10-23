@@ -43,14 +43,17 @@ advice ("you can create a ticket"), conditionals and offers are not claims.
 - **Streaming and mid-run checks.** Only the final reply is checked.
 - **Tool names without a verb, when the description does not lead with one.** A tool
   called `jira` or `email_customer` is matched through the first verb of its description
-  ("Create a ticket in Jira", "Email the customer"). A description that opens with
-  something else ("Helps the customer by creating a ticket"), names two actions, or is in
-  another language leaves the tool unmatched, and claims about it land in `unmatched`
-  (informational, they never affect the verdict). Put the verb first, or use
-  `LLMExtractor`, which matches on the whole description. On the post-hoc path, pass
-  `known_tools` with descriptions: a ledger alone carries none.
-- **Loose tool matching.** A claim maps to a tool only when the tool name shares the
-  claim's action verb family (`send`, `create`, `update`, `delete`, `refund`, ...).
+  ("Create a ticket in Jira", "Email the customer"). Only the first word counts, and a
+  read verb anywhere in the first sentence ("Look up an order and email the customer")
+  rules the tool out. A description that opens with something else ("Helps the customer
+  by creating a ticket", "Email address validation") or is in another language leaves the
+  tool unmatched, and claims about it land in `unmatched` (informational, they never
+  affect the verdict). Put the verb first, or use `LLMExtractor`, which matches on the
+  whole description. On the post-hoc path, pass `known_tools` with descriptions: a ledger
+  alone carries none.
+- **Loose tool matching.** A claim maps to a tool only when the tool's name, or the first
+  verb of its description, shares the claim's action verb family (`send`, `create`,
+  `update`, `delete`, `refund`, ...).
 - **Loose paraphrases of an action done with a different tool.** "I've raised this with our
   team" after `escalate_ticket` fits the verb family of `create_ticket` but names nothing in
   it. When a claim matches a tool on the verb family alone and that tool never ran, the claim

@@ -1,0 +1,22 @@
+{
+  "text": "I've emailed you the confirmation.",
+  "known_tools": [
+    {
+      "name": "signup",
+      "description": "Register the customer"
+    },
+    {
+      "name": "validator",
+      "description": "Email address validation for signups"
+    }
+  ],
+  "ledger": [
+    {
+      "tool": "signup",
+      "status": "ok"
+    }
+  ],
+  "expected": {
+    "verdict": "unreported"
+  }
+}

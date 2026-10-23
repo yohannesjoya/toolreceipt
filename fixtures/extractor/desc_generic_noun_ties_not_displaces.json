@@ -1,0 +1,22 @@
+{
+  "text": "I've refunded the payment.",
+  "known_tools": [
+    {
+      "name": "refund_order",
+      "description": "Refund an order"
+    },
+    {
+      "name": "payments",
+      "description": "Refund a payment"
+    }
+  ],
+  "expected": [
+    {
+      "verb": "refund",
+      "candidates": [
+        "refund_order",
+        "payments"
+      ]
+    }
+  ]
+}

@@ -82,7 +82,11 @@ def test_cancelled_run_closes_open_entry():
                 {"messages": [HumanMessage("go")]}, config=rc.config()
             )
         )
-        await asyncio.sleep(0.1)
+        for _ in range(200):  # wait until the tool call is in flight, not a fixed sleep
+            if rc._handler is not None and rc._handler._in_flight:
+                break
+            await asyncio.sleep(0.01)
+        assert rc._handler is not None and rc._handler._in_flight
         task.cancel()
         with pytest.raises(asyncio.CancelledError):
             await task

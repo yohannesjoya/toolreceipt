@@ -42,11 +42,13 @@ def test_stem_verb_third_person():
 def test_lexicon_without_skip_key_loads(tmp_path):
     lex = json.loads((PACKAGE / "lexicon.json").read_text(encoding="utf-8"))
     del lex["description_lead_skip"]
+    del lex["description_lead_nouns"]
     path = tmp_path / "lex.json"
     path.write_text(json.dumps(lex), encoding="utf-8")
     loaded = load_lexicon(path)
     assert description_family("Create a ticket", loaded) == "create"
     assert description_family("Use this tool to create a ticket", loaded) is None
+    assert description_family("Email the customer", loaded) is None  # no lead-noun list
 
 
 def test_tool_verb_tokens_empty_description_is_ineligible():

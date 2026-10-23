@@ -194,5 +194,29 @@
   {
     "description": "Get the weather.",
     "family": null
+  },
+  {
+    "description": "Email address validation",
+    "family": null
+  },
+  {
+    "description": "Issue tracker for the engineering team",
+    "family": null
+  },
+  {
+    "description": "File storage",
+    "family": null
+  },
+  {
+    "description": "Log aggregation service",
+    "family": null
+  },
+  {
+    "description": "Zendesk: Use this tool to create a ticket",
+    "family": "create"
+  },
+  {
+    "description": "Tool: create a ticket",
+    "family": "create"
   }
 ]

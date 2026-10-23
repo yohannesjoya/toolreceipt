@@ -216,10 +216,10 @@ class LLMExtractor:
     ) -> list[Claim]:
         """Parse, guard and merge one completed call; records ``last_raw``/``last_error``."""
         pairs: list[tuple[str, str | None]] = []
-        if error is None and raw is not None:
+        if error is None:
             log.debug("model output: %s", raw)
             try:
-                pairs = parse_output(raw)
+                pairs = parse_output(raw)  # type: ignore[arg-type]  # None -> TypeError, as 0.2
             except Exception as exc:
                 error = exc
         self.last_raw, self.last_error = raw, error

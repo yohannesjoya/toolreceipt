@@ -482,6 +482,10 @@ def _stem_verb(word: str) -> str:
 
 
 _LEAD_PREFIX = re.compile(r"^\s*[A-Za-z0-9_-]+:\s*")
+_LEAD_NOUN_FOLLOWERS = frozenset({
+    "the", "a", "an", "your", "our", "my", "his", "her", "their", "its", "this", "that",
+    "these", "those", "me", "you", "us", "them", "it", "all", "each", "every", "any", "one",
+})
 _CLAUSE_END = re.compile(r"[.;]| and ")
 
 
@@ -528,7 +532,12 @@ def description_family(description: str, lexicon: Mapping[str, Any] | None = Non
         single = {_stem(f) for f in fam.get("forms", ()) if " " not in f}
         if stem in _verb_tokens(name, lex) or stem in single:
             return name
-    if stem in {_stem(n) for n in lex.get("description_lead_nouns", ())}:
+    # A noun token is an imperative verb only when an object follows it ("Email the
+    # customer"), never as a modifier ("Email address validation", "Issue tracker").
+    follower = words[1] if len(words) > 1 else None
+    if stem in {_stem(n) for n in lex.get("description_lead_nouns", ())} and (
+        follower in _LEAD_NOUN_FOLLOWERS
+    ):
         return _noun_families(lex).get(stem)
     return None
 
@@ -731,10 +740,14 @@ def _match(
             described.append(spec)
     # PRD 03 §7.2 rule 4: a description-eligible tool joins the scoring only when no
     # verb-named tool scored, or when the claim's object names it ("a ticket in Jira").
-    named = any(score >= 2 for _, score, _ in scored)
+    named_best = max((score for _, score, _ in scored), default=0)
     for spec in described:
-        if not named or set(tokenize_tool_name(spec.name)) & set(words):
-            scored.append((spec.name, *_score(family, words, spec, lexicon, verb_stem, True)))
+        if named_best < 2 or set(tokenize_tool_name(spec.name)) & set(words):
+            score, matched = _score(family, words, spec, lexicon, verb_stem, True)
+            if named_best >= 2:
+                # It may join a name match as a tie, never displace it.
+                score, matched = min(score, named_best), matched and score <= named_best
+            scored.append((spec.name, score, matched))
     best = max((score for _, score, _ in scored), default=0)
     if best < 2:
         return [], None, False
@@ -749,10 +762,11 @@ def match_tools(
     """All tools at the maximum score (ties kept, in ``known_tools`` order) when it is
     at least 2; ``high`` confidence from 3.
 
-    Only tools whose name carries one of the family's verb tokens are eligible. An
-    object, description or noun-token match alone ("deleted two tickets" vs
-    ``create_ticket``, "emailed" vs ``email_customer``) never makes a candidate, nor
-    does a tool whose name conflicts (``_conflicts``).
+    Only tools whose name carries one of the family's verb tokens, or whose description
+    leads with one when the name has none (``tool_verb_tokens``), are eligible. An object
+    or description-word match alone ("deleted two tickets" vs ``create_ticket``) never
+    makes a candidate, nor does a tool whose tokens conflict (``_conflicts``). A
+    description-eligible tool can tie a name match, never outscore it.
     """
     candidates, confidence, _ = _match(family, obj, known_tools, lexicon)
     return candidates, confidence

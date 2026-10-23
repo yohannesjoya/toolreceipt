@@ -55,8 +55,16 @@ def test_parse_output_tolerates_fences_and_prose():
 
 
 @pytest.mark.parametrize(
-    "bad", ["", "no json here", '{"claims": "x"}', '{"claims": [{"text": 5}]}', "[1, 2]",
-            '{"claims": [{"tool": "send_email"}]}', '{"claims": [{"text": "x", "tool": 3}]}']
+    "bad",
+    [
+        "",
+        "no json here",
+        '{"claims": "x"}',
+        '{"claims": [{"text": 5}]}',
+        "[1, 2]",
+        '{"claims": [{"tool": "send_email"}]}',
+        '{"claims": [{"text": "x", "tool": 3}]}',
+    ],
 )
 def test_parse_output_rejects_malformed(bad):
     with pytest.raises(ValueError):
@@ -182,3 +190,14 @@ def test_aextract_fallback_sets_last_error_after_await():
     got = asyncio.run(ex.aextract("I sent the email.", TOOLS))
     assert [c.to_dict() for c in got] == [c.to_dict() for c in rules]
     assert isinstance(ex.last_error, RuntimeError) and ex.last_raw is None
+
+
+def test_none_completion_is_an_error_like_0_2():
+    rules = RuleExtractor().extract("I sent the email.", TOOLS)
+    ex = LLMExtractor(complete=lambda p: None)  # type: ignore[arg-type,return-value]
+    assert [c.to_dict() for c in ex.extract("I sent the email.", TOOLS)] == [
+        c.to_dict() for c in rules
+    ]
+    assert isinstance(ex.last_error, TypeError)
+    with pytest.raises(TypeError):
+        LLMExtractor(complete=lambda p: None, on_error="raise").extract("x", TOOLS)  # type: ignore[arg-type,return-value]

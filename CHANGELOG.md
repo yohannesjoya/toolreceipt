@@ -22,9 +22,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   scoring beside verb-named tools only when the reply names it ("a ticket in Jira"), so no
   existing fixture changes. Sibling demotion (`family_ran`) stays name-only.
 - Lexicon keys `description_lead_skip` (filler phrases stripped before the lead verb) and
-  `description_lead_nouns` (noun tokens accepted as a lead verb); both default to empty when
-  absent, so a 0.2 lexicon file loads. `fixtures/descriptions/sample.json` pins the lead verb
-  of 49 real descriptions.
+  `description_lead_nouns` (noun tokens accepted as a lead verb when an object follows them:
+  "Email the customer", not "Email address validation"); both default to empty when absent,
+  so a 0.2 lexicon file loads. `fixtures/descriptions/sample.json` pins the lead verb of 55
+  real descriptions.
+- Public helpers `toolreceipt.claims.description_family(description, lexicon)` and
+  `tool_verb_tokens(spec, lexicon)`.
 
 ### Changed
 
