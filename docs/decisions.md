@@ -109,6 +109,14 @@ prefix and one filler phrase. Only the first word counts: a later verb ("Manage
 subscriptions (cancel, pause)") is not evidence, and a read verb anywhere in the first
 clause makes the tool ineligible, as a read verb in a name does. Such a tool joins the
 scoring beside verb-named tools only when the reply names it, so no shipped fixture changed.
+It can tie a name match but never outscore it (`desc_generic_noun_ties_not_displaces`), and
+a noun lead word ("Email", "File") counts as the verb only when a determiner or pronoun
+follows it, so "Email address validation" names no family (`desc_noun_modifier_not_lead`).
+Object evidence from a description is its direct object only: the words after the lead verb
+up to the first preposition or the clause end. "Create a support ticket for the customer"
+gives `support ticket`, not `customer`, because any word anywhere in a description turned
+"I've added a note to your customer record" into a fabrication against `zendesk` when
+`hubspot` had run (`desc_crm_note_not_ticket`, `desc_generic_word_other_tool_honest`).
 `family_ran` (the sibling demotion in `diff()`) keeps reading names only: widening it to
 descriptions would silence a real "I've emailed you" fabrication whenever a Slack-style send
 tool ran, and `diff()` receives names, not descriptions. The cost is one rare false alarm,

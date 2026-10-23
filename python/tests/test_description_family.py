@@ -12,10 +12,11 @@ from tests.helpers import FIXTURES
 from toolreceipt.claims import (
     ToolSpec,
     _default_lexicon,
+    _description_object,
     _stem_verb,
+    _tool_verb_tokens,
     description_family,
     load_lexicon,
-    tool_verb_tokens,
 )
 
 PACKAGE = Path(toolreceipt.__file__).parent
@@ -52,12 +53,35 @@ def test_lexicon_without_skip_key_loads(tmp_path):
 
 
 def test_tool_verb_tokens_empty_description_is_ineligible():
-    assert tool_verb_tokens(ToolSpec("jira", ""), LEX) == set()
+    assert _tool_verb_tokens(ToolSpec("jira", ""), LEX) == set()
 
 
 def test_camelcase_verbless_name_uses_description():
-    assert "create" in tool_verb_tokens(ToolSpec("JiraV2", "Create a ticket"), LEX)
+    assert "create" in _tool_verb_tokens(ToolSpec("JiraV2", "Create a ticket"), LEX)
 
 
 def test_verb_named_tool_keeps_its_name_tokens():
-    assert tool_verb_tokens(ToolSpec("send_email", "Delete things"), LEX) == {"send", "email"}
+    assert _tool_verb_tokens(ToolSpec("send_email", "Delete things"), LEX) == {"send", "email"}
+
+
+def test_digit_verbless_name_uses_description():
+    assert "send" in _tool_verb_tokens(ToolSpec("slack2", "Send a message to a channel"), LEX)
+
+
+@pytest.mark.parametrize(
+    "description,expected",
+    [
+        ("Create a ticket in Jira", ["ticket"]),
+        ("Send an email to the customer about their order", ["email"]),
+        ("Create a support ticket for the customer", ["support", "ticket"]),
+        ("Jira: create a ticket", ["ticket"]),
+        ("Email the customer", ["customer"]),
+        ("Set up a meeting with the team", ["meeting"]),
+        ("Use this tool to refund a payment.", ["payment"]),
+        ("Create tickets and check their status", ["ticket"]),
+        ("Create", []),
+        ("", []),
+    ],
+)
+def test_description_object_is_the_lead_verbs_direct_object(description, expected):
+    assert _description_object(description, LEX) == expected

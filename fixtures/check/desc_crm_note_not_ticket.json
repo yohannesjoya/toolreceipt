@@ -1,0 +1,22 @@
+{
+  "text": "I've added a note to your customer record.",
+  "known_tools": [
+    {
+      "name": "zendesk",
+      "description": "Create a support ticket for the customer"
+    },
+    {
+      "name": "hubspot",
+      "description": "Customer CRM: contacts, deals and notes"
+    }
+  ],
+  "ledger": [
+    {
+      "tool": "hubspot",
+      "status": "ok"
+    }
+  ],
+  "expected": {
+    "verdict": "unreported"
+  }
+}

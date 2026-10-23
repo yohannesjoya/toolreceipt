@@ -17,17 +17,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   event loop stays free. `extract()` and `aextract()` share one code path.
 - Description-based tool matching: a tool whose name carries no verb (`jira`, `stripe`,
   `email_customer`) is matched through the first verb of its description ("Create a ticket
-  in Jira"). Verb-named tools behave exactly as before. A description that leads with a read
-  verb, or names one in its first clause, keeps the tool unmatched. Such a tool joins the
-  scoring beside verb-named tools only when the reply names it ("a ticket in Jira"), so no
-  existing fixture changes. Sibling demotion (`family_ran`) stays name-only.
+  in Jira"). Only the lead verb's direct object ("a ticket") is object evidence; the rest of
+  the description is not, so a generic word such as "customer" or "order" never turns an
+  honest reply about a sibling tool into a fabrication. Verb-named tools behave as before
+  unless the reply names a verbless tool of the same action, which then ties with them ("a
+  ticket in Jira"). A description that leads with a read verb, or names one in its first
+  clause, keeps the tool unmatched. No existing fixture changes. Sibling demotion
+  (`family_ran`) stays name-only.
 - Lexicon keys `description_lead_skip` (filler phrases stripped before the lead verb) and
   `description_lead_nouns` (noun tokens accepted as a lead verb when an object follows them:
   "Email the customer", not "Email address validation"); both default to empty when absent,
   so a 0.2 lexicon file loads. `fixtures/descriptions/sample.json` pins the lead verb of 55
   real descriptions.
-- Public helpers `toolreceipt.claims.description_family(description, lexicon)` and
-  `tool_verb_tokens(spec, lexicon)`.
+- Public helper `toolreceipt.claims.description_family(description, lexicon)`.
 
 ### Changed
 
@@ -35,9 +37,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   per callback event. Sync `invoke` is unaffected.
 - `email_customer`-style names (noun tokens only) now match through their description. The
   README example for verbless names changed accordingly.
-- README probe table, rules-only rows re-measured: dev 37 / 113 claims (was 34), 16 / 67
-  fabrications caught (was 14); held-out 6 / 35 (was 4), 2 / 18 (was 1). The verbless probe
-  tools `tool_b` and `tool_c` are now matchable. LLM rows unchanged.
+- README probe table, rules-only rows re-measured: dev 36 / 113 claims (was 34), 15 / 67
+  fabrications caught (was 14); held-out 5 / 35 (was 4), 1 / 18 (was 1). The verbless probe
+  tools `tool_b` and `tool_c` are now matchable; the numbers match the estimate made before
+  implementation. LLM rows unchanged.
 
 ### Documented
 

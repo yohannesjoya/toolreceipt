@@ -159,9 +159,9 @@ class LLMExtractor:
     the rules and the guards (the diff's sibling demotion under ``llm_blocks`` uses the
     packaged lexicon). ``extract()`` keeps its results in locals, so one extractor can
     serve many ``Receipts`` and threads; ``last_raw`` and ``last_error`` are debugging aids
-    holding the values of the most recent completed call, so read them when one call is in
-    flight. ``aextract()`` runs ``complete`` on a thread (``asyncio.to_thread``) and is
-    otherwise the same code path.
+    holding the values of the most recent completed call, so they are reliable only when one
+    call at a time runs on this extractor. ``aextract()`` runs ``complete`` on a thread
+    (``asyncio.to_thread``) and is otherwise the same code path.
     """
 
     def __init__(

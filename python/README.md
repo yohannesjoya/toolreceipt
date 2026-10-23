@@ -44,8 +44,10 @@ advice ("you can create a ticket"), conditionals and offers are not claims.
 - **Tool names without a verb, when the description does not lead with one.** A tool
   called `jira` or `email_customer` is matched through the first verb of its description
   ("Create a ticket in Jira", "Email the customer"). Only the first word counts, and a
-  read verb anywhere in the first sentence ("Look up an order and email the customer")
-  rules the tool out. A description that opens with something else ("Helps the customer
+  read verb anywhere in the first clause, up to the first `.`, `;` or "and" ("Look up an
+  order and email the customer"), rules the tool out. Only the verb's direct object
+  ("a ticket") is evidence that a claim is about this tool; the rest of the description
+  ("for the customer") is not. A description that opens with something else ("Helps the customer
   by creating a ticket", "Email address validation") or is in another language leaves the
   tool unmatched, and claims about it land in `unmatched` (informational, they never
   affect the verdict). Put the verb first, or use `LLMExtractor`, which matches on the
@@ -91,9 +93,10 @@ Before tuning, a milder pressure prompt produced no false claim in 10 of 10 runs
 prompt was chosen on the first 5 of the 10 pooled runs, so those 5 are not held out.
 
 In 10 of 10 live honest runs on 2026-10-19 every tool succeeded and the receipt was `ok`.
-On the held-out set (`fixtures/heldout/`: those 10 honest replies plus 12 hand-written
-adversarial negatives, labelled before any rule change) precision is 1.00 (20 of 20 claims)
-with no claim on any adversarial negative. The 10 honest replies are near-identical in
+On the held-out set (`fixtures/heldout/`: those 10 honest replies, three more written for
+0.3's verbless tools, and 12 hand-written adversarial negatives, labelled before any rule
+change) precision is 1.00 (23 of 23 claims) with no claim on any adversarial negative and no
+honest reply flagged. The 10 live honest replies are near-identical in
 phrasing ("I've issued a $64 refund ... and sent a confirmation email"), so this precision
 figure is weak evidence. `fixtures/check/` adds hand-written honest replies with more varied
 phrasing. The recorded runs in `demo/replays/` back the demo's Replay button.
@@ -109,10 +112,10 @@ temperature 0, recorded 2026-10-22 and replayed offline by `tests/test_probe_rep
 
 | Set | Extractor | Claims found | Precision | Fabrications caught | False alarms on traps |
 |---|---|---|---|---|---|
-| dev (114) | rules only | 37 / 113 (33%) | 0.95 | 16 / 67 (24%) | 2 / 23 |
+| dev (114) | rules only | 36 / 113 (32%) | 0.95 | 15 / 67 (22%) | 2 / 23 |
 | dev (114) | rules + LLM, default (`suspected`) | 101 / 113 (89%) | 0.97 | 60 / 67 (90%) | 2 / 23 (0 added by the LLM) |
 | dev (114) | rules + LLM, `llm_blocks=True` | 101 / 113 (89%) | 0.97 | 60 / 67 (90%) | 2 / 23 (0 added by the LLM) |
-| held-out (30) | rules only | 6 / 35 (17%) | 1.00 | 2 / 18 (11%) | 0 / 7 |
+| held-out (30) | rules only | 5 / 35 (14%) | 1.00 | 1 / 18 (6%) | 0 / 7 |
 | held-out (30) | rules + LLM, default (`suspected`) | 31 / 35 (89%) | 0.97 | 15 / 18 (83%) | 1 / 7 |
 | held-out (30) | rules + LLM, `llm_blocks=True` | 31 / 35 (89%) | 0.97 | 15 / 18 (83%) | 1 / 7 |
 
@@ -169,9 +172,9 @@ receipt = await rc.acheck(final_reply(result))
 `LLMExtractor` the model call runs on a thread so the event loop stays free. `astream` is
 recorded the same way, and a cancelled run closes its open tool call as an error.
 
-On Python 3.10, LangGraph does not pass the run config into async nodes implicitly. Call
-your model with the node's `config` argument there, or the tools it binds are not recorded
-as known.
+On Python 3.10, under `ainvoke` or `astream`, LangGraph does not pass the run config into
+nodes implicitly. Call your model with the node's `config` argument there, or the tools it
+binds are not recorded as known.
 
 ## With an LLM extractor
 
