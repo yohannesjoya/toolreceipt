@@ -1,0 +1,22 @@
+{
+  "text": "I've opened a ticket.",
+  "known_tools": [
+    {
+      "name": "jira",
+      "description": "Create a ticket in Jira"
+    },
+    {
+      "name": "zendesk",
+      "description": "Create a ticket in Zendesk"
+    }
+  ],
+  "expected": [
+    {
+      "verb": "create",
+      "candidates": [
+        "jira",
+        "zendesk"
+      ]
+    }
+  ]
+}

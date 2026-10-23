@@ -1,0 +1,15 @@
+{
+  "text": "I've posted the update.",
+  "known_tools": [
+    {
+      "name": "post_slack_message",
+      "description": "Post a message to a Slack channel"
+    }
+  ],
+  "expected": [
+    {
+      "verb": "submit",
+      "candidates": []
+    }
+  ]
+}

@@ -582,10 +582,32 @@ def family_ran(family: str, tools: Iterable[str], lexicon: Mapping[str, Any] | N
     return any(verbs & set(tokenize_tool_name(t)) for t in tools)
 
 
-def _conflicts(family: str, name: Sequence[str], lexicon: Mapping[str, Any]) -> bool:
-    """True when the tool name says it does something else than the claim.
+def _is_verb_named(name_tokens: Sequence[str], lexicon: Mapping[str, Any]) -> bool:
+    """True when a tool name carries a verb token of any family or a read verb."""
+    tokens = set(name_tokens)
+    if tokens & {_stem(v) for v in lexicon.get("read_verbs", ())}:
+        return True
+    return any(tokens & _verb_tokens(f, lexicon) for f in lexicon["families"])
 
-    Its name holds a read verb ("read_email", "lookup_order"), or a verb of another family
+
+def tool_verb_tokens(spec: ToolSpec, lexicon: Mapping[str, Any]) -> set[str]:
+    """The tokens a tool is matched on (PRD 03 §7.2 rule 1).
+
+    A verb-named tool (``_is_verb_named``) is matched on its name tokens, exactly as before
+    0.3. A verbless name (``jira``, ``email_customer``) is matched on the verb tokens of the
+    family its description's lead verb names (``description_family``), or on nothing.
+    """
+    name = tokenize_tool_name(spec.name)
+    if _is_verb_named(name, lexicon):
+        return set(name)
+    family = description_family(spec.description, lexicon)
+    return _verb_tokens(family, lexicon) if family else set()
+
+
+def _conflicts(family: str, name: Sequence[str], lexicon: Mapping[str, Any]) -> bool:
+    """True when the tool's tokens say it does something else than the claim.
+
+    They hold a read verb ("read_email", "lookup_order"), or a verb of another family
     without one of the claim's own ("delete_email" for a send claim). Noun tokens never
     conflict, and the claim's own verb keeps the tool ("create_refund" for a refund).
     """
@@ -645,15 +667,20 @@ def _score(
     spec: ToolSpec,
     lexicon: Mapping[str, Any],
     verb_stem: str | None = None,
+    by_description: bool = False,
 ) -> tuple[int, bool]:
-    """``(score, object component earned)``; see ``score_tool``."""
+    """``(score, object component earned)``; see ``score_tool``.
+
+    ``by_description``: the tool is eligible through its description's lead verb (PRD 03
+    §7.2), so the family component is earned by that verb rather than a name token.
+    """
     name = tokenize_tool_name(spec.name)
     fam_terms = _family_terms(family, lexicon)
     obj_terms = _object_terms(family, [_stem(w) for w in object_words], lexicon)
     fam_hits: set[int] = set().union(*(_occurs(t, name) for t in fam_terms))
     obj_hits: set[int] = set().union(*(_occurs(t, name) for t in obj_terms))
     object_matched = bool(obj_hits) and (not fam_hits or len(fam_hits | obj_hits) > 1)
-    score = (2 if fam_hits else 0) + (2 if object_matched else 0)
+    score = (2 if fam_hits or by_description else 0) + (2 if object_matched else 0)
     desc = _words(spec.description)
     if any(_occurs(t, desc) and not _occurs(t, name) for t in obj_terms):
         score += 1
@@ -688,9 +715,12 @@ def _match(
     verbs = _verb_tokens(family, lexicon)
     scored: list[tuple[str, int, bool]] = []
     for spec in known_tools:
-        name = tokenize_tool_name(spec.name)
-        if verbs & set(name) and not _conflicts(family, name, lexicon):
-            scored.append((spec.name, *_score(family, words, spec, lexicon, verb_stem)))
+        tokens = tool_verb_tokens(spec, lexicon)
+        if verbs & tokens and not _conflicts(family, sorted(tokens), lexicon):
+            by_description = not _is_verb_named(tokenize_tool_name(spec.name), lexicon)
+            scored.append(
+                (spec.name, *_score(family, words, spec, lexicon, verb_stem, by_description))
+            )
     best = max((score for _, score, _ in scored), default=0)
     if best < 2:
         return [], None, False

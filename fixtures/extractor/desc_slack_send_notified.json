@@ -1,0 +1,17 @@
+{
+  "text": "I've notified the team on Slack.",
+  "known_tools": [
+    {
+      "name": "slack",
+      "description": "Send a message to a Slack channel"
+    }
+  ],
+  "expected": [
+    {
+      "verb": "send",
+      "candidates": [
+        "slack"
+      ]
+    }
+  ]
+}

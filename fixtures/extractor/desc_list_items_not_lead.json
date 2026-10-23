@@ -1,0 +1,15 @@
+{
+  "text": "I've cancelled your subscription.",
+  "known_tools": [
+    {
+      "name": "billing",
+      "description": "Manage subscriptions (cancel, pause)"
+    }
+  ],
+  "expected": [
+    {
+      "verb": "delete",
+      "candidates": []
+    }
+  ]
+}

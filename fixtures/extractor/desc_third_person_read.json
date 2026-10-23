@@ -1,0 +1,15 @@
+{
+  "text": "I've sent you the receipt.",
+  "known_tools": [
+    {
+      "name": "order_tool",
+      "description": "Searches orders and sends a receipt"
+    }
+  ],
+  "expected": [
+    {
+      "verb": "send",
+      "candidates": []
+    }
+  ]
+}

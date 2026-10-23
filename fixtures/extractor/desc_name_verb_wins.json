@@ -1,0 +1,15 @@
+{
+  "text": "I've sent the email.",
+  "known_tools": [
+    {
+      "name": "delete_email",
+      "description": "Send an email"
+    }
+  ],
+  "expected": [
+    {
+      "verb": "send",
+      "candidates": []
+    }
+  ]
+}

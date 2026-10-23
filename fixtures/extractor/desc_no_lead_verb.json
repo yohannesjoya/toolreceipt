@@ -1,0 +1,15 @@
+{
+  "text": "I've updated your record.",
+  "known_tools": [
+    {
+      "name": "crm2",
+      "description": "Customer relationship management system that can update records"
+    }
+  ],
+  "expected": [
+    {
+      "verb": "update",
+      "candidates": []
+    }
+  ]
+}

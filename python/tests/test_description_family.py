@@ -9,7 +9,14 @@ import pytest
 
 import toolreceipt
 from tests.helpers import FIXTURES
-from toolreceipt.claims import _default_lexicon, _stem_verb, description_family, load_lexicon
+from toolreceipt.claims import (
+    ToolSpec,
+    _default_lexicon,
+    _stem_verb,
+    description_family,
+    load_lexicon,
+    tool_verb_tokens,
+)
 
 PACKAGE = Path(toolreceipt.__file__).parent
 SAMPLE = json.loads((FIXTURES / "descriptions" / "sample.json").read_text(encoding="utf-8"))
@@ -40,3 +47,15 @@ def test_lexicon_without_skip_key_loads(tmp_path):
     loaded = load_lexicon(path)
     assert description_family("Create a ticket", loaded) == "create"
     assert description_family("Use this tool to create a ticket", loaded) is None
+
+
+def test_tool_verb_tokens_empty_description_is_ineligible():
+    assert tool_verb_tokens(ToolSpec("jira", ""), LEX) == set()
+
+
+def test_camelcase_verbless_name_uses_description():
+    assert "create" in tool_verb_tokens(ToolSpec("JiraV2", "Create a ticket"), LEX)
+
+
+def test_verb_named_tool_keeps_its_name_tokens():
+    assert tool_verb_tokens(ToolSpec("send_email", "Delete things"), LEX) == {"send", "email"}
