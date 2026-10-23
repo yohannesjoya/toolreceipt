@@ -470,6 +470,69 @@ def _words(text: str) -> list[str]:
     return [_stem(w) for w in _WORD.findall(_normalize(text).lower())]
 
 
+def _stem_verb(word: str) -> str:
+    """``_stem`` plus third-person handling: "searches" -> "search", "queries" -> "query",
+    "closes" -> "close", "processes" -> "process"."""
+    w = word.lower()
+    if len(w) > 4 and w.endswith("ies"):
+        return w[:-3] + "y"
+    if len(w) > 4 and w.endswith("es") and w[:-2].endswith(("sh", "ch", "x", "z", "ss", "o")):
+        return w[:-2]
+    return _stem(w)
+
+
+_LEAD_PREFIX = re.compile(r"^\s*[A-Za-z0-9_-]+:\s*")
+_CLAUSE_END = re.compile(r"[.;]| and ")
+
+
+def _description_clause(description: str) -> str:
+    """Text up to the first ``.``, ``;`` or `` and ``."""
+    return _CLAUSE_END.split(_normalize(description), maxsplit=1)[0]
+
+
+def _lead_words(description: str, skip: Sequence[str]) -> list[str]:
+    """Lowercase words of the first clause after an optional single-word ``<Name>:`` prefix
+    and one skip phrase (longest first)."""
+    text = _LEAD_PREFIX.sub("", _description_clause(description), count=1).lower().strip()
+    for phrase in sorted(skip, key=len, reverse=True):
+        if text == phrase or text.startswith(phrase + " "):
+            text = text[len(phrase):].strip()
+            break
+    return _WORD.findall(text)
+
+
+def description_family(description: str, lexicon: Mapping[str, Any] | None = None) -> str | None:
+    """The family named by a description's lead verb (PRD 03 §7.2 rule 2), or ``None``.
+
+    The lead verb is the first content word of the first clause, after an optional
+    ``<Name>:`` prefix and one ``description_lead_skip`` phrase. It names a family when its
+    stem is one of the family's verb tokens or reply forms (a two-word form such as "set
+    up" is tested first), or a noun token listed in ``description_lead_nouns``. A read verb
+    as the lead word, or anywhere in the first clause, gives ``None``.
+    """
+    lex = _default_lexicon() if lexicon is None else lexicon
+    words = _lead_words(description, lex.get("description_lead_skip", []))
+    if not words:
+        return None
+    reads = {_stem(v) for v in lex.get("read_verbs", ())}
+    if any(_stem_verb(w) in reads for w in words):
+        return None
+    families: Mapping[str, Any] = lex["families"]
+    two = " ".join(_stem_verb(w) for w in words[:2])
+    for name, fam in families.items():
+        forms = fam.get("forms", ())
+        if any(" " in f and " ".join(_stem_verb(w) for w in f.split()) == two for f in forms):
+            return name
+    stem = _stem_verb(words[0])
+    for name, fam in families.items():
+        single = {_stem(f) for f in fam.get("forms", ()) if " " not in f}
+        if stem in _verb_tokens(name, lex) or stem in single:
+            return name
+    if stem in {_stem(n) for n in lex.get("description_lead_nouns", ())}:
+        return _noun_families(lex).get(stem)
+    return None
+
+
 def tokenize_tool_name(name: str) -> list[str]:
     """Split a tool name on ``_``, ``-``, other separators and camelCase; lowercase, singular."""
     return [_stem(part) for chunk in _NAME_SPLIT.split(name) for part in _NAME_PART.findall(chunk)]

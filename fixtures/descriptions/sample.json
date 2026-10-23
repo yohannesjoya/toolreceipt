@@ -1,0 +1,198 @@
+[
+  {
+    "description": "Create a calendar event.",
+    "family": "create"
+  },
+  {
+    "description": "Refund the customer.",
+    "family": "refund"
+  },
+  {
+    "description": "Look up the order.",
+    "family": null
+  },
+  {
+    "description": "Notify the customer by email.",
+    "family": "send"
+  },
+  {
+    "description": "Post a comment on a pull request.",
+    "family": null
+  },
+  {
+    "description": "Charge the customer's card.",
+    "family": "charge"
+  },
+  {
+    "description": "Book a flight for the traveller.",
+    "family": "schedule"
+  },
+  {
+    "description": "Add a note to a contact record.",
+    "family": "create"
+  },
+  {
+    "description": "Close a GitHub issue.",
+    "family": "delete"
+  },
+  {
+    "description": "Comment on a pull request.",
+    "family": null
+  },
+  {
+    "description": "Delete a contact from the CRM.",
+    "family": "delete"
+  },
+  {
+    "description": "Cancel the customer's subscription.",
+    "family": "delete"
+  },
+  {
+    "description": "Send a message to a Slack channel",
+    "family": "send"
+  },
+  {
+    "description": "Issue a refund through Stripe",
+    "family": "refund"
+  },
+  {
+    "description": "Process the payment.",
+    "family": "refund"
+  },
+  {
+    "description": "Run the pipeline.",
+    "family": "trigger"
+  },
+  {
+    "description": "Deploy the service to production.",
+    "family": "trigger"
+  },
+  {
+    "description": "Save the document.",
+    "family": "save"
+  },
+  {
+    "description": "Record the call.",
+    "family": "save"
+  },
+  {
+    "description": "Submit the form.",
+    "family": "submit"
+  },
+  {
+    "description": "Publish the blog post.",
+    "family": "submit"
+  },
+  {
+    "description": "Pay the invoice.",
+    "family": "charge"
+  },
+  {
+    "description": "Reschedule the appointment.",
+    "family": "schedule"
+  },
+  {
+    "description": "Email the customer",
+    "family": "send"
+  },
+  {
+    "description": "Text the customer",
+    "family": "send"
+  },
+  {
+    "description": "File a ticket with IT",
+    "family": "create"
+  },
+  {
+    "description": "Log a call in HubSpot",
+    "family": "create"
+  },
+  {
+    "description": "Set up a meeting",
+    "family": "create"
+  },
+  {
+    "description": "Jira: create a ticket",
+    "family": "create"
+  },
+  {
+    "description": "Jira tool: create a ticket",
+    "family": null
+  },
+  {
+    "description": "Use this tool to create a support ticket for the customer",
+    "family": "create"
+  },
+  {
+    "description": "A tool to create a ticket",
+    "family": "create"
+  },
+  {
+    "description": "Tool that creates tickets",
+    "family": "create"
+  },
+  {
+    "description": "Allows you to update records",
+    "family": "update"
+  },
+  {
+    "description": "Lets you delete contacts",
+    "family": "delete"
+  },
+  {
+    "description": "Searches orders and sends a receipt",
+    "family": null
+  },
+  {
+    "description": "Fetches an order and emails the customer",
+    "family": null
+  },
+  {
+    "description": "Queries the CRM and updates the record",
+    "family": null
+  },
+  {
+    "description": "Updates the customer record in the CRM",
+    "family": "update"
+  },
+  {
+    "description": "Closes the ticket.",
+    "family": "delete"
+  },
+  {
+    "description": "Processes a refund.",
+    "family": "refund"
+  },
+  {
+    "description": "Manage subscriptions (cancel, pause)",
+    "family": null
+  },
+  {
+    "description": "Customer relationship management system that can update records",
+    "family": null
+  },
+  {
+    "description": "Look up an order and email the customer",
+    "family": null
+  },
+  {
+    "description": "Helps the customer by creating a ticket",
+    "family": null
+  },
+  {
+    "description": "Create a ticket and check its status",
+    "family": "create"
+  },
+  {
+    "description": "Create a ticket to check later",
+    "family": null
+  },
+  {
+    "description": "",
+    "family": null
+  },
+  {
+    "description": "Get the weather.",
+    "family": null
+  }
+]
