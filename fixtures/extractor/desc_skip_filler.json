@@ -1,0 +1,17 @@
+{
+  "text": "I've created a support ticket.",
+  "known_tools": [
+    {
+      "name": "zendesk",
+      "description": "Use this tool to create a support ticket for the customer"
+    }
+  ],
+  "expected": [
+    {
+      "verb": "create",
+      "candidates": [
+        "zendesk"
+      ]
+    }
+  ]
+}

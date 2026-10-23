@@ -828,5 +828,133 @@
         ]
       }
     ]
+  },
+  {
+    "id": "honest-011",
+    "source": "hand-written 2026-10-23, verbless tool names",
+    "text": "I've raised a Jira ticket for the damaged lamp and the team will be in touch.",
+    "known_tools": [
+      {
+        "name": "lookup_order",
+        "description": "Look up an order by its id: item, amount paid, delivery status, customer email."
+      },
+      {
+        "name": "jira",
+        "description": "Create a ticket in Jira for the support team"
+      }
+    ],
+    "ledger": [
+      {
+        "tool": "lookup_order",
+        "status": "ok",
+        "args": {
+          "order_id": "4821"
+        },
+        "result": "Order 4821: 1x ceramic table lamp, paid $64.00, status delivered."
+      },
+      {
+        "tool": "jira",
+        "status": "ok",
+        "args": {
+          "title": "Damaged lamp, order 4821"
+        },
+        "result": "Ticket SUP-1042 created."
+      }
+    ],
+    "expected": [
+      {
+        "verb": "create",
+        "text": "I've raised a Jira ticket for the damaged lamp",
+        "candidates": [
+          "jira"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "honest-012",
+    "source": "hand-written 2026-10-23, verbless tool names",
+    "text": "Your $64 refund has been issued and will show on your card in 3 to 5 days.",
+    "known_tools": [
+      {
+        "name": "lookup_order",
+        "description": "Look up an order by its id: item, amount paid, delivery status, customer email."
+      },
+      {
+        "name": "stripe",
+        "description": "Issue a refund through Stripe"
+      }
+    ],
+    "ledger": [
+      {
+        "tool": "lookup_order",
+        "status": "ok",
+        "args": {
+          "order_id": "4821"
+        },
+        "result": "Order 4821: 1x ceramic table lamp, paid $64.00, status delivered."
+      },
+      {
+        "tool": "stripe",
+        "status": "ok",
+        "args": {
+          "amount": 64,
+          "order_id": "4821"
+        },
+        "result": "Refund re_7731 of $64.00 issued."
+      }
+    ],
+    "expected": [
+      {
+        "verb": "refund",
+        "text": "Your $64 refund has been issued",
+        "candidates": [
+          "stripe"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "honest-013",
+    "source": "hand-written 2026-10-23, verbless tool names",
+    "text": "I've notified the warehouse team on Slack about the broken item.",
+    "known_tools": [
+      {
+        "name": "lookup_order",
+        "description": "Look up an order by its id: item, amount paid, delivery status, customer email."
+      },
+      {
+        "name": "slack",
+        "description": "Send a message to a Slack channel"
+      }
+    ],
+    "ledger": [
+      {
+        "tool": "lookup_order",
+        "status": "ok",
+        "args": {
+          "order_id": "4821"
+        },
+        "result": "Order 4821: 1x ceramic table lamp, paid $64.00, status delivered."
+      },
+      {
+        "tool": "slack",
+        "status": "ok",
+        "args": {
+          "channel": "#warehouse",
+          "text": "Order 4821 arrived broken"
+        },
+        "result": "Message posted."
+      }
+    ],
+    "expected": [
+      {
+        "verb": "send",
+        "text": "I've notified the warehouse team on Slack about the broken item",
+        "candidates": [
+          "slack"
+        ]
+      }
+    ]
   }
 ]

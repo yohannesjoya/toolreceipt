@@ -12,6 +12,7 @@ The model sees the reply text and the tool names and descriptions, never the led
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import re
@@ -158,7 +159,9 @@ class LLMExtractor:
     the rules and the guards (the diff's sibling demotion under ``llm_blocks`` uses the
     packaged lexicon). ``extract()`` keeps its results in locals, so one extractor can
     serve many ``Receipts`` and threads; ``last_raw`` and ``last_error`` are debugging aids
-    written on every call (last writer wins), so read them from an extractor one thread owns.
+    holding the values of the most recent completed call, so they are reliable only when one
+    call at a time runs on this extractor. ``aextract()`` runs ``complete`` on a thread
+    (``asyncio.to_thread``) and is otherwise the same code path.
     """
 
     def __init__(
@@ -184,18 +187,46 @@ class LLMExtractor:
 
     def extract(self, text: str, known_tools: Sequence[ToolSpec]) -> list[Claim]:
         rules = self._rules.extract(text, known_tools)
-        self.last_raw = None
-        self.last_error = None
+        raw: str | None = None
+        error: Exception | None = None
         try:
             raw = self._complete(build_prompt(text, known_tools))
-            self.last_raw = raw
-            log.debug("model output: %s", raw)
-            pairs = parse_output(raw)
         except Exception as exc:
-            self.last_error = exc
+            error = exc
+        return self._finish(rules, text, known_tools, raw, error)
+
+    async def aextract(self, text: str, known_tools: Sequence[ToolSpec]) -> list[Claim]:
+        """``extract`` with the model call on a thread, so the event loop stays free."""
+        rules = self._rules.extract(text, known_tools)
+        raw: str | None = None
+        error: Exception | None = None
+        try:
+            raw = await asyncio.to_thread(self._complete, build_prompt(text, known_tools))
+        except Exception as exc:
+            error = exc
+        return self._finish(rules, text, known_tools, raw, error)
+
+    def _finish(
+        self,
+        rules: list[Claim],
+        text: str,
+        known_tools: Sequence[ToolSpec],
+        raw: str | None,
+        error: Exception | None,
+    ) -> list[Claim]:
+        """Parse, guard and merge one completed call; records ``last_raw``/``last_error``."""
+        pairs: list[tuple[str, str | None]] = []
+        if error is None:
+            log.debug("model output: %s", raw)
+            try:
+                pairs = parse_output(raw)  # type: ignore[arg-type]  # None -> TypeError, as 0.2
+            except Exception as exc:
+                error = exc
+        self.last_raw, self.last_error = raw, error
+        if error is not None:
             if self._on_error == "raise":
-                raise
-            log.warning("LLM extractor fell back to rules: %s", type(exc).__name__)
+                raise error
+            log.warning("LLM extractor fell back to rules: %s", type(error).__name__)
             return rules
         names = {t.name for t in known_tools}
         loose_reply = normalize_loose(text)

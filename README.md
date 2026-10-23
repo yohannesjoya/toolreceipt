@@ -41,11 +41,21 @@ advice ("you can create a ticket"), conditionals and offers are not claims.
 - **Non-English replies.** The default extractor is English only. `LLMExtractor` reads
   other languages, but its guards are English only (see below).
 - **Streaming and mid-run checks.** Only the final reply is checked.
-- **Tool names without a verb.** With the default extractor a tool called `email_customer`
-  never matches, so claims about it land in `unmatched` (informational, they never affect
-  the verdict). `LLMExtractor` can name it, since the model matches on the description.
-- **Loose tool matching.** A claim maps to a tool only when the tool name shares the
-  claim's action verb family (`send`, `create`, `update`, `delete`, `refund`, ...).
+- **Tool names without a verb, when the description does not lead with one.** A tool
+  called `jira` or `email_customer` is matched through the first verb of its description
+  ("Create a ticket in Jira", "Email the customer"). Only the first word counts, and a
+  read verb anywhere in the first clause, up to the first `.`, `;` or "and" ("Look up an
+  order and email the customer"), rules the tool out. Only the verb's direct object
+  ("a ticket") is evidence that a claim is about this tool; the rest of the description
+  ("for the customer") is not. A description that opens with something else ("Helps the customer
+  by creating a ticket", "Email address validation") or is in another language leaves the
+  tool unmatched, and claims about it land in `unmatched` (informational, they never
+  affect the verdict). Put the verb first, or use `LLMExtractor`, which matches on the
+  whole description. On the post-hoc path, pass `known_tools` with descriptions: a ledger
+  alone carries none.
+- **Loose tool matching.** A claim maps to a tool only when the tool's name, or the first
+  verb of its description, shares the claim's action verb family (`send`, `create`,
+  `update`, `delete`, `refund`, ...).
 - **Loose paraphrases of an action done with a different tool.** "I've raised this with our
   team" after `escalate_ticket` fits the verb family of `create_ticket` but names nothing in
   it. When a claim matches a tool on the verb family alone and that tool never ran, the claim
@@ -83,9 +93,10 @@ Before tuning, a milder pressure prompt produced no false claim in 10 of 10 runs
 prompt was chosen on the first 5 of the 10 pooled runs, so those 5 are not held out.
 
 In 10 of 10 live honest runs on 2026-10-19 every tool succeeded and the receipt was `ok`.
-On the held-out set (`fixtures/heldout/`: those 10 honest replies plus 12 hand-written
-adversarial negatives, labelled before any rule change) precision is 1.00 (20 of 20 claims)
-with no claim on any adversarial negative. The 10 honest replies are near-identical in
+On the held-out set (`fixtures/heldout/`: those 10 honest replies, three more written for
+0.3's verbless tools, and 12 hand-written adversarial negatives, labelled before any rule
+change) precision is 1.00 (23 of 23 claims) with no claim on any adversarial negative and no
+honest reply flagged. The 10 live honest replies are near-identical in
 phrasing ("I've issued a $64 refund ... and sent a confirmation email"), so this precision
 figure is weak evidence. `fixtures/check/` adds hand-written honest replies with more varied
 phrasing. The recorded runs in `demo/replays/` back the demo's Replay button.
@@ -101,14 +112,16 @@ temperature 0, recorded 2026-10-22 and replayed offline by `tests/test_probe_rep
 
 | Set | Extractor | Claims found | Precision | Fabrications caught | False alarms on traps |
 |---|---|---|---|---|---|
-| dev (114) | rules only | 34 / 113 (30%) | 0.94 | 14 / 67 (21%) | 2 / 23 |
+| dev (114) | rules only | 36 / 113 (32%) | 0.95 | 15 / 67 (22%) | 2 / 23 |
 | dev (114) | rules + LLM, default (`suspected`) | 101 / 113 (89%) | 0.97 | 60 / 67 (90%) | 2 / 23 (0 added by the LLM) |
 | dev (114) | rules + LLM, `llm_blocks=True` | 101 / 113 (89%) | 0.97 | 60 / 67 (90%) | 2 / 23 (0 added by the LLM) |
-| held-out (30) | rules only | 4 / 35 (11%) | 1.00 | 1 / 18 (6%) | 0 / 7 |
+| held-out (30) | rules only | 5 / 35 (14%) | 1.00 | 1 / 18 (6%) | 0 / 7 |
 | held-out (30) | rules + LLM, default (`suspected`) | 31 / 35 (89%) | 0.97 | 15 / 18 (83%) | 1 / 7 |
 | held-out (30) | rules + LLM, `llm_blocks=True` | 31 / 35 (89%) | 0.97 | 15 / 18 (83%) | 1 / 7 |
 
-"Caught" means the receipt flags a labelled fabrication: `verdict == "fabricated"`, or a
+Rules-only rows re-measured for 0.3.0, when verbless probe tools (`tool_b`, `tool_c`) became
+matchable through their descriptions; the LLM rows are unchanged. "Caught" means the receipt
+flags a labelled fabrication: `verdict == "fabricated"`, or a
 non-empty `suspected` under the default. The two dev trap alarms are the rules' own (a quoted
 draft and "refunded in March"), unchanged from 0.1. The held-out alarm is the model reading
 "the refund bounced" as a refund; the misses are vague replies ("Both of those are sorted
@@ -146,6 +159,22 @@ if not receipt.ok:
 `rc.config()` returns a LangGraph config with a callback handler attached. Create one
 `Receipts` per run. Your tools and graph stay unchanged, apart from
 `ToolNode(tools, handle_tool_errors=True)`.
+
+Async graphs work the same way:
+
+```python
+rc = Receipts()  # one per run: config() binds the ledger to this instance
+result = await graph.ainvoke(inputs, config=rc.config())
+receipt = await rc.acheck(final_reply(result))
+```
+
+`acheck` returns the same receipt as `check`. With the rules alone it does no I/O; with an
+`LLMExtractor` the model call runs on a thread so the event loop stays free. `astream` is
+recorded the same way, and a cancelled run closes its open tool call as an error.
+
+On Python 3.10, under `ainvoke` or `astream`, LangGraph does not pass the run config into
+nodes implicitly. Call your model with the node's `config` argument there, or the tools it
+binds are not recorded as known.
 
 ## With an LLM extractor
 
@@ -227,8 +256,9 @@ no result is recorded as an error. Timestamps are `None` on this path.
 
 Pass `known_tools`. A ledger only knows the tools that ran, so without `known_tools` a claim
 about a tool that was never called ("I emailed you" when `send_email` never ran) has nothing
-to match and cannot be flagged. Names are enough; `(name, description)` pairs and
-OpenAI-style tool dicts also work. In a live run (`Receipts.config()`), bound tools are
+to match and cannot be flagged. Names are enough for verb-named tools; `(name, description)`
+pairs and OpenAI-style tool dicts also work, and a tool whose name has no verb (`jira`) is
+matched only when its description is given. In a live run (`Receipts.config()`), bound tools are
 discovered automatically.
 
 Without LangGraph, build a `Ledger` of `LedgerEntry` objects yourself and call `check()`.
@@ -280,12 +310,13 @@ kept.
 
 ## Roadmap
 
-Done in 0.2: LLM-backed extractor behind the existing `ClaimExtractor` protocol.
+Done in 0.2: LLM-backed extractor behind the existing `ClaimExtractor` protocol. Done in
+0.3: async API; verbless tool names matched through their descriptions.
 
 - TypeScript port, sharing the JSON fixtures as the contract
 - Adapters: Mastra, CrewAI, Vercel AI SDK
 - Argument check ("emailed Bob" against `to="alice"`)
-- Async API
+- Framework-free message input (OpenAI-style message lists)
 
 ## Contributing
 

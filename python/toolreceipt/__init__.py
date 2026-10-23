@@ -4,9 +4,9 @@ from toolreceipt.claims import Claim, ClaimExtractor, RuleExtractor, ToolSpec
 from toolreceipt.ledger import Ledger, LedgerEntry
 from toolreceipt.llm import LLMExtractor
 from toolreceipt.receipt import Receipt, Verdict
-from toolreceipt.receipts import Receipts, check
+from toolreceipt.receipts import Receipts, acheck, check
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"
 
 __all__ = [
     "Claim",
@@ -20,5 +20,6 @@ __all__ = [
     "ToolSpec",
     "Verdict",
     "__version__",
+    "acheck",
     "check",
 ]

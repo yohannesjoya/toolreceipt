@@ -470,6 +470,115 @@ def _words(text: str) -> list[str]:
     return [_stem(w) for w in _WORD.findall(_normalize(text).lower())]
 
 
+def _stem_verb(word: str) -> str:
+    """``_stem`` plus third-person handling: "searches" -> "search", "queries" -> "query",
+    "closes" -> "close", "processes" -> "process"."""
+    w = word.lower()
+    if len(w) > 4 and w.endswith("ies"):
+        return w[:-3] + "y"
+    if len(w) > 4 and w.endswith("es") and w[:-2].endswith(("sh", "ch", "x", "z", "ss", "o")):
+        return w[:-2]
+    return _stem(w)
+
+
+_LEAD_PREFIX = re.compile(r"^\s*[A-Za-z0-9_-]+:\s*")
+_LEAD_NOUN_FOLLOWERS = frozenset({
+    "the", "a", "an", "your", "our", "my", "his", "her", "their", "its", "this", "that",
+    "these", "those", "me", "you", "us", "them", "it", "all", "each", "every", "any", "one",
+})
+_CLAUSE_END = re.compile(r"[.;]| and ")
+
+
+def _description_clause(description: str) -> str:
+    """Text up to the first ``.``, ``;`` or `` and ``."""
+    return _CLAUSE_END.split(_normalize(description), maxsplit=1)[0]
+
+
+def _lead_words(description: str, skip: Sequence[str]) -> list[str]:
+    """Lowercase words of the first clause after an optional single-word ``<Name>:`` prefix
+    and one skip phrase (longest first)."""
+    text = _LEAD_PREFIX.sub("", _description_clause(description), count=1).lower().strip()
+    for phrase in sorted(skip, key=len, reverse=True):
+        if text == phrase or text.startswith(phrase + " "):
+            text = text[len(phrase):].strip()
+            break
+    return _WORD.findall(text)
+
+
+def description_family(description: str, lexicon: Mapping[str, Any] | None = None) -> str | None:
+    """The family named by a description's lead verb (PRD 03 §7.2 rule 2), or ``None``.
+
+    The lead verb is the first content word of the first clause, after an optional
+    ``<Name>:`` prefix and one ``description_lead_skip`` phrase. It names a family when its
+    stem is one of the family's verb tokens or reply forms (a two-word form such as "set
+    up" is tested first), or a noun token listed in ``description_lead_nouns``. A read verb
+    as the lead word, or anywhere in the first clause, gives ``None``.
+    """
+    lex = _default_lexicon() if lexicon is None else lexicon
+    words = _lead_words(description, lex.get("description_lead_skip", []))
+    if not words:
+        return None
+    reads = {_stem(v) for v in lex.get("read_verbs", ())}
+    if any(_stem_verb(w) in reads for w in words):
+        return None
+    families: Mapping[str, Any] = lex["families"]
+    two = " ".join(_stem_verb(w) for w in words[:2])
+    for name, fam in families.items():
+        forms = fam.get("forms", ())
+        if any(" " in f and " ".join(_stem_verb(w) for w in f.split()) == two for f in forms):
+            return name
+    stem = _stem_verb(words[0])
+    for name, fam in families.items():
+        single = {_stem(f) for f in fam.get("forms", ()) if " " not in f}
+        if stem in _verb_tokens(name, lex) or stem in single:
+            return name
+    # A noun token is an imperative verb only when an object follows it ("Email the
+    # customer"), never as a modifier ("Email address validation", "Issue tracker").
+    follower = words[1] if len(words) > 1 else None
+    if stem in {_stem(n) for n in lex.get("description_lead_nouns", ())} and (
+        follower in _LEAD_NOUN_FOLLOWERS
+    ):
+        return _noun_families(lex).get(stem)
+    return None
+
+
+# Words that end a description's direct object: prepositions and clause openers.
+_OBJECT_END = frozenset({
+    "to", "for", "of", "in", "on", "at", "by", "with", "from", "into", "about", "through",
+    "via", "as", "using", "when", "if", "that", "which", "who", "where", "so", "or",
+})
+
+
+def _description_object(
+    description: str, lexicon: Mapping[str, Any] | None = None
+) -> list[str]:
+    """Stemmed words of the lead verb's direct object (PRD 03 §7.2 rule 3), or ``[]``.
+
+    The words after the lead verb (both words of a two-word form such as "set up") and any
+    determiners, up to the first preposition or the clause end: "Create a ticket in Jira"
+    gives ``["ticket"]``, "Send an email to the customer about their order" gives
+    ``["email"]``. Empty when the description names no family.
+    """
+    lex = _default_lexicon() if lexicon is None else lexicon
+    if description_family(description, lex) is None:
+        return []
+    words = _lead_words(description, lex.get("description_lead_skip", []))
+    two = " ".join(_stem_verb(w) for w in words[:2])
+    two_word_forms = {
+        " ".join(_stem_verb(w) for w in f.split())
+        for fam in lex["families"].values()
+        for f in fam.get("forms", ())
+        if " " in f
+    }
+    obj: list[str] = []
+    for w in words[2:] if two in two_word_forms else words[1:]:
+        if w in _OBJECT_END:
+            break
+        if w not in _LEAD_NOUN_FOLLOWERS:
+            obj.append(_stem(w))
+    return obj
+
+
 def tokenize_tool_name(name: str) -> list[str]:
     """Split a tool name on ``_``, ``-``, other separators and camelCase; lowercase, singular."""
     return [_stem(part) for chunk in _NAME_SPLIT.split(name) for part in _NAME_PART.findall(chunk)]
@@ -519,10 +628,32 @@ def family_ran(family: str, tools: Iterable[str], lexicon: Mapping[str, Any] | N
     return any(verbs & set(tokenize_tool_name(t)) for t in tools)
 
 
-def _conflicts(family: str, name: Sequence[str], lexicon: Mapping[str, Any]) -> bool:
-    """True when the tool name says it does something else than the claim.
+def _is_verb_named(name_tokens: Sequence[str], lexicon: Mapping[str, Any]) -> bool:
+    """True when a tool name carries a verb token of any family or a read verb."""
+    tokens = set(name_tokens)
+    if tokens & {_stem(v) for v in lexicon.get("read_verbs", ())}:
+        return True
+    return any(tokens & _verb_tokens(f, lexicon) for f in lexicon["families"])
 
-    Its name holds a read verb ("read_email", "lookup_order"), or a verb of another family
+
+def _tool_verb_tokens(spec: ToolSpec, lexicon: Mapping[str, Any]) -> set[str]:
+    """The tokens a tool is matched on (PRD 03 §7.2 rule 1).
+
+    A verb-named tool (``_is_verb_named``) is matched on its name tokens, exactly as before
+    0.3. A verbless name (``jira``, ``email_customer``) is matched on the verb tokens of the
+    family its description's lead verb names (``description_family``), or on nothing.
+    """
+    name = tokenize_tool_name(spec.name)
+    if _is_verb_named(name, lexicon):
+        return set(name)
+    family = description_family(spec.description, lexicon)
+    return _verb_tokens(family, lexicon) if family else set()
+
+
+def _conflicts(family: str, name: Sequence[str], lexicon: Mapping[str, Any]) -> bool:
+    """True when the tool's tokens say it does something else than the claim.
+
+    They hold a read verb ("read_email", "lookup_order"), or a verb of another family
     without one of the claim's own ("delete_email" for a send claim). Noun tokens never
     conflict, and the claim's own verb keeps the tool ("create_refund" for a refund).
     """
@@ -582,17 +713,34 @@ def _score(
     spec: ToolSpec,
     lexicon: Mapping[str, Any],
     verb_stem: str | None = None,
+    *,
+    by_description: bool = False,
 ) -> tuple[int, bool]:
-    """``(score, object component earned)``; see ``score_tool``."""
+    """``(score, object component earned)``; see ``score_tool``.
+
+    ``by_description``: the tool is eligible through its description's lead verb (PRD 03
+    §7.2), so the family component is earned by that verb rather than a name token, and
+    only the description's direct object (``_description_object``) is object evidence.
+    """
     name = tokenize_tool_name(spec.name)
     fam_terms = _family_terms(family, lexicon)
     obj_terms = _object_terms(family, [_stem(w) for w in object_words], lexicon)
     fam_hits: set[int] = set().union(*(_occurs(t, name) for t in fam_terms))
     obj_hits: set[int] = set().union(*(_occurs(t, name) for t in obj_terms))
     object_matched = bool(obj_hits) and (not fam_hits or len(fam_hits | obj_hits) > 1)
-    score = (2 if fam_hits else 0) + (2 if object_matched else 0)
+    if by_description:
+        # PRD 03 §7.2 rule 3: the lead verb earns the family component; an object word in
+        # the name or in the description's direct object earns the object component, once.
+        # Any other description word ("customer", "order") is not evidence: it would turn
+        # an honest reply about a sibling tool into a fabrication.
+        direct_object = _description_object(spec.description, lexicon)
+        desc_hit = any(_occurs(t, direct_object) and not _occurs(t, name) for t in obj_terms)
+        object_matched = bool(obj_hits) or desc_hit
+        return 2 + (2 if object_matched else 0), object_matched
     desc = _words(spec.description)
-    if any(_occurs(t, desc) and not _occurs(t, name) for t in obj_terms):
+    desc_hit = any(_occurs(t, desc) and not _occurs(t, name) for t in obj_terms)
+    score = (2 if fam_hits else 0) + (2 if object_matched else 0)
+    if desc_hit:
         score += 1
     # Evidence only, never score: a sibling ``<verb>_<stem>`` tool must not outrank the
     # tool that ran ("refunded you" vs ``issue_refund`` and ``refund_payment``).
@@ -609,6 +757,10 @@ def score_tool(
     word (synonym-expanded) is a tool-name token, +1 when the description holds an object
     word (synonym-expanded) that the tool name lacks. One tool-name token cannot earn both
     +2s ("sent the email" scores the ``email`` of ``email_report`` once).
+
+    This is the name path. A tool that is eligible only through its description
+    (``_tool_verb_tokens``) is scored by ``match_tools`` with the lead verb as the family
+    component and the description's direct object as object evidence, without the ``+1``.
     """
     return _score(family, object_words, spec, lexicon)[0]
 
@@ -624,10 +776,25 @@ def _match(
     words = _words(obj) if obj else []
     verbs = _verb_tokens(family, lexicon)
     scored: list[tuple[str, int, bool]] = []
+    described: list[ToolSpec] = []
     for spec in known_tools:
-        name = tokenize_tool_name(spec.name)
-        if verbs & set(name) and not _conflicts(family, name, lexicon):
+        tokens = _tool_verb_tokens(spec, lexicon)
+        if not (verbs & tokens) or _conflicts(family, sorted(tokens), lexicon):
+            continue
+        if _is_verb_named(tokenize_tool_name(spec.name), lexicon):
             scored.append((spec.name, *_score(family, words, spec, lexicon, verb_stem)))
+        else:
+            described.append(spec)
+    # PRD 03 §7.2 rule 4: a description-eligible tool joins the scoring only when no
+    # verb-named tool scored, or when the claim's object names it ("a ticket in Jira").
+    named_best = max((score for _, score, _ in scored), default=0)
+    for spec in described:
+        if named_best < 2 or set(tokenize_tool_name(spec.name)) & set(words):
+            score, matched = _score(family, words, spec, lexicon, verb_stem, by_description=True)
+            if named_best >= 2:
+                # It may join a name match as a tie, never displace it.
+                score, matched = min(score, named_best), matched and score <= named_best
+            scored.append((spec.name, score, matched))
     best = max((score for _, score, _ in scored), default=0)
     if best < 2:
         return [], None, False
@@ -642,10 +809,11 @@ def match_tools(
     """All tools at the maximum score (ties kept, in ``known_tools`` order) when it is
     at least 2; ``high`` confidence from 3.
 
-    Only tools whose name carries one of the family's verb tokens are eligible. An
-    object, description or noun-token match alone ("deleted two tickets" vs
-    ``create_ticket``, "emailed" vs ``email_customer``) never makes a candidate, nor
-    does a tool whose name conflicts (``_conflicts``).
+    Only tools whose name carries one of the family's verb tokens, or whose description
+    leads with one when the name has none (``_tool_verb_tokens``), are eligible. An object
+    or description-word match alone ("deleted two tickets" vs ``create_ticket``) never
+    makes a candidate, nor does a tool whose tokens conflict (``_conflicts``). A
+    description-eligible tool can tie a name match, never outscore it.
     """
     candidates, confidence, _ = _match(family, obj, known_tools, lexicon)
     return candidates, confidence

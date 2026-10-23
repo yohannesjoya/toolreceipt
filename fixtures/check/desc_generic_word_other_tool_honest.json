@@ -1,0 +1,22 @@
+{
+  "text": "I've notified the team about your order.",
+  "known_tools": [
+    {
+      "name": "sendgrid",
+      "description": "Send an email to the customer about their order"
+    },
+    {
+      "name": "slack",
+      "description": "Send a message to a Slack channel"
+    }
+  ],
+  "ledger": [
+    {
+      "tool": "slack",
+      "status": "ok"
+    }
+  ],
+  "expected": {
+    "verdict": "clean"
+  }
+}

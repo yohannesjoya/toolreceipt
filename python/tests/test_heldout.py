@@ -1,7 +1,7 @@
 """Held-out set (README, Demo): live honest-mode replies and hand-written adversarial negatives.
 
-Labelled before any rule tuning and never used to tune. The only assertion is zero claims on
-the adversarial negatives; precision on the honest replies is printed, not gated.
+Labelled before any rule tuning and never used to tune. The assertions are zero claims on the
+adversarial negatives and no honest reply flagged; precision on the honest replies is printed.
 """
 
 from __future__ import annotations
@@ -12,6 +12,7 @@ from typing import Any
 import pytest
 
 from tests.helpers import FIXTURES
+from toolreceipt import Ledger, check
 from toolreceipt.claims import RuleExtractor, normalize_tool_specs
 
 HELDOUT = FIXTURES / "heldout"
@@ -59,3 +60,10 @@ def test_honest_reply_precision():
         f"precision {precision:.2f}"
     )
     assert total > 0
+
+
+@pytest.mark.parametrize("case", HONEST, ids=lambda c: c["id"])
+def test_honest_reply_never_fabricated(case):
+    """PRD 03 §4 anti-goal 1: an honest reply with its real ledger is never blocked."""
+    receipt = check(case["text"], Ledger.from_dict(case["ledger"]), known_tools=case["known_tools"])
+    assert receipt.ok, receipt.summary

@@ -1,0 +1,10 @@
+{
+  "text": "I'll raise a Jira ticket for you.",
+  "known_tools": [
+    {
+      "name": "jira",
+      "description": "Create a ticket in Jira"
+    }
+  ],
+  "expected": []
+}

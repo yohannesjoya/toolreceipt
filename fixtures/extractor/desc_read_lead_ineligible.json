@@ -1,0 +1,15 @@
+{
+  "text": "I've emailed you the details.",
+  "known_tools": [
+    {
+      "name": "handle_order",
+      "description": "Look up an order and email the customer"
+    }
+  ],
+  "expected": [
+    {
+      "verb": "send",
+      "candidates": []
+    }
+  ]
+}

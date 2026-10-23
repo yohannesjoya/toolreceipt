@@ -100,3 +100,34 @@ run over the merged list for the same reason; instead a model claim whose candid
 a surviving rule claim's is dropped. The guards reuse the rule lexicon's negation, other-subject
 and state checks but not its future or advice lists, because outcome claims ("you'll find the
 confirmation in your inbox") are the largest measured gap and those lists would delete them.
+
+## Description lead verb makes a verbless tool eligible; sibling demotion stays name-only
+
+A tool whose name carries no verb token (`jira`, `stripe`, `email_customer`) is matched on
+the family named by the first content word of its description, after an optional `Name:`
+prefix and one filler phrase. Only the first word counts: a later verb ("Manage
+subscriptions (cancel, pause)") is not evidence, and a read verb anywhere in the first
+clause makes the tool ineligible, as a read verb in a name does. Such a tool joins the
+scoring beside verb-named tools only when the reply names it, so no shipped fixture changed.
+It can tie a name match but never outscore it (`desc_generic_noun_ties_not_displaces`), and
+a noun lead word ("Email", "File") counts as the verb only when a determiner or pronoun
+follows it, so "Email address validation" names no family (`desc_noun_modifier_not_lead`).
+Object evidence from a description is its direct object only: the words after the lead verb
+up to the first preposition or the clause end. "Create a support ticket for the customer"
+gives `support ticket`, not `customer`, because any word anywhere in a description turned
+"I've added a note to your customer record" into a fabrication against `zendesk` when
+`hubspot` had run (`desc_crm_note_not_ticket`, `desc_generic_word_other_tool_honest`).
+`family_ran` (the sibling demotion in `diff()`) keeps reading names only: widening it to
+descriptions would silence a real "I've emailed you" fabrication whenever a Slack-style send
+tool ran, and `diff()` receives names, not descriptions. The cost is one rare false alarm,
+pinned by `fixtures/check/desc_slack_ran_keeps_email_flag.json`.
+
+## `acheck` shares one code path with `check`; one `Receipts` per run
+
+`acheck` resolves the ledger and known tools exactly as `check` and differs only in awaiting
+an extractor's `aextract` when it defines one. `LLMExtractor.aextract` runs the user's sync
+`complete` on a thread; no async client hook in 0.3, because the thread already keeps the
+loop free. `Receipts.config()` binds the ledger to the instance, so two concurrent runs on
+one instance read each other's ledger; the quickstart says "one per run" and a test pins two
+concurrent runs on separate instances. Binding a check to a specific run's config is left to
+a later release.

@@ -7,6 +7,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-30
+
+### Added
+
+- `acheck()` and `Receipts.acheck()`: the same receipt as `check()` for async code. An
+  extractor's `aextract` coroutine is awaited when it defines one; the rules alone do no I/O.
+- `LLMExtractor.aextract()`: the model call runs on a thread (`asyncio.to_thread`), so the
+  event loop stays free. `extract()` and `aextract()` share one code path.
+- Description-based tool matching: a tool whose name carries no verb (`jira`, `stripe`,
+  `email_customer`) is matched through the first verb of its description ("Create a ticket
+  in Jira"). Only the lead verb's direct object ("a ticket") is object evidence; the rest of
+  the description is not, so a generic word such as "customer" or "order" never turns an
+  honest reply about a sibling tool into a fabrication. Verb-named tools behave as before
+  unless the reply names a verbless tool of the same action, which then ties with them ("a
+  ticket in Jira"). A description that leads with a read verb, or names one in its first
+  clause, keeps the tool unmatched. No existing fixture changes. Sibling demotion
+  (`family_ran`) stays name-only.
+- Lexicon keys `description_lead_skip` (filler phrases stripped before the lead verb) and
+  `description_lead_nouns` (noun tokens accepted as a lead verb when an object follows them:
+  "Email the customer", not "Email address validation"); both default to empty when absent,
+  so a 0.2 lexicon file loads. `fixtures/descriptions/sample.json` pins the lead verb of 55
+  real descriptions.
+- Public helper `toolreceipt.claims.description_family(description, lexicon)`.
+
+### Changed
+
+- `ReceiptCallbackHandler.run_inline = True`: async callers no longer pay one executor hop
+  per callback event. Sync `invoke` is unaffected.
+- `email_customer`-style names (noun tokens only) now match through their description. The
+  README example for verbless names changed accordingly.
+- README probe table, rules-only rows re-measured: dev 36 / 113 claims (was 34), 15 / 67
+  fabrications caught (was 14); held-out 5 / 35 (was 4), 1 / 18 (was 1). The verbless probe
+  tools `tool_b` and `tool_c` are now matchable; the numbers match the estimate made before
+  implementation. LLM rows unchanged.
+
+### Documented
+
+- 0.2.0 shipped these public names without listing them: `toolreceipt.llm.build_prompt`,
+  `parse_output`, `message_text` and `MAX_SPAN_CHARS`.
+
 ## [0.2.0] - 2026-10-22
 
 ### Added

@@ -1,0 +1,18 @@
+{
+  "text": "I've raised a Jira ticket.",
+  "known_tools": [
+    {
+      "name": "jira",
+      "description": "Create a ticket in Jira"
+    }
+  ],
+  "ledger": [
+    {
+      "tool": "jira",
+      "status": "ok"
+    }
+  ],
+  "expected": {
+    "verdict": "clean"
+  }
+}

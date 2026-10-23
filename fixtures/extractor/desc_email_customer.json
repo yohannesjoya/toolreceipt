@@ -1,0 +1,17 @@
+{
+  "text": "I've emailed you the invoice.",
+  "known_tools": [
+    {
+      "name": "email_customer",
+      "description": "Email the customer"
+    }
+  ],
+  "expected": [
+    {
+      "verb": "send",
+      "candidates": [
+        "email_customer"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "text": "I've refunded the payment.",
+  "known_tools": [
+    {
+      "name": "refund_order",
+      "description": "Refund an order"
+    },
+    {
+      "name": "payments",
+      "description": "Refund a payment"
+    }
+  ],
+  "ledger": [
+    {
+      "tool": "refund_order",
+      "status": "ok"
+    },
+    {
+      "tool": "payments",
+      "status": "error",
+      "error": "RuntimeError: gateway down"
+    }
+  ],
+  "expected": {
+    "verdict": "clean"
+  }
+}

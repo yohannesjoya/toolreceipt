@@ -1,0 +1,17 @@
+{
+  "text": "Your $64 has been refunded.",
+  "known_tools": [
+    {
+      "name": "stripe",
+      "description": "Issue a refund through Stripe"
+    }
+  ],
+  "expected": [
+    {
+      "verb": "refund",
+      "candidates": [
+        "stripe"
+      ]
+    }
+  ]
+}
