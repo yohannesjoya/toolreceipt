@@ -31,7 +31,7 @@ from langgraph.graph import START, MessagesState, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 from langgraph.prebuilt import ToolNode, tools_condition
 from pydantic import BaseModel
-from toolreceipt import Ledger, Receipts, check
+from toolreceipt import Ledger, LLMExtractor, Receipts, check
 from toolreceipt.langgraph import final_reply
 
 from scenarios import support_desk
@@ -41,15 +41,16 @@ INDEX_HTML = HERE / "static" / "index.html"
 DEFAULT_REPLAY_DIR = HERE / "replays"
 EXAMPLE_DIR = HERE / "examples"
 
-# Fixed runs the page shows on demand: three recorded live runs and five hand-written replies
-# (see examples/). Each is re-checked by the installed toolreceipt when served.
+# Fixed runs the page shows on demand: three recorded live runs and six hand-written replies
+# (see examples/). Each is re-checked by the installed toolreceipt when served. An example
+# with an ``llm_output`` key replays that recorded model text through ``LLMExtractor``.
 EXAMPLES: dict[str, Path] = {
     "pressure": DEFAULT_REPLAY_DIR / "pressure-001.json",
     "ticket": DEFAULT_REPLAY_DIR / "pressure-002.json",
     "honest": DEFAULT_REPLAY_DIR / "honest-001.json",
     **{
         name: EXAMPLE_DIR / f"{name}.json"
-        for name in ("clean", "admits", "notcalled", "unmatched", "vague")
+        for name in ("clean", "admits", "notcalled", "unmatched", "vague", "outcome")
     },
 }
 
@@ -290,8 +291,21 @@ def load_example(name: str) -> dict[str, Any]:
     """The named example's reply and ledger, checked against the support desk's tools."""
     data = json.loads(EXAMPLES[name].read_text(encoding="utf-8"))
     tools = support_desk.build_tools("honest")
-    receipt = check(data["reply"], Ledger.from_dict(data["ledger"]), known_tools=tools).to_dict()
+    receipt = check(
+        data["reply"],
+        Ledger.from_dict(data["ledger"]),
+        known_tools=tools,
+        extractor=_recorded_extractor(data),
+    ).to_dict()
     return {"example": name, "source": "example", **_payload(data["reply"], receipt)}
+
+
+def _recorded_extractor(data: dict[str, Any]) -> LLMExtractor | None:
+    """Replay a recorded model output through ``LLMExtractor``; ``None`` without one."""
+    raw = data.get("llm_output")
+    if not isinstance(raw, str):
+        return None
+    return LLMExtractor(complete=lambda _prompt: raw, on_error="raise")
 
 
 # --- rate limit: one POST /run per client IP per RATE_LIMIT_SECONDS (in memory) ---

@@ -471,6 +471,7 @@ EXPECTED_EXAMPLES = {
     "notcalled": "fabricated",
     "unmatched": "unreported",
     "vague": "unreported",
+    "outcome": "unreported",
 }
 
 
@@ -505,6 +506,28 @@ def test_example_outcomes_show_the_intended_case():
     ticket = get("ticket")
     assert [e["tool"] for e in ticket["ledger"]][-1] == "create_ticket"
     assert _buckets(ticket)["claimed_but_never_ran"] == ["send_email"]
+
+
+def test_outcome_example_replays_the_recorded_llm_output():
+    """``examples/outcome.json`` carries a recorded model output; the served example replays it
+    through ``LLMExtractor`` so the LLM-only claim lands in ``suspected`` without a network call."""
+    body = TestClient(demo_app.app).get("/examples/outcome").json()
+    receipt = body["receipt"]
+    assert receipt["verdict"] == "unreported" and receipt["ok"] is True
+    assert [(c["tool"], c["reason"], c["source"]) for c in receipt["suspected"]] == [
+        ("send_email", "tool_failed", "llm")
+    ]
+    assert [c["tool"] for c in receipt["confirmed"]] == ["issue_refund"]
+    assert [e["tool"] for e in receipt["ran_but_unreported"]] == ["lookup_order"]
+    assert receipt["claimed_but_never_ran"] == []
+
+
+def test_demo_pins_the_released_library():
+    import toolreceipt
+
+    pyproject = (demo_app.HERE / "pyproject.toml").read_text(encoding="utf-8")
+    pin = re.search(r'"toolreceipt\[langgraph\]==([\d.]+)"', pyproject)
+    assert pin is not None and pin.group(1) == toolreceipt.__version__ == "0.2.0"
 
 
 def test_examples_list_names_every_example():
