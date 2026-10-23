@@ -712,6 +712,10 @@ def test_demo_pins_the_released_library():
     pyproject = (demo_app.HERE / "pyproject.toml").read_text(encoding="utf-8")
     pin = re.search(r'"toolreceipt\[langgraph\]==([\d.]+)"', pyproject)
     assert pin is not None and pin.group(1) == toolreceipt.__version__ == "0.2.0"
+    # Render installs from its own command, not from pyproject: the two pins must agree.
+    render = (demo_app.HERE.parent / "render.yaml").read_text(encoding="utf-8")
+    render_pin = re.search(r'toolreceipt\[langgraph\]==([\d.]+)', render)
+    assert render_pin is not None and render_pin.group(1) == pin.group(1)
 
 
 def test_examples_list_names_every_example():
