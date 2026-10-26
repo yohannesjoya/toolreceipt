@@ -32,9 +32,12 @@ dependencies beyond the standard library.
   `amount=32`; "cancelled order 4821" when it ran with `order_id="4822"`):
   `claimed_but_never_ran` with reason `args_mismatch`, the contradicting arguments in the
   claim's `observed`. A reference number needs a cue word ("order 4821", "ticket #5521") and
-  an argument key naming the same thing (`order_id`, `ticketNumber`); a clause with two
-  amounts or two references is not judged; a cents-style value (`6400` for $64), a total
-  split across two calls and a number the agent read from the tool's result all agree.
+  an argument key naming the same thing (`order_id`, `ticketNumber`); a sentence with two
+  amounts ("$19.99 for the mug and $5.99 for shipping") or a clause with two references is
+  not judged, and neither is an amount its neighbours qualify ("half of your $64 order",
+  "the $64 jacket", "$16 each", "$1.5k", "around $64", "€1.250,00"); a cents-style value
+  (`6400` for $64), a total split across two calls, a number the agent read from a tool's
+  result and a display number a lookup mapped to the id (`#1001` to `450789469`) all agree.
   Measured on the 19 recorded demo runs, the 6 demo examples and the held-out replies: no
   honest reply flagged. `check_args=False` turns it off.
 
@@ -264,11 +267,13 @@ receipt = check_messages(messages, known_tools=tools)   # tools: the list you se
 
 `check_messages` reads OpenAI Chat Completions messages, OpenAI Responses items and
 Anthropic messages, as dicts or SDK objects. Only the last turn counts: the messages after
-the last user message that carries no tool result. The final reply is the last assistant message, or `""` when the run
+the last user message with text in it and no tool result (an image-only user message or one
+returning tool results continues the run). The final reply is the last assistant message, or `""` when the run
 ended on a tool call (then every tool that ran is `ran_but_unreported`). A tool result is a
 success unless Anthropic's `is_error` says otherwise; nothing is read out of its text. The
-legacy `function_call` shape and LangChain message objects raise a `ValueError` instead of
-producing an empty ledger. `acheck_messages` is the async twin.
+legacy `function_call` shape, custom and MCP tool calls (not read yet) and LangChain message
+objects raise a `ValueError` instead of producing an empty ledger. A built-in tool in the
+`tools` list (`{"type": "web_search"}`) is skipped. `acheck_messages` is the async twin.
 
 With LangChain messages from a finished run, build the ledger with the adapter:
 

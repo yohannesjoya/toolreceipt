@@ -14,17 +14,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `check_messages()` and `acheck_messages()` (`toolreceipt.messages`): a receipt from a plain
   message list with no framework installed. OpenAI Chat Completions messages, OpenAI
   Responses items and Anthropic messages, as dicts or SDK objects; only the last turn (after
-  the last user message that carries no tool result) is read; the final reply is `""` when the run ends on a tool call;
-  the legacy `function_call` shape and LangChain message objects raise `ValueError`.
+  the last user message with text and no tool result) is read; the final reply is `""` when
+  the run ends on a tool call; the legacy `function_call` shape, custom and MCP tool calls
+  and LangChain message objects raise `ValueError`; a built-in tool spec in `known_tools` is
+  skipped.
   `toolreceipt.messages.ledger_from_messages` and `final_reply` are the framework-free twins
   of the LangChain adapter's helpers.
 - Argument check: a claim whose tool ran with arguments that contradict the one money amount
   or cued reference number in its clause is `claimed_but_never_ran` with the new reason
   `args_mismatch`. Only top-level arguments whose key names the same kind are compared; a
   cents-style value, a total split across calls and a number read from the tool's result
-  agree; names, email addresses, dates and quantities are never compared. An amount is not
-  judged when the words around it qualify it ("half of your $64 order", "$16 each", "$1.5k",
-  "around $64"). `check_args=False` on `check`, `acheck`, `check_messages`,
+  agree, as does a display number a lookup mapped to the id; names, email addresses, dates
+  and quantities are never compared. Amounts are counted over the sentence, and an amount is
+  not judged when the words around it qualify it ("half of your $64 order", "the $64 jacket",
+  "$16 each", "$1.5k", "around $64", "€1.250,00"). `check_args=False` on `check`, `acheck`, `check_messages`,
   `acheck_messages`, `diff` and `Receipts` turns the check off. Lexicon keys `amount_keys` and `id_cues`; both default to empty when absent.
 - `Claim.observed`: the contradicting arguments of an `args_mismatch` claim (`{"amount": 32}`),
   `None` elsewhere; emitted last by `to_dict()`.

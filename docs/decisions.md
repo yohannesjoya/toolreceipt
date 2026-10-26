@@ -136,18 +136,27 @@ passed back, so one instance can serve concurrent runs when the caller keeps eac
 
 The argument check (0.3.1) reads two kinds of literal from a confirmed claim's clause: a money
 amount with a currency mark, and a reference number that follows a cue word (`order 4821`,
-`ticket #5521`). A clause with two of one kind is not judged for that kind ("refunded $32 of
-your $64 order"), and an amount the surrounding words qualify is not judged either: one
-after a preposition ("half of your $64 order"), one before the noun it prices ("your $120
-plan"), a unit rate ("$16 each"), a magnitude suffix ("$1.5k") or an approximation ("around
-$64"). "pounds" is not a currency word, since it is a weight as often ("3 pounds of apples"). A literal is compared only with top-level arguments whose key names the
+`ticket #5521`). Amounts are counted over the whole sentence, since the extractor's clause
+split at a comma hides the second one ("$64, minus the $5 fee"); a sentence with two amounts
+or a clause with two references is not judged for that kind. An amount the surrounding words
+qualify is not judged either. The rule is an allowlist, not a list of bad words, because the
+nouns an amount can price are open-ended: after the amount only the end of the sentence, a
+past participle ("$64 refunded") or a short list of words that keep it the action's amount
+(`to`, `for`, `on`, `back`, `as`, `in`, `from`, `has`, `was`, `and`, ...) is accepted, so
+"$64 jacket", "$200 deposit", "$16 apiece", "$64 less the fee", "$2.5 million" and "$64
+before tax" are all unjudged, and "for each" is a rate; before it, a preposition reached
+through any run of filler words ("half of your original $64 charge") or an approximation
+("around", "up to") disqualifies it. A number in another format ("€1.250,00", "€1 250") is
+not judged. "pounds" is not a currency word, since it is a weight as often ("3 pounds of
+apples"). Digit groups are one reference ("tracking 9400 1118 9922 3334"). A literal is compared only with top-level arguments whose key names the
 same kind (`amount`, `refund_amount`, `amount_cents` for amounts; a key carrying the cue
 word, `order_id`, for references) and whose value parses as that kind; nested values, free
 text and keys such as `charge="ch_…"` are never evidence. A value agrees when it equals the
 literal, equals it times 100 (Stripe-style cents), when the keyed amounts of all the tool's
 calls sum to it (a refund split across calls), or when the digits appear in the tool's
 result (an id the agent learned from the result; a result cut by `max_result_chars` can lose
-that excuse). The claim is `args_mismatch` only when every `ok` call of its candidates is
+that excuse), or when another successful call's arguments or result hold both the claim's
+number and the keyed value (a lookup that mapped the customer-facing `#1001` to the API id). The claim is `args_mismatch` only when every `ok` call of its candidates is
 keyed for every literal and disagrees on at least one, and no same-family tool's call
 agrees; a family-only match is never judged, since it says nothing about which tool did the
 work. Names, email addresses, dates and times stay out: nicknames, roles, display names and
@@ -161,14 +170,16 @@ beside an order number, a date after "order").
 `toolreceipt.messages` reads OpenAI Chat Completions messages, OpenAI Responses items and
 Anthropic messages through one accessor (mapping key, else attribute), so dicts and SDK
 objects behave the same and no SDK is imported. Only the last turn is read, the messages
-after the last user message that carries no `tool_result` block (Anthropic puts tool results,
-sometimes with a text block beside them, in user messages that continue the run), because a whole
+after the last user message that has text and no `tool_result` block (Anthropic puts tool
+results, sometimes with a text block beside them, in user messages, and a tool's screenshot
+comes back as an image-only user message; both continue the run), because a whole
 conversation would mark every earlier turn's tools `ran_but_unreported` and compare the last
 reply's amounts with earlier calls. The final reply is `""` when the run ends on a tool call,
 so an abandoned run checks as "no claims, tools unreported" rather than against an earlier
 preamble; the LangChain `final_reply` keeps returning the last text until 0.4 aligns it. A
 tool result is `ok` unless Anthropic's explicit `is_error` says otherwise: reading "Error:"
 out of a result would turn a successful call into `tool_failed`. Recognised but unsupported
-shapes (the legacy `function_call` field, `role: "function"`, LangChain message objects)
-raise rather than yield an empty ledger that would make every claim `not_called` or every run
-`clean` silently.
+shapes (the legacy `function_call` field, `role: "function"`, custom and MCP tool calls,
+LangChain message objects) raise rather than yield an empty ledger that would make every
+claim `not_called` or every run `clean` silently. A built-in tool spec in the `tools` list
+names no tool and is skipped.
