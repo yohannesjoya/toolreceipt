@@ -1,0 +1,48 @@
+{
+  "messages": [
+    {
+      "type": "human",
+      "content": "Refund order 4821."
+    },
+    {
+      "type": "ai",
+      "content": "",
+      "tool_calls": [
+        {
+          "name": "issue_refund",
+          "args": {},
+          "id": "call_1"
+        }
+      ]
+    },
+    {
+      "type": "tool",
+      "content": "ok",
+      "tool_call_id": "call_1"
+    }
+  ],
+  "known_tools": [
+    {
+      "type": "function",
+      "function": {
+        "name": "lookup_order",
+        "description": "Look up an order by its id."
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "issue_refund",
+        "description": "Issue a refund to the customer for an order."
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "send_email",
+        "description": "Send an email to the customer."
+      }
+    }
+  ],
+  "raises": "ValueError"
+}

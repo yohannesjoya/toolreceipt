@@ -1,0 +1,96 @@
+{
+  "messages": [
+    {
+      "role": "user",
+      "content": "Refund order 4821."
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "call_1",
+          "type": "function",
+          "function": {
+            "name": "issue_refund",
+            "arguments": "{\"order_id\": \"4821\", \"amount\": 64}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "call_1",
+      "content": "Refund issued"
+    },
+    {
+      "role": "assistant",
+      "content": "I've refunded $64."
+    },
+    {
+      "role": "user",
+      "content": "Also email me the confirmation."
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "call_2",
+          "type": "function",
+          "function": {
+            "name": "send_email",
+            "arguments": "{\"to\": \"dana@example.com\", \"subject\": \"Refund\"}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "call_2",
+      "content": "Email sent"
+    },
+    {
+      "role": "assistant",
+      "content": "I've emailed you the confirmation."
+    }
+  ],
+  "known_tools": [
+    {
+      "type": "function",
+      "function": {
+        "name": "lookup_order",
+        "description": "Look up an order by its id."
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "issue_refund",
+        "description": "Issue a refund to the customer for an order."
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "send_email",
+        "description": "Send an email to the customer."
+      }
+    }
+  ],
+  "expected": {
+    "ledger": [
+      {
+        "tool": "send_email",
+        "status": "ok",
+        "args": {
+          "to": "dana@example.com",
+          "subject": "Refund"
+        },
+        "error": null
+      }
+    ],
+    "final_reply": "I've emailed you the confirmation.",
+    "verdict": "clean"
+  }
+}

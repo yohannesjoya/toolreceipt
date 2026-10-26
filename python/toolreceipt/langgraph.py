@@ -15,9 +15,7 @@ from langchain_core.callbacks import BaseCallbackHandler, BaseCallbackManager
 from langchain_core.messages import AIMessage, BaseMessage, ToolMessage
 
 from toolreceipt.claims import ToolSpec
-from toolreceipt.ledger import Ledger, LedgerEntry, coerce_args, truncate
-
-NO_RESULT = "no result"
+from toolreceipt.ledger import NO_RESULT, Ledger, LedgerEntry, coerce_args, truncate
 
 __all__ = [
     "ReceiptCallbackHandler",

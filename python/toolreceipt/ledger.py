@@ -8,6 +8,8 @@ from dataclasses import dataclass, field
 from typing import Any, Literal
 
 Status = Literal["ok", "error"]
+NO_RESULT = "no result"
+"""``error`` text of a tool call that never returned a result."""
 
 
 @dataclass
