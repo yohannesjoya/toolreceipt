@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Any, Literal, NamedTuple, Protocol
 
 Confidence = Literal["high", "medium"]
-Reason = Literal["tool_failed", "not_called"]
+Reason = Literal["tool_failed", "not_called", "args_mismatch"]
 Source = Literal["rules", "llm"]
 
 
@@ -43,6 +43,9 @@ class Claim:
     confidence: Confidence | None = None
     reason: Reason | None = None
     source: Source = "rules"
+    # The ledger arguments that contradict the claim when ``reason == "args_mismatch"``
+    # (``{"amount": 32}`` for "I've refunded $64"); ``None`` on every other claim.
+    observed: dict[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -55,6 +58,7 @@ class Claim:
             "confidence": self.confidence,
             "reason": self.reason,
             "source": self.source,
+            "observed": self.observed,
         }
 
     def __post_init__(self) -> None:
@@ -77,6 +81,7 @@ class Claim:
             confidence=data.get("confidence"),
             reason=data.get("reason"),
             source=data.get("source", "rules"),
+            observed=data.get("observed"),
         )
 
 

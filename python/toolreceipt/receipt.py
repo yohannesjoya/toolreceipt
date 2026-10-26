@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+import json
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
 from toolreceipt.claims import Claim
-from toolreceipt.ledger import Ledger, LedgerEntry
+from toolreceipt.ledger import Ledger, LedgerEntry, truncate
 
 Verdict = Literal["clean", "unreported", "fabricated"]
 
@@ -49,6 +50,18 @@ def _plural(n: int, word: str) -> str:
     return f"{n} {word}" if n == 1 else f"{n} {word}s"
 
 
+def _format_observed(observed: Mapping[str, Any]) -> str:
+    """``key=json`` pairs of the contradicting ledger arguments, cut to 60 characters."""
+    text = ", ".join(f"{k}={json.dumps(v, default=str)}" for k, v in observed.items())
+    return truncate(text, 60) or ""
+
+
+def _quoted(claim: Claim) -> str:
+    """``tool ("text")``, plus ``, ledger k=v`` when the claim carries ``observed``."""
+    appendix = f", ledger {_format_observed(claim.observed)}" if claim.observed else ""
+    return f'{claim.tool} ("{claim.text}"{appendix})'
+
+
 def render_summary(
     verdict: Verdict,
     claimed_but_never_ran: Sequence[Claim],
@@ -64,7 +77,7 @@ def render_summary(
     if verdict == "fabricated":
         first = claimed_but_never_ran[0]
         n = len(claimed_but_never_ran)
-        line = f'{n} claimed action{"" if n == 1 else "s"} never ran: {first.tool} ("{first.text}")'
+        line = f'{n} claimed action{"" if n == 1 else "s"} never ran: {_quoted(first)}'
         if suspected:
             line += f"; {len(suspected)} more suspected"
         return line + "."
@@ -79,6 +92,5 @@ def render_summary(
         names = list(dict.fromkeys(e.tool for e in ran_but_unreported))
         parts.append(f"{_plural(len(names), 'tool')} ran unreported: {', '.join(names)}")
     if suspected:
-        s = suspected[0]
-        parts.append(f'{len(suspected)} suspected (LLM only): {s.tool} ("{s.text}")')
+        parts.append(f"{len(suspected)} suspected (LLM only): {_quoted(suspected[0])}")
     return "; ".join(parts) + "."

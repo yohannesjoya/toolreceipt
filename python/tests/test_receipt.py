@@ -1,4 +1,5 @@
 import json
+from dataclasses import replace
 
 from toolreceipt.claims import Claim
 from toolreceipt.diff import diff
@@ -108,3 +109,36 @@ def test_receipt_to_dict_has_suspected_after_unmatched():
     keys = list(diff([], Ledger()).to_dict())
     assert keys[keys.index("unmatched") + 1] == "suspected"
     assert diff([], Ledger()).suspected == []
+
+
+def test_claim_observed_defaults_and_roundtrips():
+    c = Claim(text="x", verb="refund")
+    assert c.observed is None and list(c.to_dict())[-1] == "observed"
+    d = Claim(text="x", verb="refund", observed={"amount": 32}).to_dict()
+    assert d["observed"] == {"amount": 32} and Claim.from_dict(d).observed == {"amount": 32}
+
+
+def test_summary_appendix_for_observed():
+    m = Claim(
+        text="I've refunded $64", verb="refund", candidates=["issue_refund"], tool="issue_refund",
+        reason="args_mismatch", observed={"amount": 32},
+    )
+    assert render_summary("fabricated", [m], [], []) == (
+        '1 claimed action never ran: issue_refund ("I\'ve refunded $64", ledger amount=32).'
+    )
+    both = replace(m, observed={"amount": 64, "order_id": "4822"})
+    assert render_summary("fabricated", [both], [], []).endswith(
+        'ledger amount=64, order_id="4822").'
+    )
+    s = replace(m, source="llm")
+    assert render_summary("clean", [], [], [s], confirmed_count=1) == (
+        '1 claim confirmed; 1 suspected (LLM only): issue_refund '
+        '("I\'ve refunded $64", ledger amount=32).'
+    )
+    plain = Claim(
+        text="I have emailed you", verb="send", candidates=["send_email"], tool="send_email",
+        reason="not_called",
+    )
+    assert render_summary("fabricated", [plain, m], [], []) == (
+        '2 claimed actions never ran: send_email ("I have emailed you").'
+    )
