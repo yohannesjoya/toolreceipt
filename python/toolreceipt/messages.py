@@ -67,11 +67,16 @@ def _text(content: Any) -> str:
 
 
 def _is_user(message: Any) -> bool:
-    """A user message that starts a turn (not one made only of ``tool_result`` blocks)."""
+    """A user message that starts a turn: one that carries no ``tool_result`` block.
+
+    Anthropic returns tool results inside user messages, sometimes with a text block beside
+    them; such a message continues the run, otherwise the turn's calls would drop out of the
+    ledger and an honest reply would read as ``not_called``.
+    """
     if _get(message, "role") != "user":
         return False
     blocks = _blocks(_get(message, "content"))
-    return not blocks or any(_get(b, "type") != "tool_result" for b in blocks)
+    return not blocks or all(_get(b, "type") != "tool_result" for b in blocks)
 
 
 def _reject_unsupported(message: Any) -> None:
@@ -139,7 +144,8 @@ def _results(message: Any) -> list[tuple[str, str, bool]]:
 
 
 def run_messages(messages: Sequence[Any]) -> list[Any]:
-    """The last turn: the messages after the last user message (§7.4); all when there is none."""
+    """The last turn: the messages after the last user message that carries no tool result
+    (§7.4); all when there is none."""
     items = list(messages)
     for i in range(len(items) - 1, -1, -1):
         if _is_user(items[i]):
