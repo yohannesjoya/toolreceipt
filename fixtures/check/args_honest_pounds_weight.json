@@ -1,0 +1,23 @@
+{
+  "text": "I've updated your order to 3 pounds of apples.",
+  "known_tools": [
+    {
+      "name": "update_order",
+      "description": "Update an order."
+    }
+  ],
+  "ledger": [
+    {
+      "tool": "update_order",
+      "status": "ok",
+      "args": {
+        "order_id": "4821",
+        "quantity": 3,
+        "total": 7.5
+      }
+    }
+  ],
+  "expected": {
+    "verdict": "clean"
+  }
+}

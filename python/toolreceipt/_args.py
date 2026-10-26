@@ -23,12 +23,34 @@ SEPARATORS = frozenset({"#", "no", "no.", "number", "id", ":"})
 _NUMBER = r"\d+(?:,\d{3})*(?:\.\d+)?"
 _SYMBOLS = r"[$€£¥]"
 _CODES = r"(?:usd|eur|gbp|cad|aud|jpy)"
-_WORDS = r"(?:dollars?|euros?|pounds?)"
+# "pounds" is a weight as often as a currency ("3 pounds of apples"), so sterling needs £ or
+# gbp; dollars and euros are unambiguous.
+_WORDS = r"(?:dollars?|euros?)"
 _AMOUNT = re.compile(
     rf"{_SYMBOLS}\s?({_NUMBER})(?![\d%])"
     rf"|\b{_CODES}\s?({_NUMBER})(?![\d%])"
     rf"|\b({_NUMBER})\s?(?:{_CODES}|{_WORDS})\b"
 )
+# An amount is the action's amount only when nothing around it says otherwise (review B1,
+# B2). Before it: a preposition, optionally through one filler word, means it describes
+# another noun ("half of your $64 order"); an approximation word means it is not exact.
+# After it: a unit rate, a magnitude suffix, an addend or the noun it prices ("$64 order").
+_PREPOSITIONS = frozenset({
+    "of", "on", "from", "in", "at", "with", "per", "by", "over", "under", "about", "around",
+})
+_FILLERS = frozenset({
+    "your", "the", "a", "an", "my", "our", "this", "that", "their", "its", "his", "her",
+    "original", "full", "entire", "first", "whole", "same", "total",
+})
+_APPROXIMATIONS = frozenset({
+    "about", "around", "roughly", "approximately", "nearly", "almost", "over", "under", "~",
+    "to", "least", "most",  # "up to", "at least", "at most"
+})
+_AMOUNT_FOLLOWERS = frozenset({
+    "each", "per", "a", "an", "plus", "minus", "+", "k", "m", "bn", "thousand", "million",
+    "billion", "order", "orders", "plan", "plans", "purchase", "subscription", "invoice",
+    "bill", "item", "items", "cart", "package", "bundle", "product", "products", "fee",
+})
 _REFERENCE = re.compile(r"\d[\d-]*\d|\d{3,}")
 _DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$|^\d{2}/\d{2}/\d{4}$")
 _EDGE_PUNCT = ".,;!?()\"'"
@@ -40,13 +62,35 @@ def _clause_text(claim: Claim) -> str:
     return normalize_loose(clause).translate(_HYPHENS)
 
 
+def _qualified(low: str, start: int, end: int) -> bool:
+    """False when the words around ``low[start:end]`` say the amount is not the action's."""
+    if end < len(low) and (low[end].isalpha() or low[end] in "+/"):
+        return False  # "$1.5k", "$64/mo", "$64+"
+    before = low[:start].split()[-2:]
+    after = low[end:].strip(_EDGE_PUNCT + " ").split(maxsplit=1)
+    if before:
+        last = before[-1].strip(_EDGE_PUNCT)
+        if last in _PREPOSITIONS or last in _APPROXIMATIONS:
+            return False
+        if len(before) == 2 and last in _FILLERS:
+            if before[0].strip(_EDGE_PUNCT) in _PREPOSITIONS:
+                return False
+    if after and after[0].strip(_EDGE_PUNCT) in _AMOUNT_FOLLOWERS:
+        return False
+    return True
+
+
 def find_amount(clause: str) -> Decimal | None:
-    """The clause's one money amount (currency mark required), else ``None``."""
+    """The clause's one money amount (currency mark required) when the words around it do
+    not qualify it (§8.2 rule 1); else ``None``."""
     low = normalize_loose(clause).translate(_HYPHENS)
-    found = [next(g for g in m.groups() if g) for m in _AMOUNT.finditer(low)]
-    if len(found) != 1:
+    matches = list(_AMOUNT.finditer(low))
+    if len(matches) != 1:
         return None
-    return abs(Decimal(found[0].replace(",", "")))
+    m = matches[0]
+    if not _qualified(low, m.start(), m.end()):
+        return None
+    return abs(Decimal(next(g for g in m.groups() if g).replace(",", "")))
 
 
 def _tokens(low: str) -> list[str]:

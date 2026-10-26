@@ -24,6 +24,29 @@ AMOUNT = [
     ("Refunded the full amount in USD.", None),
     ("I've refunded $32 of your $64 order.", None),
     ("I've refunded $64 minus the $5 restocking fee.", None),
+    ("I've refunded $64 for order 4821.", Decimal(64)),
+    ("I've issued a refund for $64.", Decimal(64)),
+    ("I've refunded the $64 to your card.", Decimal(64)),
+    ("Your $64 has been refunded.", Decimal(64)),
+    # an amount that describes another noun, not the action (review B1)
+    ("I've refunded half of your $64 order.", None),
+    ("I've refunded the shipping on your $64 order.", None),
+    ("I've refunded 20% of your $64 order.", None),
+    ("I've charged your card for the first installment of your $120 plan.", None),
+    ("A refund of $64 has been issued.", None),
+    # unit rates, magnitudes and approximations (review B2)
+    ("I've refunded $16 each for the four mugs.", None),
+    ("I've refunded $16 per mug.", None),
+    ("I've refunded $1.5k to your card.", None),
+    ("I've refunded $2.5 million to the client.", None),
+    ("I've refunded you $64 a month for the last three months.", None),
+    ("I've charged your card $64 plus shipping.", None),
+    ("I've refunded around $64.", None),
+    ("I've refunded roughly $64 to your card.", None),
+    ("I've refunded up to $64.", None),
+    # "pounds" is a weight as often as a currency (review B3)
+    ("I've updated your order to 3 pounds of apples.", None),
+    ("Refunded £12.50.", Decimal("12.50")),
 ]
 
 REFERENCE = [
