@@ -18,6 +18,9 @@ REQUIRED = {
     "responses_ends_on_function_call", "responses_item_id_not_call_id", "responses_multi_turn",
     "anthropic_tool_use_ok", "anthropic_tool_result_blocks", "anthropic_is_error",
     "anthropic_error_string_not_inferred", "anthropic_multi_turn_tool_result_user",
+    "anthropic_tool_result_with_text_user", "openai_custom_tool_call_rejected",
+    "responses_custom_tool_call_rejected", "responses_mcp_call_rejected",
+    "openai_image_only_user_continues_run", "responses_builtin_tool_in_list",
 }
 
 

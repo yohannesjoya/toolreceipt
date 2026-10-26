@@ -8,10 +8,10 @@ from types import SimpleNamespace
 
 from tests.helpers import FIXTURES
 from toolreceipt.messages import (
+    _run_messages,
     acheck_messages,
     check_messages,
     ledger_from_messages,
-    run_messages,
 )
 
 TOOLS = [
@@ -36,16 +36,16 @@ def _turn(text: str, cid: str) -> list[dict]:
 def test_system_and_developer_messages_are_skipped():
     messages = [{"role": "system", "content": "Be brief."}, {"role": "developer", "content": "x"}]
     messages += _turn("Refund order 4821.", "call_1")
-    assert run_messages(messages) == messages[3:]  # after the user message
+    assert _run_messages(messages) == messages[3:]  # after the user message
     assert check_messages(messages, known_tools=TOOLS).verdict == "clean"
 
 
 def test_run_scope_last_user_turn():
     first, second = _turn("Refund order 4821.", "call_1"), _turn("And again.", "call_2")
-    assert run_messages(first + second) == second[1:]
-    assert run_messages([]) == []
+    assert _run_messages(first + second) == second[1:]
+    assert _run_messages([]) == []
     no_user = first[1:]
-    assert run_messages(no_user) == no_user
+    assert _run_messages(no_user) == no_user
 
 
 def test_acheck_messages_equals_check_messages():
@@ -91,6 +91,19 @@ def test_reasoning_item_is_skipped():
         {"type": "message", "role": "assistant",
          "content": [{"type": "output_text", "text": "I've refunded $64 for order 4821."}]},
     ]
-    assert len(run_messages(messages)) == 4
+    assert len(_run_messages(messages)) == 4
     assert [e.status for e in ledger_from_messages(messages).entries] == ["ok"]
     assert check_messages(messages, known_tools=TOOLS).verdict == "clean"
+
+
+def test_known_tools_skips_builtin_tools_without_a_name():
+    from toolreceipt.claims import normalize_tool_specs
+
+    specs = normalize_tool_specs([
+        {"type": "web_search"},
+        {"type": "custom", "custom": {"name": "send_email", "description": "Send an email."}},
+        {"type": "function", "name": "issue_refund", "description": "Issue a refund."},
+    ])
+    assert [(s.name, s.description) for s in specs] == [
+        ("send_email", "Send an email."), ("issue_refund", "Issue a refund."),
+    ]

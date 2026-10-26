@@ -24,12 +24,17 @@ __all__ = [
     "check_messages",
     "final_reply",
     "ledger_from_messages",
-    "run_messages",
 ]
 
 SUPPORTED = "OpenAI Chat Completions messages, OpenAI Responses items or Anthropic messages"
 _TEXT_TYPES = frozenset({"text", "output_text", "input_text"})
 _LANGCHAIN_TYPES = frozenset({"ai", "human", "tool", "system"})
+# Tool-call shapes this reader knows about but does not read yet (0.3.2): dropping them
+# would empty the ledger and make every honest claim ``not_called``.
+_UNREAD_ITEM_TYPES = frozenset({
+    "custom_tool_call", "custom_tool_call_output", "mcp_call", "computer_call",
+    "local_shell_call", "shell_call",
+})
 
 
 def _get(obj: Any, key: str) -> Any:
@@ -67,16 +72,24 @@ def _text(content: Any) -> str:
 
 
 def _is_user(message: Any) -> bool:
-    """A user message that starts a turn: one that carries no ``tool_result`` block.
+    """A user message that starts a turn: one with text and no ``tool_result`` block.
 
     Anthropic returns tool results inside user messages, sometimes with a text block beside
-    them; such a message continues the run, otherwise the turn's calls would drop out of the
-    ledger and an honest reply would read as ``not_called``.
+    them, and a tool's screenshot comes back as an image-only user message; both continue
+    the run, otherwise the turn's calls would drop out of the ledger and an honest reply
+    would read as ``not_called``.
     """
     if _get(message, "role") != "user":
         return False
-    blocks = _blocks(_get(message, "content"))
-    return not blocks or all(_get(b, "type") != "tool_result" for b in blocks)
+    content = _get(message, "content")
+    if isinstance(content, str):
+        return bool(content.strip())
+    blocks = _blocks(content)
+    if blocks is None:
+        return True
+    if any(_get(b, "type") == "tool_result" for b in blocks):
+        return False
+    return bool(_text(content).strip())
 
 
 def _reject_unsupported(message: Any) -> None:
@@ -90,6 +103,18 @@ def _reject_unsupported(message: Any) -> None:
             "LangChain messages belong to toolreceipt.langgraph.ledger_from_messages; "
             f"toolreceipt.messages reads {SUPPORTED}"
         )
+    item_type = _get(message, "type")
+    if item_type in _UNREAD_ITEM_TYPES:
+        raise ValueError(
+            f"{item_type} items are not supported yet; only function tool calls are read"
+        )
+    for call in _blocks(_get(message, "tool_calls")) or []:
+        call_type = _get(call, "type")
+        if call_type is not None and call_type != "function":
+            raise ValueError(
+                f"tool calls of type {call_type!r} are not supported yet; only function tool "
+                "calls are read"
+            )
 
 
 def _parse_args(arguments: Any) -> dict[str, Any]:
@@ -143,7 +168,7 @@ def _results(message: Any) -> list[tuple[str, str, bool]]:
     return out
 
 
-def run_messages(messages: Sequence[Any]) -> list[Any]:
+def _run_messages(messages: Sequence[Any]) -> list[Any]:
     """The last turn: the messages after the last user message that carries no tool result
     (§7.4); all when there is none."""
     items = list(messages)
@@ -165,7 +190,7 @@ def ledger_from_messages(messages: Sequence[Any]) -> Ledger:
     """
     entries: list[LedgerEntry] = []
     open_calls: dict[str, deque[LedgerEntry]] = {}
-    for message in run_messages(messages):
+    for message in _run_messages(messages):
         _reject_unsupported(message)
         for call_id, name, args in _calls(message):
             entry = LedgerEntry(
@@ -188,7 +213,7 @@ def ledger_from_messages(messages: Sequence[Any]) -> Ledger:
 def final_reply(messages: Sequence[Any]) -> str:
     """Text of the last turn's last assistant message when no tool call follows it or sits
     in it, else ``""`` (a run that ends on a tool call has no final reply)."""
-    for message in reversed(run_messages(messages)):
+    for message in reversed(_run_messages(messages)):
         if _calls(message):
             return ""
         if _get(message, "role") == "assistant":

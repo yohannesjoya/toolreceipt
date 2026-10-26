@@ -1,0 +1,43 @@
+{
+  "messages": [
+    {
+      "role": "user",
+      "content": "Open a ticket."
+    },
+    {
+      "type": "mcp_call",
+      "id": "mcp_1",
+      "server_label": "helpdesk",
+      "name": "create_ticket",
+      "arguments": "{}",
+      "output": "ok"
+    },
+    {
+      "type": "message",
+      "role": "assistant",
+      "content": [
+        {
+          "type": "output_text",
+          "text": "I've created a ticket for you."
+        }
+      ]
+    }
+  ],
+  "known_tools": [
+    {
+      "type": "function",
+      "function": {
+        "name": "send_email",
+        "description": "Send an email to the customer."
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "issue_refund",
+        "description": "Issue a refund."
+      }
+    }
+  ],
+  "raises": "ValueError"
+}

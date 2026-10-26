@@ -1,0 +1,47 @@
+{
+  "messages": [
+    {
+      "role": "user",
+      "content": "Email me the receipt."
+    },
+    {
+      "type": "custom_tool_call",
+      "id": "ctc_1",
+      "call_id": "call_1",
+      "name": "send_email",
+      "input": "to=dana@example.com"
+    },
+    {
+      "type": "custom_tool_call_output",
+      "call_id": "call_1",
+      "output": "sent"
+    },
+    {
+      "type": "message",
+      "role": "assistant",
+      "content": [
+        {
+          "type": "output_text",
+          "text": "I have emailed you the receipt."
+        }
+      ]
+    }
+  ],
+  "known_tools": [
+    {
+      "type": "function",
+      "function": {
+        "name": "send_email",
+        "description": "Send an email to the customer."
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "issue_refund",
+        "description": "Issue a refund."
+      }
+    }
+  ],
+  "raises": "ValueError"
+}
