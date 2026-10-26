@@ -126,18 +126,21 @@ pinned by `fixtures/check/desc_slack_ran_keeps_email_flag.json`.
 
 `acheck` resolves the ledger and known tools exactly as `check` and differs only in awaiting
 an extractor's `aextract` when it defines one. `LLMExtractor.aextract` runs the user's sync
-`complete` on a thread; no async client hook in 0.3, because the thread already keeps the
-loop free. `Receipts.config()` binds the ledger to the instance, so two concurrent runs on
-one instance read each other's ledger; the quickstart says "one per run" and a test pins two
-concurrent runs on separate instances. Binding a check to a specific run's config is left to
-a later release.
+`complete` on a thread, or awaits `acomplete` when the caller has an async-only client
+(0.3.1). `Receipts.config()` binds the newest ledger to the instance, so two concurrent runs
+on one instance that call `check()` with no arguments read each other's ledger; the quickstart
+says "one per run", and since 0.3.1 `check(reply, config=cfg)` reads the run whose config is
+passed back, so one instance can serve concurrent runs when the caller keeps each config.
 
 ## Argument literals are compared one per kind against keyed top-level arguments; names are never compared
 
 The argument check (0.3.1) reads two kinds of literal from a confirmed claim's clause: a money
 amount with a currency mark, and a reference number that follows a cue word (`order 4821`,
 `ticket #5521`). A clause with two of one kind is not judged for that kind ("refunded $32 of
-your $64 order"). A literal is compared only with top-level arguments whose key names the
+your $64 order"), and an amount the surrounding words qualify is not judged either: one
+after a preposition ("half of your $64 order"), one before the noun it prices ("your $120
+plan"), a unit rate ("$16 each"), a magnitude suffix ("$1.5k") or an approximation ("around
+$64"). "pounds" is not a currency word, since it is a weight as often ("3 pounds of apples"). A literal is compared only with top-level arguments whose key names the
 same kind (`amount`, `refund_amount`, `amount_cents` for amounts; a key carrying the cue
 word, `order_id`, for references) and whose value parses as that kind; nested values, free
 text and keys such as `charge="ch_…"` are never evidence. A value agrees when it equals the
@@ -158,7 +161,8 @@ beside an order number, a date after "order").
 `toolreceipt.messages` reads OpenAI Chat Completions messages, OpenAI Responses items and
 Anthropic messages through one accessor (mapping key, else attribute), so dicts and SDK
 objects behave the same and no SDK is imported. Only the last turn is read, the messages
-after the last user message that is not made only of `tool_result` blocks, because a whole
+after the last user message that carries no `tool_result` block (Anthropic puts tool results,
+sometimes with a text block beside them, in user messages that continue the run), because a whole
 conversation would mark every earlier turn's tools `ran_but_unreported` and compare the last
 reply's amounts with earlier calls. The final reply is `""` when the run ends on a tool call,
 so an abandoned run checks as "no claims, tools unreported" rather than against an earlier

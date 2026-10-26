@@ -264,7 +264,7 @@ receipt = check_messages(messages, known_tools=tools)   # tools: the list you se
 
 `check_messages` reads OpenAI Chat Completions messages, OpenAI Responses items and
 Anthropic messages, as dicts or SDK objects. Only the last turn counts: the messages after
-the last user message. The final reply is the last assistant message, or `""` when the run
+the last user message that carries no tool result. The final reply is the last assistant message, or `""` when the run
 ended on a tool call (then every tool that ran is `ran_but_unreported`). A tool result is a
 success unless Anthropic's `is_error` says otherwise; nothing is read out of its text. The
 legacy `function_call` shape and LangChain message objects raise a `ValueError` instead of
@@ -341,6 +341,10 @@ the tool names and descriptions are sent to whatever model your `complete` calla
 model calls; the ledger (arguments, results, errors) is never sent. Use
 `capture_results=False` to drop args and results, and `max_result_chars` to bound what is
 kept.
+
+The receipt quotes the ledger when a claim contradicts it: an `args_mismatch` claim carries
+the disagreeing argument values in `observed` and in the summary line (`ledger amount=32`).
+With `capture_results=False` no argument is stored and nothing is quoted.
 
 ## Roadmap
 
