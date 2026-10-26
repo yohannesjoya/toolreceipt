@@ -1,0 +1,31 @@
+{
+  "text": "I've refunded $64.",
+  "known_tools": [
+    {
+      "name": "issue_refund",
+      "description": "Issue a refund to the customer for an order."
+    }
+  ],
+  "ledger": [
+    {
+      "tool": "issue_refund",
+      "status": "ok",
+      "args": {
+        "amount": 32
+      }
+    }
+  ],
+  "expected": {
+    "verdict": "fabricated",
+    "claimed_but_never_ran": [
+      {
+        "tool": "issue_refund",
+        "reason": "args_mismatch",
+        "observed": {
+          "amount": 32
+        }
+      }
+    ],
+    "summary": "1 claimed action never ran: issue_refund (\"I've refunded $64\", ledger amount=32)."
+  }
+}

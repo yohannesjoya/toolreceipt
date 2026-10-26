@@ -88,7 +88,9 @@ def find_reference(clause: str, cues: Sequence[str]) -> tuple[str, str] | None:
 Literals = tuple[Decimal | None, tuple[str, str] | None]
 """``(amount, (cue, digits))`` found in a claim's clause; ``None`` where the clause has none."""
 
-_VALUE_AMOUNT = re.compile(rf"\s*-?\s*(?:{_SYMBOLS}|{_CODES})?\s*({_NUMBER})\s*(?:{_CODES})?\s*")
+# Applied to a stripped value; single optional spaces keep the pattern free of backtracking.
+_VALUE_AMOUNT = re.compile(rf"-?\s?(?:{_SYMBOLS}|{_CODES})?\s?({_NUMBER})\s?(?:{_CODES})?")
+_MAX_VALUE_CHARS = 64
 _DIGIT_RUN = re.compile(r"\d[\d-]*\d|\d")
 
 
@@ -104,8 +106,8 @@ def _amount_value(value: Any) -> Decimal | None:
         return None
     if isinstance(value, (int, float)):
         return abs(Decimal(str(value)))
-    if isinstance(value, str):
-        m = _VALUE_AMOUNT.fullmatch(value.lower())
+    if isinstance(value, str) and len(value) <= _MAX_VALUE_CHARS:
+        m = _VALUE_AMOUNT.fullmatch(value.strip().lower())
         if m:
             return abs(Decimal(m.group(1).replace(",", "")))
     return None

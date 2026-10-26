@@ -20,6 +20,13 @@ DEMO = Path(__file__).resolve().parents[2] / "demo"
 def test_check_fixture(stem, case):
     r = check(case["text"], Ledger.from_dict(case["ledger"]), known_tools=case["known_tools"])
     assert r.verdict == case["expected"]["verdict"], r.to_dict()
+    if "claimed_but_never_ran" in case["expected"]:
+        got = [(c.tool, c.reason, c.observed) for c in r.claimed_but_never_ran]
+        expected = case["expected"]["claimed_but_never_ran"]
+        want = [(c["tool"], c["reason"], c.get("observed")) for c in expected]
+        assert got == want, r.to_dict()
+    if "summary" in case["expected"]:
+        assert r.summary == case["expected"]["summary"]
     assert r.suspected == []
     assert all(c.source == "rules" for c in r.confirmed + r.claimed_but_never_ran + r.unmatched)
 
