@@ -58,5 +58,6 @@ def test_lexicon_without_argument_keys_loads():
 
     lex = load_lexicon()
     del lex["amount_keys"], lex["id_cues"]
-    claims = RuleExtractor(lex).extract("I've refunded $64.", normalize_tool_specs(["issue_refund"]))
+    specs = normalize_tool_specs(["issue_refund"])
+    claims = RuleExtractor(lex).extract("I've refunded $64.", specs)
     assert [c.candidates for c in claims] == [["issue_refund"]]
