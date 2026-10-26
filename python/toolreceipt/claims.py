@@ -644,18 +644,24 @@ def _is_verb_named(name_tokens: Sequence[str], lexicon: Mapping[str, Any]) -> bo
     return any(tokens & _verb_tokens(f, lexicon) for f in lexicon["families"])
 
 
-def _tool_verb_tokens(spec: ToolSpec, lexicon: Mapping[str, Any]) -> set[str]:
-    """The tokens a tool is matched on (PRD 03 §7.2 rule 1).
+def _eligibility(spec: ToolSpec, lexicon: Mapping[str, Any]) -> tuple[set[str], bool]:
+    """``(tokens the tool is matched on, by_description)`` (PRD 03 §7.2 rule 1).
 
     A verb-named tool (``_is_verb_named``) is matched on its name tokens, exactly as before
     0.3. A verbless name (``jira``, ``email_customer``) is matched on the verb tokens of the
-    family its description's lead verb names (``description_family``), or on nothing.
+    family its description's lead verb names (``description_family``), or on nothing; the
+    flag is then true so ``_match`` scores it on the description path.
     """
     name = tokenize_tool_name(spec.name)
     if _is_verb_named(name, lexicon):
-        return set(name)
+        return set(name), False
     family = description_family(spec.description, lexicon)
-    return _verb_tokens(family, lexicon) if family else set()
+    return (_verb_tokens(family, lexicon) if family else set()), True
+
+
+def _tool_verb_tokens(spec: ToolSpec, lexicon: Mapping[str, Any]) -> set[str]:
+    """The tokens a tool is matched on; see ``_eligibility``."""
+    return _eligibility(spec, lexicon)[0]
 
 
 def _conflicts(family: str, name: Sequence[str], lexicon: Mapping[str, Any]) -> bool:
@@ -786,13 +792,13 @@ def _match(
     scored: list[tuple[str, int, bool]] = []
     described: list[ToolSpec] = []
     for spec in known_tools:
-        tokens = _tool_verb_tokens(spec, lexicon)
+        tokens, by_description = _eligibility(spec, lexicon)
         if not (verbs & tokens) or _conflicts(family, sorted(tokens), lexicon):
             continue
-        if _is_verb_named(tokenize_tool_name(spec.name), lexicon):
-            scored.append((spec.name, *_score(family, words, spec, lexicon, verb_stem)))
-        else:
+        if by_description:
             described.append(spec)
+        else:
+            scored.append((spec.name, *_score(family, words, spec, lexicon, verb_stem)))
     # PRD 03 §7.2 rule 4: a description-eligible tool joins the scoring only when no
     # verb-named tool scored, or when the claim's object names it ("a ticket in Jira").
     named_best = max((score for _, score, _ in scored), default=0)
