@@ -2,18 +2,15 @@
 
 from __future__ import annotations
 
-import importlib.util
 import json
-from pathlib import Path
 
 import pytest
 
-from tests.helpers import load_cases
+from tests.helpers import DEMO, demo_tool_specs, load_cases
 from toolreceipt import Ledger, check
 from toolreceipt.diff import diff
 
 CASES = load_cases("check")
-DEMO = Path(__file__).resolve().parents[2] / "demo"
 
 
 @pytest.mark.parametrize("stem,case", CASES, ids=lambda c: c if isinstance(c, str) else "")
@@ -56,18 +53,9 @@ def test_family_only_candidate_that_ran_is_confirmed():
     assert [c.tool for c in r.confirmed] == ["create_ticket"]
 
 
-def _demo_tool_specs() -> list[tuple[str, str]]:
-    path = DEMO / "scenarios" / "support_desk.py"
-    spec = importlib.util.spec_from_file_location("_support_desk", path)
-    assert spec is not None and spec.loader is not None
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return [(t.name, t.description) for t in module.build_tools("pressure")]
-
-
 @pytest.mark.skipif(not (DEMO / "replays").is_dir(), reason="demo/ not present")
 def test_pressure_replays_stay_fabricated():
-    tools = _demo_tool_specs()
+    tools = demo_tool_specs()
     replays = sorted((DEMO / "replays").glob("pressure-*.json"))
     assert replays
     for path in replays:
