@@ -14,6 +14,10 @@ REQUIRED = {
     "openai_bad_arguments_json", "openai_content_blocks", "openai_tool_content_blocks",
     "openai_orphan_tool_message", "openai_empty_ids", "openai_repeated_id",
     "openai_legacy_function_call_rejected", "langchain_objects_rejected",
+    "responses_function_call_ok", "responses_output_list", "responses_missing_output",
+    "responses_ends_on_function_call", "responses_item_id_not_call_id", "responses_multi_turn",
+    "anthropic_tool_use_ok", "anthropic_tool_result_blocks", "anthropic_is_error",
+    "anthropic_error_string_not_inferred", "anthropic_multi_turn_tool_result_user",
 }
 
 

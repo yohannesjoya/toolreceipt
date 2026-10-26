@@ -1,8 +1,10 @@
 """Framework-free message input (PRD 04 §7): a ledger and a final reply from a message list.
 
 Reads OpenAI Chat Completions messages (``role``, ``content``, ``tool_calls``,
-``tool_call_id``) as plain dicts or SDK objects, by key and attribute, with no SDK imported.
-Only the last turn is read: the messages after the last ``user`` message.
+``tool_call_id``), OpenAI Responses items (``type`` of ``message``, ``function_call``,
+``function_call_output``; ``call_id``) and Anthropic Messages (``tool_use`` and
+``tool_result`` content blocks) as plain dicts or SDK objects, by key and attribute, with no
+SDK imported. Only the last turn is read: the messages after the last ``user`` message.
 """
 
 from __future__ import annotations
@@ -25,7 +27,7 @@ __all__ = [
     "run_messages",
 ]
 
-SUPPORTED = "OpenAI Chat Completions messages"
+SUPPORTED = "OpenAI Chat Completions messages, OpenAI Responses items or Anthropic messages"
 _TEXT_TYPES = frozenset({"text", "output_text", "input_text"})
 _LANGCHAIN_TYPES = frozenset({"ai", "human", "tool", "system"})
 
@@ -96,7 +98,9 @@ def _parse_args(arguments: Any) -> dict[str, Any]:
 
 
 def _calls(message: Any) -> list[tuple[str, str, dict[str, Any]]]:
-    """``(call id, tool name, args)`` for every tool call the message carries."""
+    """``(call id, tool name, args)`` for every tool call the message carries: Chat
+    Completions ``tool_calls``, a Responses ``function_call`` item, Anthropic ``tool_use``
+    blocks. A Responses item's ``id`` is the item id, never the call id."""
     out: list[tuple[str, str, dict[str, Any]]] = []
     for call in _blocks(_get(message, "tool_calls")) or []:
         function = _get(call, "function")
@@ -104,14 +108,34 @@ def _calls(message: Any) -> list[tuple[str, str, dict[str, Any]]]:
         if isinstance(name, str) and name:
             call_id = str(_get(call, "id") or "")
             out.append((call_id, name, _parse_args(_get(function, "arguments"))))
+    if _get(message, "type") == "function_call":
+        name = _get(message, "name")
+        if isinstance(name, str) and name:
+            call_id = str(_get(message, "call_id") or "")
+            out.append((call_id, name, _parse_args(_get(message, "arguments"))))
+    for block in _blocks(_get(message, "content")) or []:
+        name = _get(block, "name")
+        if _get(block, "type") == "tool_use" and isinstance(name, str) and name:
+            out.append((str(_get(block, "id") or ""), name, coerce_args(_get(block, "input"))))
     return out
 
 
 def _results(message: Any) -> list[tuple[str, str, bool]]:
-    """``(call id, text, is_error)`` for every tool result the message carries."""
+    """``(call id, text, is_error)`` for every tool result the message carries: a Chat
+    Completions ``tool`` message, a Responses ``function_call_output`` item, Anthropic
+    ``tool_result`` blocks (the only shape with an explicit error flag)."""
+    out: list[tuple[str, str, bool]] = []
     if _get(message, "role") == "tool":
-        return [(str(_get(message, "tool_call_id") or ""), _text(_get(message, "content")), False)]
-    return []
+        call_id = str(_get(message, "tool_call_id") or "")
+        out.append((call_id, _text(_get(message, "content")), False))
+    if _get(message, "type") == "function_call_output":
+        call_id = str(_get(message, "call_id") or "")
+        out.append((call_id, _text(_get(message, "output")), False))
+    for block in _blocks(_get(message, "content")) or []:
+        if _get(block, "type") == "tool_result":
+            call_id = str(_get(block, "tool_use_id") or "")
+            out.append((call_id, _text(_get(block, "content")), bool(_get(block, "is_error"))))
+    return out
 
 
 def run_messages(messages: Sequence[Any]) -> list[Any]:
@@ -128,9 +152,10 @@ def ledger_from_messages(messages: Sequence[Any]) -> Ledger:
 
     A call with no result is ``status="error", error="no result"``; a result with no call is
     ignored; a call whose id is empty pairs with the next result whose id is empty; a
-    repeated id pairs first-in, first-out. Status is ``ok`` for every result (nothing is
-    inferred from its text). Timestamps are ``None``. Raises ``ValueError`` on a legacy
-    OpenAI function-call message or a LangChain message object.
+    repeated id pairs first-in, first-out. Status is ``ok`` for every result except an
+    Anthropic ``tool_result`` with ``is_error: true`` (nothing is inferred from result text).
+    Timestamps are ``None``. Raises ``ValueError`` on a legacy OpenAI function-call message
+    or a LangChain message object.
     """
     entries: list[LedgerEntry] = []
     open_calls: dict[str, deque[LedgerEntry]] = {}
@@ -155,10 +180,13 @@ def ledger_from_messages(messages: Sequence[Any]) -> Ledger:
 
 
 def final_reply(messages: Sequence[Any]) -> str:
-    """Text of the last turn's last assistant message when it carries no tool call, else ``""``."""
+    """Text of the last turn's last assistant message when no tool call follows it or sits
+    in it, else ``""`` (a run that ends on a tool call has no final reply)."""
     for message in reversed(run_messages(messages)):
+        if _calls(message):
+            return ""
         if _get(message, "role") == "assistant":
-            return "" if _calls(message) else _text(_get(message, "content"))
+            return _text(_get(message, "content"))
     return ""
 
 

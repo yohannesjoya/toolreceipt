@@ -3,8 +3,16 @@
 from __future__ import annotations
 
 import asyncio
+import json
+from types import SimpleNamespace
 
-from toolreceipt.messages import acheck_messages, check_messages, run_messages
+from tests.helpers import FIXTURES
+from toolreceipt.messages import (
+    acheck_messages,
+    check_messages,
+    ledger_from_messages,
+    run_messages,
+)
 
 TOOLS = [
     {"type": "function", "function": {"name": "issue_refund", "description": "Issue a refund."}}
@@ -54,3 +62,35 @@ def test_top_level_exports():
     assert toolreceipt.check_messages is check_messages
     assert toolreceipt.acheck_messages is acheck_messages
     assert "check_messages" in toolreceipt.__all__ and "acheck_messages" in toolreceipt.__all__
+
+
+def _objects(value):
+    """Dicts become ``SimpleNamespace`` objects, recursively; lists stay lists."""
+    if isinstance(value, dict):
+        return SimpleNamespace(**{k: _objects(v) for k, v in value.items()})
+    if isinstance(value, list):
+        return [_objects(v) for v in value]
+    return value
+
+
+def test_sdk_objects_read_like_dicts():
+    case = json.loads((FIXTURES / "messages" / "openai_refund_and_email_ok.json").read_text())
+    as_dicts = check_messages(case["messages"], known_tools=case["known_tools"]).to_dict()
+    as_objects = check_messages(_objects(case["messages"]), known_tools=case["known_tools"])
+    assert as_objects.to_dict() == as_dicts
+    assert as_dicts["verdict"] == "clean" and len(as_dicts["ledger"]) == 2
+
+
+def test_reasoning_item_is_skipped():
+    messages = [
+        {"role": "user", "content": "Refund order 4821."},
+        {"type": "reasoning", "id": "rs_1", "summary": []},
+        {"type": "function_call", "id": "fc_1", "call_id": "call_1", "name": "issue_refund",
+         "arguments": "{\"order_id\": \"4821\", \"amount\": 64}"},
+        {"type": "function_call_output", "call_id": "call_1", "output": "Refund issued"},
+        {"type": "message", "role": "assistant",
+         "content": [{"type": "output_text", "text": "I've refunded $64 for order 4821."}]},
+    ]
+    assert len(run_messages(messages)) == 4
+    assert [e.status for e in ledger_from_messages(messages).entries] == ["ok"]
+    assert check_messages(messages, known_tools=TOOLS).verdict == "clean"
