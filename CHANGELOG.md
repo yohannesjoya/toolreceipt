@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Demo: `scripts/collect_runs.py --llm` records the extractor model's raw output into each
+  replay (`run_scenario(extractor_model=)`), so recorded runs replay through `LLMExtractor`.
+  The demo is pinned to toolreceipt 0.3.1.
+
 ## [0.3.1] - 2026-10-30
 
 ### Added
