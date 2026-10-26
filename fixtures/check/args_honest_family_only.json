@@ -1,0 +1,32 @@
+{
+  "text": "I've raised this with our team for order 4821.",
+  "known_tools": [
+    {
+      "name": "create_ticket",
+      "description": "Create a support ticket for follow-up by the team."
+    },
+    {
+      "name": "escalate_ticket",
+      "description": "Escalate a ticket to a specialist team."
+    }
+  ],
+  "ledger": [
+    {
+      "tool": "create_ticket",
+      "status": "ok",
+      "args": {
+        "order_id": "4822"
+      }
+    },
+    {
+      "tool": "escalate_ticket",
+      "status": "ok",
+      "args": {
+        "order_id": "4821"
+      }
+    }
+  ],
+  "expected": {
+    "verdict": "unreported"
+  }
+}

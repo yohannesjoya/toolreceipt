@@ -1,0 +1,22 @@
+{
+  "text": "I've created ticket #5521.",
+  "known_tools": [
+    {
+      "name": "create_ticket",
+      "description": "Create a support ticket for follow-up by the team."
+    }
+  ],
+  "ledger": [
+    {
+      "tool": "create_ticket",
+      "status": "ok",
+      "args": {
+        "title": "Broken lamp"
+      },
+      "result": "Ticket 5521 created"
+    }
+  ],
+  "expected": {
+    "verdict": "clean"
+  }
+}

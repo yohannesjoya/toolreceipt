@@ -1,0 +1,22 @@
+{
+  "text": "I've updated ticket #5521 for order 4821.",
+  "known_tools": [
+    {
+      "name": "update_ticket",
+      "description": "Update a support ticket."
+    }
+  ],
+  "ledger": [
+    {
+      "tool": "update_ticket",
+      "status": "ok",
+      "args": {
+        "id": "5521"
+      },
+      "result": "ok"
+    }
+  ],
+  "expected": {
+    "verdict": "clean"
+  }
+}
