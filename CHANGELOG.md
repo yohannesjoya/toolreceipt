@@ -7,6 +7,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-10-30
+
+### Added
+
+- `check_messages()` and `acheck_messages()` (`toolreceipt.messages`): a receipt from a plain
+  message list with no framework installed. OpenAI Chat Completions messages, OpenAI
+  Responses items and Anthropic messages, as dicts or SDK objects; only the last turn (after
+  the last user message) is read; the final reply is `""` when the run ends on a tool call;
+  the legacy `function_call` shape and LangChain message objects raise `ValueError`.
+  `toolreceipt.messages.ledger_from_messages` and `final_reply` are the framework-free twins
+  of the LangChain adapter's helpers.
+- Argument check: a claim whose tool ran with arguments that contradict the one money amount
+  or cued reference number in its clause is `claimed_but_never_ran` with the new reason
+  `args_mismatch`. Only top-level arguments whose key names the same kind are compared; a
+  cents-style value, a total split across calls and a number read from the tool's result
+  agree; names, email addresses, dates and quantities are never compared. `check_args=True`
+  on `check`, `acheck`, `check_messages`, `acheck_messages`, `diff` and `Receipts` turns it
+  off. Lexicon keys `amount_keys` and `id_cues`; both default to empty when absent.
+- `Claim.observed`: the contradicting arguments of an `args_mismatch` claim (`{"amount": 32}`),
+  `None` elsewhere; emitted last by `to_dict()`.
+- `Receipts.check(..., config=cfg)` and `acheck(..., config=cfg)` read the run whose config is
+  given, so one `Receipts` can serve concurrent runs.
+- `LLMExtractor(acomplete=...)` for async-only clients, awaited natively by `aextract`;
+  `from_chat_model` wires the model's `ainvoke` too. `extract()` on an async-only extractor
+  raises `TypeError`.
+
+### Changed
+
+- Verdicts can change for ledgers that carry arguments: a `clean` 0.3.0 receipt becomes
+  `fabricated` when a confirmed claim's amount or reference number contradicts the call.
+  `check_args=False` restores the 0.3.0 receipt. Every existing fixture and probe recording is
+  unchanged; the 19 recorded demo runs and 6 demo examples produce no `args_mismatch`.
+- The summary line names the contradicting argument for an `args_mismatch` claim:
+  `1 claimed action never ran: issue_refund ("I've refunded $64", ledger amount=32).`
+- `NO_RESULT` lives in `toolreceipt.ledger` (still importable from `toolreceipt.langgraph`).
+
 ## [0.3.0] - 2026-10-30
 
 ### Added

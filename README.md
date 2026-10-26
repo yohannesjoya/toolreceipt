@@ -27,6 +27,16 @@ dependencies beyond the standard library.
   `ToolMessage`): `claimed_but_never_ran` with reason `tool_failed`.
 - Tools that ran successfully but that the reply never mentions: `ran_but_unreported`.
   Informational, it does not block.
+- A claim whose tool ran, but with arguments that contradict the one money amount or
+  reference number in the claim ("I've refunded $64" when `issue_refund` ran with
+  `amount=32`; "cancelled order 4821" when it ran with `order_id="4822"`):
+  `claimed_but_never_ran` with reason `args_mismatch`, the contradicting arguments in the
+  claim's `observed`. A reference number needs a cue word ("order 4821", "ticket #5521") and
+  an argument key naming the same thing (`order_id`, `ticketNumber`); a clause with two
+  amounts or two references is not judged; a cents-style value (`6400` for $64), a total
+  split across two calls and a number the agent read from the tool's result all agree.
+  Measured on the 19 recorded demo runs, the 6 demo examples and the held-out replies: no
+  honest reply flagged. `check_args=False` turns it off.
 
 Precision comes before recall. Negation ("I did not send"), the future ("I'll send"),
 advice ("you can create a ticket"), conditionals and offers are not claims.
@@ -36,7 +46,9 @@ advice ("you can create a ticket"), conditionals and offers are not claims.
 - **Tools that return an error string with a success status.** If a tool returns
   `"Error: SMTP timeout"` as a normal value, the framework reports success and so does the
   ledger. Raise, or return an error `ToolMessage`.
-- **Argument mismatches.** "I emailed Bob" passes if `send_email` ran, whatever `to` was.
+- **Names, email addresses, dates and times in arguments.** "I emailed Bob" passes if
+  `send_email` ran, whatever `to` was: nicknames, roles and display names make a name
+  comparison unsafe, so only money amounts and cued reference numbers are compared.
 - **Quantities.** "Updated 3 rows" against one call is recorded as a count on the claim, never judged.
 - **Non-English replies.** The default extractor is English only. `LLMExtractor` reads
   other languages, but its guards are English only (see below).
@@ -157,7 +169,7 @@ if not receipt.ok:
 ```
 
 `rc.config()` returns a LangGraph config with a callback handler attached. Create one
-`Receipts` per run. Your tools and graph stay unchanged, apart from
+`Receipts` per run, or keep one and pass each run's config back: `rc.check(reply, config=cfg)`. Your tools and graph stay unchanged, apart from
 `ToolNode(tools, handle_tool_errors=True)`.
 
 Async graphs work the same way:
@@ -195,8 +207,9 @@ receipt = rc.check(final_reply(result))
 receipt.suspected   # claims only the LLM found, whose tool never ran
 ```
 
-`from_chat_model` takes any LangChain chat model; `LLMExtractor(complete=fn)` takes any
-`fn(prompt: str) -> str` for other SDKs. The rules still run first and still decide `ok`:
+`from_chat_model` takes any LangChain chat model, and uses its `ainvoke` under `acheck`;
+`LLMExtractor(complete=fn)` takes any `fn(prompt: str) -> str` for other SDKs, and
+`LLMExtractor(acomplete=afn)` an async-only client. The rules still run first and still decide `ok`:
 a claim only the LLM found lands in `receipt.suspected`, reported but not blocking, so two
 runs of the same reply block or pass the same way even though model output varies. Pass
 `llm_blocks=True` to `Receipts()` or `check()` to let those claims make the verdict
@@ -217,7 +230,7 @@ on one model round trip (one to three seconds on Groq).
 |---|---|
 | **Ledger** | Ordered list of ledger entries captured during one agent run, ordered by `started_at`. |
 | **Ledger entry** | One tool invocation: `tool`, `status` (`ok` or `error`), `args`, `result`, `error`, `call_id`, timestamps. |
-| **Claim** | One assertion in the reply that an action was performed: quoted `text`, `verb`, `object`, `count`, candidate `tool`s. |
+| **Claim** | One assertion in the reply that an action was performed: quoted `text`, `verb`, `object`, `count`, candidate `tool`s; `observed` holds the contradicting arguments of an `args_mismatch` claim. |
 | **Receipt** | The result of diffing claims against the ledger. |
 | **Verdict** | `clean`, `unreported` or `fabricated`. Only `fabricated` is blocking (`receipt.ok` is `False`). |
 
@@ -240,8 +253,24 @@ The adapter is a LangChain callback handler, so capture needs no tool wrapping. 
 
 ## Post-hoc usage
 
-Already have the messages from a finished run, or a different framework? Build a ledger and
-call `check()`:
+Calling the OpenAI or Anthropic SDK directly? Pass the two lists you already have, no
+framework needed:
+
+```python
+from toolreceipt import check_messages
+
+receipt = check_messages(messages, known_tools=tools)   # tools: the list you sent to the API
+```
+
+`check_messages` reads OpenAI Chat Completions messages, OpenAI Responses items and
+Anthropic messages, as dicts or SDK objects. Only the last turn counts: the messages after
+the last user message. The final reply is the last assistant message, or `""` when the run
+ended on a tool call (then every tool that ran is `ran_but_unreported`). A tool result is a
+success unless Anthropic's `is_error` says otherwise; nothing is read out of its text. The
+legacy `function_call` shape and LangChain message objects raise a `ValueError` instead of
+producing an empty ledger. `acheck_messages` is the async twin.
+
+With LangChain messages from a finished run, build the ledger with the adapter:
 
 ```python
 from toolreceipt import check
@@ -252,7 +281,9 @@ receipt = check(final_reply(result), ledger, known_tools=["issue_refund", "send_
 ```
 
 `ledger_from_messages` pairs each `AIMessage` tool call with its `ToolMessage`. A call with
-no result is recorded as an error. Timestamps are `None` on this path.
+no result is recorded as an error. Timestamps are `None` on this path. This `final_reply`
+returns the last `AIMessage` with text even when a tool call follows it; the message-list
+one returns `""` then.
 
 Pass `known_tools`. A ledger only knows the tools that ran, so without `known_tools` a claim
 about a tool that was never called ("I emailed you" when `send_email` never ran) has nothing
@@ -273,6 +304,7 @@ rc = Receipts(
     capture_results=True,    # False: ledger keeps no args or results
     max_result_chars=2000,   # truncate result and error text in the ledger
     llm_blocks=False,        # True: claims only the LLM found can make the verdict fabricated
+    check_args=True,         # False: never compare a claim's amount or reference number with the call's arguments
 )
 ```
 
@@ -280,7 +312,9 @@ rc = Receipts(
   LangChain tools. Merged with the tools discovered from the run.
 - `ignore_tools`: read-only tools you do not want listed as unreported.
 - `capture_results=False`: the ledger records only tool name, status and error. Use it when
-  tool arguments or results are sensitive.
+  tool arguments or results are sensitive. With no arguments stored, the argument check has
+  nothing to compare and never fires.
+- `check_args=False`: keep the arguments but skip the argument check (the 0.3.0 receipt).
 - `max_result_chars`: caps stored result and error text.
 
 ## Comparison with prior art
@@ -311,12 +345,12 @@ kept.
 ## Roadmap
 
 Done in 0.2: LLM-backed extractor behind the existing `ClaimExtractor` protocol. Done in
-0.3: async API; verbless tool names matched through their descriptions.
+0.3: async API; verbless tool names matched through their descriptions; framework-free
+message input; argument check for amounts and reference numbers.
 
 - TypeScript port, sharing the JSON fixtures as the contract
 - Adapters: Mastra, CrewAI, Vercel AI SDK
-- Argument check ("emailed Bob" against `to="alice"`)
-- Framework-free message input (OpenAI-style message lists)
+- Per-turn receipts for runs that end without a final reply
 
 ## Contributing
 

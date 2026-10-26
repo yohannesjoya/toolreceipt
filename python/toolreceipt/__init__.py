@@ -7,7 +7,7 @@ from toolreceipt.messages import acheck_messages, check_messages
 from toolreceipt.receipt import Receipt, Verdict
 from toolreceipt.receipts import Receipts, acheck, check
 
-__version__ = "0.3.0"
+__version__ = "0.3.1"
 
 __all__ = [
     "Claim",

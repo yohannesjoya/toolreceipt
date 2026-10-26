@@ -131,3 +131,40 @@ loop free. `Receipts.config()` binds the ledger to the instance, so two concurre
 one instance read each other's ledger; the quickstart says "one per run" and a test pins two
 concurrent runs on separate instances. Binding a check to a specific run's config is left to
 a later release.
+
+## Argument literals are compared one per kind against keyed top-level arguments; names are never compared
+
+The argument check (0.3.1) reads two kinds of literal from a confirmed claim's clause: a money
+amount with a currency mark, and a reference number that follows a cue word (`order 4821`,
+`ticket #5521`). A clause with two of one kind is not judged for that kind ("refunded $32 of
+your $64 order"). A literal is compared only with top-level arguments whose key names the
+same kind (`amount`, `refund_amount`, `amount_cents` for amounts; a key carrying the cue
+word, `order_id`, for references) and whose value parses as that kind; nested values, free
+text and keys such as `charge="ch_…"` are never evidence. A value agrees when it equals the
+literal, equals it times 100 (Stripe-style cents), when the keyed amounts of all the tool's
+calls sum to it (a refund split across calls), or when the digits appear in the tool's
+result (an id the agent learned from the result; a result cut by `max_result_chars` can lose
+that excuse). The claim is `args_mismatch` only when every `ok` call of its candidates is
+keyed for every literal and disagrees on at least one, and no same-family tool's call
+agrees; a family-only match is never judged, since it says nothing about which tool did the
+work. Names, email addresses, dates and times stay out: nicknames, roles, display names and
+formats make them unsafe for rules. The honest corpus with real arguments is the 19 demo
+replays, the 6 demo examples and the held-out replies; `args_honest_*` fixtures pin the
+shapes that nearly flagged in review (cents, line items, two amounts, `update_ticket(id=…)`
+beside an order number, a date after "order").
+
+## Message lists are read by key and attribute over the last turn; failure is never inferred from result text
+
+`toolreceipt.messages` reads OpenAI Chat Completions messages, OpenAI Responses items and
+Anthropic messages through one accessor (mapping key, else attribute), so dicts and SDK
+objects behave the same and no SDK is imported. Only the last turn is read, the messages
+after the last user message that is not made only of `tool_result` blocks, because a whole
+conversation would mark every earlier turn's tools `ran_but_unreported` and compare the last
+reply's amounts with earlier calls. The final reply is `""` when the run ends on a tool call,
+so an abandoned run checks as "no claims, tools unreported" rather than against an earlier
+preamble; the LangChain `final_reply` keeps returning the last text until 0.4 aligns it. A
+tool result is `ok` unless Anthropic's explicit `is_error` says otherwise: reading "Error:"
+out of a result would turn a successful call into `tool_failed`. Recognised but unsupported
+shapes (the legacy `function_call` field, `role: "function"`, LangChain message objects)
+raise rather than yield an empty ledger that would make every claim `not_called` or every run
+`clean` silently.
