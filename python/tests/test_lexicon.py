@@ -42,3 +42,21 @@ def test_lexicon_tokens_unique_across_families():
     assert len(all_tokens) == len(set(all_tokens))
     assert set(lex["noun_tokens"]) <= set(all_tokens)
     assert "get" in lex["read_verbs"]
+
+
+def test_argument_keys_present():
+    lex = load_lexicon()
+    assert lex["amount_keys"] == ["amount", "total", "cents", "minor"]
+    assert lex["id_cues"] == [
+        "order", "ticket", "case", "invoice", "booking", "reservation", "account",
+        "confirmation", "tracking", "reference",
+    ]
+
+
+def test_lexicon_without_argument_keys_loads():
+    from toolreceipt.claims import RuleExtractor, normalize_tool_specs
+
+    lex = load_lexicon()
+    del lex["amount_keys"], lex["id_cues"]
+    claims = RuleExtractor(lex).extract("I've refunded $64.", normalize_tool_specs(["issue_refund"]))
+    assert [c.candidates for c in claims] == [["issue_refund"]]
