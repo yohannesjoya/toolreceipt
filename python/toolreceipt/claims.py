@@ -68,6 +68,9 @@ class Claim:
         # built by hand or by ``from_dict``). ``diff`` only reports a family-alone match whose
         # tool never ran as ``unmatched``, never as ``not_called``.
         self._object_matched: bool | None = None
+        # The reply clause the claim's literals are read from by the argument check, when
+        # the extractor knows it (an LLM span may run across clauses); None means ``text``.
+        self._clause: str | None = None
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> Claim:

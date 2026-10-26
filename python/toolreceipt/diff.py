@@ -24,9 +24,7 @@ def _copy(claim: Claim, **changes: Any) -> Claim:
     """``dataclasses.replace`` that keeps the extractor's private match evidence."""
     out = replace(claim, **changes)
     out._object_matched = claim._object_matched
-    clause = getattr(claim, "_clause", None)
-    if clause is not None:
-        out._clause = clause
+    out._clause = claim._clause
     return out
 
 

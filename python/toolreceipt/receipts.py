@@ -51,12 +51,13 @@ def _check(
     ignore_tools: Collection[str],
     extractor: ClaimExtractor | None,
     llm_blocks: bool = False,
+    check_args: bool = True,
 ) -> Receipt:
     specs = _merge_tools(known, (ToolSpec(name, "") for name in sorted(ledger.tools())))
     claims = (extractor or RuleExtractor()).extract(reply, specs)
     return diff(
         claims, ledger, known_tools=[s.name for s in specs], ignore_tools=ignore_tools,
-        llm_blocks=llm_blocks,
+        llm_blocks=llm_blocks, check_args=check_args,
     )
 
 
@@ -67,6 +68,7 @@ async def _acheck(
     ignore_tools: Collection[str],
     extractor: ClaimExtractor | None,
     llm_blocks: bool = False,
+    check_args: bool = True,
 ) -> Receipt:
     """``_check`` that awaits an extractor's ``aextract`` coroutine when it has one."""
     specs = _merge_tools(known, (ToolSpec(name, "") for name in sorted(ledger.tools())))
@@ -77,7 +79,7 @@ async def _acheck(
         claims = (extractor or RuleExtractor()).extract(reply, specs)
     return diff(
         claims, ledger, known_tools=[s.name for s in specs], ignore_tools=ignore_tools,
-        llm_blocks=llm_blocks,
+        llm_blocks=llm_blocks, check_args=check_args,
     )
 
 
@@ -89,14 +91,18 @@ def check(
     ignore_tools: Collection[str] = (),
     extractor: ClaimExtractor | None = None,
     llm_blocks: bool = False,
+    check_args: bool = True,
 ) -> Receipt:
     """Framework-free check of ``reply`` against ``ledger``.
 
     ``llm_blocks``: let claims found only by an LLM extractor make the verdict ``fabricated``;
-    by default they are reported in ``Receipt.suspected``.
+    by default they are reported in ``Receipt.suspected``. ``check_args``: compare the one
+    amount or cued reference number in a confirmed claim's clause with the call's arguments
+    (``args_mismatch``); ``False`` skips that check.
     """
     return _check(
-        reply, ledger, normalize_tool_specs(known_tools), ignore_tools, extractor, llm_blocks
+        reply, ledger, normalize_tool_specs(known_tools), ignore_tools, extractor, llm_blocks,
+        check_args,
     )
 
 
@@ -108,12 +114,14 @@ async def acheck(
     ignore_tools: Collection[str] = (),
     extractor: ClaimExtractor | None = None,
     llm_blocks: bool = False,
+    check_args: bool = True,
 ) -> Receipt:
     """``check()`` for async code: the same receipt, with an extractor's ``aextract``
     awaited when it defines one (``LLMExtractor`` runs its model call on a thread). With
     the rules alone there is no I/O and the result equals ``check()``."""
     return await _acheck(
-        reply, ledger, normalize_tool_specs(known_tools), ignore_tools, extractor, llm_blocks
+        reply, ledger, normalize_tool_specs(known_tools), ignore_tools, extractor, llm_blocks,
+        check_args,
     )
 
 
@@ -129,9 +137,11 @@ class Receipts:
         capture_results: bool = True,
         max_result_chars: int = 2000,
         llm_blocks: bool = False,
+        check_args: bool = True,
     ) -> None:
         self._extractor = extractor
         self._llm_blocks = llm_blocks
+        self._check_args = check_args
         self._known_tools = normalize_tool_specs(known_tools)
         self._ignore_tools = set(ignore_tools)
         self._capture_results = capture_results
@@ -177,7 +187,8 @@ class Receipts:
         """Check ``reply``; with no ``ledger``, use the most recent ``config()`` run's."""
         ledger, known = self._resolve(ledger)
         return _check(
-            reply, ledger, known, self._ignore_tools, self._extractor, self._llm_blocks
+            reply, ledger, known, self._ignore_tools, self._extractor, self._llm_blocks,
+            self._check_args,
         )
 
     async def acheck(self, reply: str, ledger: Ledger | None = None) -> Receipt:
@@ -186,5 +197,6 @@ class Receipts:
         own instances."""
         ledger, known = self._resolve(ledger)
         return await _acheck(
-            reply, ledger, known, self._ignore_tools, self._extractor, self._llm_blocks
+            reply, ledger, known, self._ignore_tools, self._extractor, self._llm_blocks,
+            self._check_args,
         )

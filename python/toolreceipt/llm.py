@@ -277,6 +277,7 @@ def _guard(
         source="llm",
     )
     claim._object_matched = True
+    claim._clause = clauses[0]  # the argument check reads literals from this clause only
     return claim
 
 

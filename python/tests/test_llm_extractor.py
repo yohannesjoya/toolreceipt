@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 from types import SimpleNamespace
 
@@ -211,3 +212,21 @@ def test_none_completion_is_an_error_like_0_2():
     assert isinstance(ex.last_error, TypeError)
     with pytest.raises(TypeError):
         LLMExtractor(complete=lambda p: None, on_error="raise").extract("x", TOOLS)  # type: ignore[arg-type,return-value]
+
+
+def test_llm_span_across_clauses_uses_first_clause():
+    """PRD 04 §8.2 rule 1: a model span may run across clauses; only the first clause's
+    literals are judged, so the $5 goodwill credit is not compared with the refund amount."""
+    from toolreceipt import Ledger, LedgerEntry, check
+
+    reply = (
+        "Your refund for order 4821 is on its way, and $5 will be credited as a goodwill "
+        "gesture."
+    )
+    span = "refund for order 4821 is on its way, and $5 will be credited"
+    out = json.dumps({"claims": [{"text": span, "tool": "issue_refund"}]})
+    ledger = Ledger([LedgerEntry(tool="issue_refund", args={"amount": 64, "order_id": "4821"})])
+    extractor = LLMExtractor(complete=lambda _p: out)
+    r = check(reply, ledger, known_tools=["issue_refund"], extractor=extractor)
+    assert r.suspected == [] and r.claimed_but_never_ran == [], r.to_dict()
+    assert [c.tool for c in r.confirmed] == ["issue_refund"]

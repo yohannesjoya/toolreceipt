@@ -36,7 +36,7 @@ _EDGE_PUNCT = ".,;!?()\"'"
 
 def _clause_text(claim: Claim) -> str:
     """The clause the literals come from: the extractor's recorded clause, else the text."""
-    clause = getattr(claim, "_clause", None) or claim.text
+    clause = claim._clause or claim.text
     return normalize_loose(clause).translate(_HYPHENS)
 
 

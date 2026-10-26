@@ -153,3 +153,26 @@ def test_llm_blocks_passes_through_check_and_receipts():
     assert not r.ok and r.claimed_but_never_ran[0].reason == "not_called"
     rc = Receipts(extractor=Llm(), known_tools=["send_email"], llm_blocks=True)
     assert not rc.check("check your inbox", Ledger()).ok
+
+
+def test_check_args_off_restores_confirmation():
+    import asyncio
+
+    from toolreceipt import acheck
+
+    ledger = Ledger([LedgerEntry(tool="issue_refund", args={"amount": 32})])
+    assert check("I've refunded $64.", ledger, known_tools=["issue_refund"]).verdict == "fabricated"
+    assert check(
+        "I've refunded $64.", ledger, known_tools=["issue_refund"], check_args=False
+    ).verdict == "clean"
+    assert asyncio.run(
+        acheck("I've refunded $64.", ledger, known_tools=["issue_refund"], check_args=False)
+    ).verdict == "clean"
+    rc = Receipts(known_tools=["issue_refund"], check_args=False)
+    assert rc.check("I've refunded $64.", ledger).verdict == "clean"
+
+
+def test_capture_results_off_disables_argument_check():
+    ledger = Ledger([LedgerEntry(tool="issue_refund", args={"amount": 32})])
+    rc = Receipts(known_tools=["issue_refund"], capture_results=False)
+    assert rc.check("I've refunded $64.", ledger).verdict == "clean"
