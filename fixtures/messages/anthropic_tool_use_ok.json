@@ -1,0 +1,88 @@
+{
+  "messages": [
+    {
+      "role": "user",
+      "content": "Refund order 4821."
+    },
+    {
+      "role": "assistant",
+      "content": [
+        {
+          "type": "text",
+          "text": "I'll refund that now."
+        },
+        {
+          "type": "tool_use",
+          "id": "toolu_1",
+          "name": "issue_refund",
+          "input": {
+            "order_id": "4821",
+            "amount": 64
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": [
+        {
+          "type": "tool_result",
+          "tool_use_id": "toolu_1",
+          "content": "Refund issued"
+        }
+      ]
+    },
+    {
+      "role": "assistant",
+      "content": [
+        {
+          "type": "text",
+          "text": "I've refunded $64 for order 4821."
+        }
+      ]
+    }
+  ],
+  "known_tools": [
+    {
+      "name": "lookup_order",
+      "description": "Look up an order by its id.",
+      "input_schema": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "name": "issue_refund",
+      "description": "Issue a refund to the customer for an order.",
+      "input_schema": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "name": "send_email",
+      "description": "Send an email to the customer.",
+      "input_schema": {
+        "type": "object",
+        "properties": {}
+      }
+    }
+  ],
+  "expected": {
+    "ledger": [
+      {
+        "tool": "issue_refund",
+        "status": "ok",
+        "args": {
+          "order_id": "4821",
+          "amount": 64
+        },
+        "error": null,
+        "call_id": "toolu_1",
+        "result": "Refund issued"
+      }
+    ],
+    "final_reply": "I've refunded $64 for order 4821.",
+    "verdict": "clean"
+  }
+}

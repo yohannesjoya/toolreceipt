@@ -1,0 +1,21 @@
+{
+  "text": "I've refunded €1,250.00.",
+  "known_tools": [
+    {
+      "name": "issue_refund",
+      "description": "Issue a refund to the customer for an order."
+    }
+  ],
+  "ledger": [
+    {
+      "tool": "issue_refund",
+      "status": "ok",
+      "args": {
+        "amount": "1250.00"
+      }
+    }
+  ],
+  "expected": {
+    "verdict": "clean"
+  }
+}

@@ -7,6 +7,7 @@ from dataclasses import replace
 from functools import lru_cache
 from typing import Any
 
+from toolreceipt._args import args_verdict
 from toolreceipt.claims import (
     Claim,
     Reason,
@@ -15,7 +16,7 @@ from toolreceipt.claims import (
     family_ran,
     tokenize_tool_name,
 )
-from toolreceipt.ledger import Ledger
+from toolreceipt.ledger import Ledger, LedgerEntry
 from toolreceipt.receipt import Receipt, Verdict, render_summary
 
 
@@ -23,6 +24,8 @@ def _copy(claim: Claim, **changes: Any) -> Claim:
     """``dataclasses.replace`` that keeps the extractor's private match evidence."""
     out = replace(claim, **changes)
     out._object_matched = claim._object_matched
+    out._clause = claim._clause
+    out._sentence = claim._sentence
     return out
 
 
@@ -44,6 +47,24 @@ def _sibling_ran(candidate: str, ok_tools: Iterable[str]) -> bool:
     return bool(verbs) and any(verbs & set(tokenize_tool_name(t)) for t in ok_tools)
 
 
+def _mismatch(claim: Claim, ok_entries: Sequence[LedgerEntry]) -> dict[str, Any] | None:
+    """The arguments contradicting a confirmed claim, or ``None`` (PRD 04 §8.1).
+
+    A family-only match (``_object_matched is False``) says nothing about which tool did
+    the work, so its arguments say nothing either and it is never judged.
+    """
+    if claim._object_matched is False:
+        return None
+    candidates = set(claim.candidates)
+    hit_entries = [e for e in ok_entries if e.tool in candidates]
+    family_entries = [
+        e for e in ok_entries if e.tool not in candidates and family_ran(claim.verb, [e.tool])
+    ]
+    return args_verdict(
+        claim, hit_entries, family_entries, _default_lexicon(), context=ok_entries
+    )
+
+
 def diff(
     claims: Sequence[Claim],
     ledger: Ledger,
@@ -51,6 +72,7 @@ def diff(
     known_tools: Sequence[str] = (),
     ignore_tools: Collection[str] = (),
     llm_blocks: bool = False,
+    check_args: bool = True,
 ) -> Receipt:
     """Compare ``claims`` with what ``ledger`` recorded.
 
@@ -58,8 +80,12 @@ def diff(
     A claim with ``source == "llm"`` whose tool never ran lands in ``suspected`` unless
     ``llm_blocks`` is set; then it blocks like a rule claim, except that a sibling tool of
     the same action (by the packaged lexicon's verb tokens) having run makes it ``unmatched``.
+    With ``check_args`` (default), a claim whose tool ran is still ``args_mismatch`` when the
+    one amount or cued reference number in its clause contradicts every matching call's
+    arguments (``toolreceipt._args``); ``check_args=False`` gives the 0.3.0 receipt.
     """
     ok_tools = ledger.ok_tools()
+    ok_entries = [e for e in ledger.entries if e.status == "ok"]
     error_tools = ledger.error_tools()
     ignored = set(ignore_tools)
 
@@ -76,7 +102,18 @@ def diff(
             continue
         hit = next((c for c in claim.candidates if c in ok_tools), None)
         if hit is not None:
-            confirmed.append(_copy(claim, candidates=list(claim.candidates), tool=hit))
+            observed = _mismatch(claim, ok_entries) if check_args else None
+            if observed is None:
+                confirmed.append(_copy(claim, candidates=list(claim.candidates), tool=hit))
+                continue
+            judged = _copy(
+                claim, candidates=list(claim.candidates), tool=hit, reason="args_mismatch",
+                observed=observed,
+            )
+            if claim.source == "llm" and not llm_blocks:
+                suspected.append(judged)
+            else:
+                never_ran.append(judged)
             continue
         failed = any(c in error_tools for c in claim.candidates)
         if claim.source == "llm":

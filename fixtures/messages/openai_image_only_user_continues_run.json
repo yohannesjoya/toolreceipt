@@ -1,0 +1,71 @@
+{
+  "messages": [
+    {
+      "role": "user",
+      "content": "Email me the report and take a screenshot."
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "c1",
+          "type": "function",
+          "function": {
+            "name": "send_email",
+            "arguments": "{\"to\": \"dana@example.com\"}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "c1",
+      "content": "sent"
+    },
+    {
+      "role": "user",
+      "content": [
+        {
+          "type": "image_url",
+          "image_url": {
+            "url": "data:image/png;base64,AAAA"
+          }
+        }
+      ]
+    },
+    {
+      "role": "assistant",
+      "content": "I emailed you the report and took a screenshot."
+    }
+  ],
+  "known_tools": [
+    {
+      "type": "function",
+      "function": {
+        "name": "send_email",
+        "description": "Send an email to the customer."
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "issue_refund",
+        "description": "Issue a refund."
+      }
+    }
+  ],
+  "expected": {
+    "ledger": [
+      {
+        "tool": "send_email",
+        "status": "ok",
+        "args": {
+          "to": "dana@example.com"
+        }
+      }
+    ],
+    "final_reply": "I emailed you the report and took a screenshot.",
+    "verdict": "clean"
+  }
+}

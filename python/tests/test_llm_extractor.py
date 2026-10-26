@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 from types import SimpleNamespace
 
@@ -211,3 +212,104 @@ def test_none_completion_is_an_error_like_0_2():
     assert isinstance(ex.last_error, TypeError)
     with pytest.raises(TypeError):
         LLMExtractor(complete=lambda p: None, on_error="raise").extract("x", TOOLS)  # type: ignore[arg-type,return-value]
+
+
+def test_llm_span_across_clauses_uses_first_clause():
+    """PRD 04 §8.2 rule 1: a model span may run across clauses; only the first clause's
+    literals are judged, so the $5 goodwill credit is not compared with the refund amount."""
+    from toolreceipt import Ledger, LedgerEntry, check
+
+    reply = (
+        "Your refund for order 4821 is on its way, and $5 will be credited as a goodwill "
+        "gesture."
+    )
+    span = "refund for order 4821 is on its way, and $5 will be credited"
+    out = json.dumps({"claims": [{"text": span, "tool": "issue_refund"}]})
+    ledger = Ledger([LedgerEntry(tool="issue_refund", args={"amount": 64, "order_id": "4821"})])
+    extractor = LLMExtractor(complete=lambda _p: out)
+    r = check(reply, ledger, known_tools=["issue_refund"], extractor=extractor)
+    assert r.suspected == [] and r.claimed_but_never_ran == [], r.to_dict()
+    assert [c.tool for c in r.confirmed] == ["issue_refund"]
+
+
+# ---------------------------------------------------------------------------
+# PRD 04 §9.2: acomplete for async clients
+# ---------------------------------------------------------------------------
+
+OUT = '{"claims": [{"text": "check your inbox", "tool": "send_email"}]}'
+
+
+def test_acomplete_is_awaited_natively():
+    import asyncio
+    import threading
+
+    from toolreceipt import Ledger, acheck
+
+    seen: list[int] = []
+
+    async def acomplete(prompt: str) -> str:
+        seen.append(threading.get_ident())
+        return OUT
+
+    ex = LLMExtractor(acomplete=acomplete)
+    receipt = asyncio.run(
+        acheck("Refund done, check your inbox.", Ledger(), known_tools=TOOLS, extractor=ex)
+    )
+    assert [c.tool for c in receipt.suspected] == ["send_email"]
+    assert seen == [threading.get_ident()]  # on the event loop thread, no executor hop
+    assert ex.last_raw == OUT and ex.last_error is None
+
+
+def test_async_only_extract_raises_typeerror():
+    async def acomplete(prompt: str) -> str:
+        return OUT
+
+    ex = LLMExtractor(acomplete=acomplete)
+    with pytest.raises(TypeError, match="async-only"):
+        ex.extract(REPLY, TOOLS)
+    with pytest.raises(TypeError, match="async-only"):
+        LLMExtractor(acomplete=acomplete, on_error="fallback").extract(REPLY, TOOLS)
+
+
+def test_init_requires_one_callable():
+    with pytest.raises(ValueError, match="complete or acomplete"):
+        LLMExtractor()
+
+
+def test_acomplete_must_be_coroutine_function():
+    with pytest.raises(TypeError, match="async function"):
+        LLMExtractor(acomplete=lambda p: OUT)  # type: ignore[arg-type]
+
+
+def test_cancelled_error_propagates_through_aextract():
+    import asyncio
+
+    async def acomplete(prompt: str) -> str:
+        raise asyncio.CancelledError
+
+    ex = LLMExtractor(acomplete=acomplete)
+    with pytest.raises(asyncio.CancelledError):
+        asyncio.run(ex.aextract(REPLY, TOOLS))
+    assert ex.last_error is None
+
+
+def test_from_chat_model_wires_ainvoke():
+    import asyncio
+
+    calls: list[str] = []
+
+    class Msg:
+        text = OUT
+
+    class Model:
+        def invoke(self, prompt: str) -> Msg:
+            calls.append("invoke")
+            return Msg()
+
+        async def ainvoke(self, prompt: str) -> Msg:
+            calls.append("ainvoke")
+            return Msg()
+
+    ex = LLMExtractor.from_chat_model(Model())
+    assert ex.extract(REPLY, TOOLS) and calls == ["invoke"]
+    assert asyncio.run(ex.aextract(REPLY, TOOLS)) and calls == ["invoke", "ainvoke"]

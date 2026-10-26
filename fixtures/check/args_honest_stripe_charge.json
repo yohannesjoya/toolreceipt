@@ -1,0 +1,21 @@
+{
+  "text": "I've refunded your $64 payment.",
+  "known_tools": [
+    {
+      "name": "stripe_refund",
+      "description": "Refund a payment through Stripe."
+    }
+  ],
+  "ledger": [
+    {
+      "tool": "stripe_refund",
+      "status": "ok",
+      "args": {
+        "charge": "ch_3N9xQ2"
+      }
+    }
+  ],
+  "expected": {
+    "verdict": "clean"
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "text": "Your $64 has been refunded.",
+  "known_tools": [
+    {
+      "name": "issue_refund",
+      "description": "Issue a refund to the customer for an order."
+    }
+  ],
+  "ledger": [
+    {
+      "tool": "issue_refund",
+      "status": "ok",
+      "args": {
+        "amount": 32
+      }
+    }
+  ],
+  "expected": {
+    "verdict": "fabricated",
+    "claimed_but_never_ran": [
+      {
+        "tool": "issue_refund",
+        "reason": "args_mismatch",
+        "observed": {
+          "amount": 32
+        }
+      }
+    ]
+  }
+}

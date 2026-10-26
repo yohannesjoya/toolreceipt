@@ -164,3 +164,56 @@ def test_receipts_acheck_with_llm_extractor_equals_check():
     a = asyncio.run(rc.acheck(text, Ledger()))
     assert a.to_dict() == rc.check(text, Ledger()).to_dict()
     assert [c.tool for c in a.suspected] == ["send_email"]
+
+
+# ---------------------------------------------------------------------------
+# PRD 04 §9.1: bind a check to a run's config
+# ---------------------------------------------------------------------------
+
+
+def test_check_with_config_reads_that_run():
+    rc = Receipts()
+    c1, c2 = rc.config(), rc.config()
+    r1 = _graph("I have emailed you.").invoke({"messages": [HumanMessage("email me")]}, config=c1)
+    r2 = _graph("Done.", "slow_tool").invoke({"messages": [HumanMessage("wait")]}, config=c2)
+    first = rc.check(final_reply(r1), config=c1)
+    assert first.verdict == "clean" and [e.tool for e in first.ledger] == ["send_email"]
+    second = rc.check(final_reply(r2), config=c2)
+    assert [e.tool for e in second.ledger] == ["slow_tool"]
+    # the stored handler is still the newest one
+    assert [e.tool for e in rc.check(final_reply(r2)).ledger] == ["slow_tool"]
+
+
+def test_two_concurrent_runs_one_receipts_with_config():
+    async def main() -> None:
+        rc = Receipts()
+        configs = [rc.config(), rc.config()]
+        results = await asyncio.gather(
+            *(
+                _graph().ainvoke({"messages": [HumanMessage("email me")]}, config=cfg)
+                for cfg in configs
+            )
+        )
+        for cfg, result in zip(configs, results, strict=True):
+            receipt = await rc.acheck(final_reply(result), config=cfg)
+            assert receipt.verdict == "clean" and len(receipt.ledger) == 1
+
+    asyncio.run(main())
+
+
+def test_check_config_errors():
+    rc = Receipts()
+    with pytest.raises(ValueError, match="ReceiptCallbackHandler"):
+        rc.check("x", config={"callbacks": []})
+    other = Receipts().config()
+    with pytest.raises(ValueError, match="another Receipts"):
+        rc.check("x", config=other)
+    nested = rc.config(rc.config())
+    with pytest.raises(ValueError, match="more than one"):
+        rc.check("x", config=nested)
+    cfg = rc.config()
+    with pytest.raises(ValueError, match="not both"):
+        rc.check("x", ledger=Ledger(), config=cfg)
+    with pytest.raises(ValueError, match="not both"):
+        asyncio.run(rc.acheck("x", ledger=Ledger(), config=cfg))
+    assert rc.check("x", config=cfg).verdict == "clean"

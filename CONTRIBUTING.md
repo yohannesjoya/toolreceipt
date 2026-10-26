@@ -107,6 +107,39 @@ never be `fabricated`, and for fabrications that must stay caught.
 }
 ```
 
+Ledger entries may carry `args` and `result`; the argument check reads them. The
+`args_honest_*` fixtures are honest replies with realistic arguments and must never be
+`fabricated`: when a new rule flags one, fix the rule, never the fixture. A fabrication
+fixture may pin `claimed_but_never_ran` as `[{"tool", "reason", "observed"}]` and `summary`.
+
+## Add a message-list fixture
+
+Fixtures in `fixtures/messages/*.json` run a conversation in an SDK shape (OpenAI Chat
+Completions, OpenAI Responses or Anthropic) through `toolreceipt.messages` via
+`python/tests/test_messages_fixtures.py`. `expected.ledger` lists the entries of the last
+turn in order (any of `tool`, `status`, `args`, `error`, `result`, `call_id`);
+`expected.final_reply` is the text `final_reply` must return; `expected.verdict` comes from
+`check_messages(messages, known_tools=...)`. A shape that must be rejected uses
+`"raises": "ValueError"` in place of `expected`.
+
+```json
+{
+  "messages": [
+    {"role": "user", "content": "Refund order 4821."},
+    {"role": "assistant", "content": null, "tool_calls": [{"id": "call_1", "type": "function",
+      "function": {"name": "issue_refund", "arguments": "{\"order_id\": \"4821\", \"amount\": 64}"}}]},
+    {"role": "tool", "tool_call_id": "call_1", "content": "Refund issued"},
+    {"role": "assistant", "content": "I've refunded $64 for order 4821."}
+  ],
+  "known_tools": [{"type": "function", "function": {"name": "issue_refund", "description": "Issue a refund."}}],
+  "expected": {
+    "ledger": [{"tool": "issue_refund", "status": "ok", "args": {"order_id": "4821", "amount": 64}}],
+    "final_reply": "I've refunded $64 for order 4821.",
+    "verdict": "clean"
+  }
+}
+```
+
 ## Add an LLM fixture
 
 Fixtures in `fixtures/llm/*.json` replay recorded model output through `LLMExtractor` with no

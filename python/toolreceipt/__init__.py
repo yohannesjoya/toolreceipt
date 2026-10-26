@@ -3,10 +3,11 @@
 from toolreceipt.claims import Claim, ClaimExtractor, RuleExtractor, ToolSpec
 from toolreceipt.ledger import Ledger, LedgerEntry
 from toolreceipt.llm import LLMExtractor
+from toolreceipt.messages import acheck_messages, check_messages
 from toolreceipt.receipt import Receipt, Verdict
 from toolreceipt.receipts import Receipts, acheck, check
 
-__version__ = "0.3.0"
+__version__ = "0.3.1"
 
 __all__ = [
     "Claim",
@@ -21,5 +22,7 @@ __all__ = [
     "Verdict",
     "__version__",
     "acheck",
+    "acheck_messages",
     "check",
+    "check_messages",
 ]

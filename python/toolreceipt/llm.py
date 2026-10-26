@@ -13,10 +13,11 @@ The model sees the reply text and the tool names and descriptions, never the led
 from __future__ import annotations
 
 import asyncio
+import inspect
 import json
 import logging
 import re
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Awaitable, Callable, Mapping, Sequence
 from typing import Any, Literal
 
 from toolreceipt.claims import (
@@ -153,27 +154,37 @@ class LLMExtractor:
     """Rules plus a chat model behind the ``ClaimExtractor`` protocol.
 
     ``complete`` receives the full prompt and returns the model's text; the caller sets the
-    model, temperature, timeout and retries inside it. ``on_error="fallback"`` (default)
-    returns the rule claims alone on any exception or unparsable output, after one warning
-    on the ``toolreceipt.llm`` logger; ``"raise"`` re-raises. One ``lexicon`` drives both
-    the rules and the guards (the diff's sibling demotion under ``llm_blocks`` uses the
-    packaged lexicon). ``extract()`` keeps its results in locals, so one extractor can
-    serve many ``Receipts`` and threads; ``last_raw`` and ``last_error`` are debugging aids
-    holding the values of the most recent completed call, so they are reliable only when one
-    call at a time runs on this extractor. ``aextract()`` runs ``complete`` on a thread
-    (``asyncio.to_thread``) and is otherwise the same code path.
+    model, temperature, timeout and retries inside it. ``acomplete`` is its async twin for
+    an async-only client: ``aextract`` awaits it natively, and ``extract`` raises
+    ``TypeError`` when only ``acomplete`` is given. At least one of the two is required.
+    ``on_error="fallback"`` (default) returns the rule claims alone on any ``Exception`` or
+    unparsable output, after one warning on the ``toolreceipt.llm`` logger; ``"raise"``
+    re-raises. ``asyncio.CancelledError`` is not an ``Exception`` and always propagates. One
+    ``lexicon`` drives both the rules and the guards (the diff's sibling demotion under
+    ``llm_blocks`` uses the packaged lexicon). ``extract()`` keeps its results in locals, so
+    one extractor can serve many ``Receipts``, threads and concurrent runs; ``last_raw`` and
+    ``last_error`` are debugging aids holding the values of the most recent completed call,
+    so they are unreliable whenever more than one call is in flight on this extractor.
+    ``aextract()`` runs ``complete`` on a thread (``asyncio.to_thread``) when no
+    ``acomplete`` is set and is otherwise the same code path.
     """
 
     def __init__(
         self,
-        complete: Callable[[str], str],
+        complete: Callable[[str], str] | None = None,
         *,
+        acomplete: Callable[[str], Awaitable[str]] | None = None,
         on_error: OnError = "fallback",
         lexicon: Mapping[str, Any] | None = None,
     ) -> None:
         if on_error not in ("fallback", "raise"):
             raise ValueError('on_error must be "fallback" or "raise"')
+        if complete is None and acomplete is None:
+            raise ValueError("complete or acomplete is required")
+        if acomplete is not None and not inspect.iscoroutinefunction(acomplete):
+            raise TypeError("acomplete must be an async function")
         self._complete = complete
+        self._acomplete = acomplete
         self._on_error: OnError = on_error
         self._lexicon: Mapping[str, Any] = _default_lexicon() if lexicon is None else lexicon
         self._rules = RuleExtractor(self._lexicon)
@@ -182,10 +193,19 @@ class LLMExtractor:
 
     @classmethod
     def from_chat_model(cls, model: Any, **kwargs: Any) -> LLMExtractor:
-        """Wrap any object with ``invoke(prompt) -> message`` (a LangChain chat model)."""
-        return cls(lambda prompt: message_text(model.invoke(prompt)), **kwargs)
+        """Wrap any object with ``invoke(prompt) -> message`` (a LangChain chat model); its
+        ``ainvoke``, when present, backs ``aextract`` natively."""
+        acomplete: Callable[[str], Awaitable[str]] | None = None
+        if callable(getattr(model, "ainvoke", None)):
+
+            async def acomplete(prompt: str) -> str:
+                return message_text(await model.ainvoke(prompt))
+
+        return cls(lambda prompt: message_text(model.invoke(prompt)), acomplete=acomplete, **kwargs)
 
     def extract(self, text: str, known_tools: Sequence[ToolSpec]) -> list[Claim]:
+        if self._complete is None:
+            raise TypeError("this extractor is async-only; use acheck")
         rules = self._rules.extract(text, known_tools)
         raw: str | None = None
         error: Exception | None = None
@@ -196,12 +216,18 @@ class LLMExtractor:
         return self._finish(rules, text, known_tools, raw, error)
 
     async def aextract(self, text: str, known_tools: Sequence[ToolSpec]) -> list[Claim]:
-        """``extract`` with the model call on a thread, so the event loop stays free."""
+        """``extract`` awaiting ``acomplete``, or running ``complete`` on a thread so the
+        event loop stays free."""
         rules = self._rules.extract(text, known_tools)
         raw: str | None = None
         error: Exception | None = None
+        prompt = build_prompt(text, known_tools)
         try:
-            raw = await asyncio.to_thread(self._complete, build_prompt(text, known_tools))
+            if self._acomplete is not None:
+                raw = await self._acomplete(prompt)
+            else:
+                assert self._complete is not None  # __init__ requires one of the two
+                raw = await asyncio.to_thread(self._complete, prompt)
         except Exception as exc:
             error = exc
         return self._finish(rules, text, known_tools, raw, error)
@@ -277,6 +303,10 @@ def _guard(
         source="llm",
     )
     claim._object_matched = True
+    # The argument check reads literals from this clause and counts amounts over its sentence.
+    claim._clause = clauses[0]
+    located = _locate(loose_span, reply)
+    claim._sentence = located[0] if located is not None else span
     return claim
 
 
@@ -384,6 +414,7 @@ def _merge(rules: list[Claim], llm: list[Claim]) -> list[Claim]:
                 candidates=list(claim.candidates), confidence="medium", source="llm",
             )
             resolved._object_matched = True
+            resolved._sentence = r._sentence
             replaced.append(id(r))
             kept.append(resolved)
         else:

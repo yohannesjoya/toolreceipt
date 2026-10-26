@@ -1,0 +1,21 @@
+{
+  "text": "I've charged your card for the first installment of your $120 plan.",
+  "known_tools": [
+    {
+      "name": "charge_card",
+      "description": "Charge the customer's card."
+    }
+  ],
+  "ledger": [
+    {
+      "tool": "charge_card",
+      "status": "ok",
+      "args": {
+        "amount": 40
+      }
+    }
+  ],
+  "expected": {
+    "verdict": "clean"
+  }
+}

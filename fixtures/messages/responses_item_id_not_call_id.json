@@ -1,0 +1,73 @@
+{
+  "messages": [
+    {
+      "role": "user",
+      "content": "Refund order 4821."
+    },
+    {
+      "type": "function_call",
+      "id": "fc_9",
+      "call_id": "call_7",
+      "name": "issue_refund",
+      "arguments": "{\"order_id\": \"4821\", \"amount\": 64}",
+      "status": "incomplete"
+    },
+    {
+      "type": "function_call_output",
+      "call_id": "call_7",
+      "output": "Refund issued"
+    },
+    {
+      "type": "message",
+      "id": "msg_1",
+      "role": "assistant",
+      "status": "completed",
+      "content": [
+        {
+          "type": "output_text",
+          "text": "I've refunded $64 for order 4821.",
+          "annotations": []
+        }
+      ]
+    }
+  ],
+  "known_tools": [
+    {
+      "type": "function",
+      "function": {
+        "name": "lookup_order",
+        "description": "Look up an order by its id."
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "issue_refund",
+        "description": "Issue a refund to the customer for an order."
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "send_email",
+        "description": "Send an email to the customer."
+      }
+    }
+  ],
+  "expected": {
+    "ledger": [
+      {
+        "tool": "issue_refund",
+        "status": "ok",
+        "args": {
+          "order_id": "4821",
+          "amount": 64
+        },
+        "error": null,
+        "call_id": "call_7"
+      }
+    ],
+    "final_reply": "I've refunded $64 for order 4821.",
+    "verdict": "clean"
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "text": "I've updated account 12345678.",
+  "known_tools": [
+    {
+      "name": "update_account",
+      "description": "Update a customer account."
+    }
+  ],
+  "ledger": [
+    {
+      "tool": "update_account",
+      "status": "ok",
+      "args": {
+        "account_number": "1234 5678"
+      }
+    }
+  ],
+  "expected": {
+    "verdict": "clean"
+  }
+}

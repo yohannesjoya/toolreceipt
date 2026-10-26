@@ -1,0 +1,41 @@
+{
+  "claims": [
+    {
+      "text": "I've refunded $64",
+      "verb": "refund",
+      "candidates": [
+        "issue_refund"
+      ],
+      "confidence": "high"
+    }
+  ],
+  "ledger": [
+    {
+      "tool": "issue_refund",
+      "status": "ok",
+      "args": {
+        "amount": 32
+      }
+    }
+  ],
+  "known_tools": [
+    "issue_refund"
+  ],
+  "ignore_tools": [],
+  "check_args": false,
+  "expected": {
+    "verdict": "clean",
+    "ok": true,
+    "confirmed": [
+      {
+        "tool": "issue_refund",
+        "observed": null
+      }
+    ],
+    "claimed_but_never_ran": [],
+    "unmatched": [],
+    "suspected": [],
+    "ran_but_unreported": [],
+    "summary": "All claims confirmed."
+  }
+}

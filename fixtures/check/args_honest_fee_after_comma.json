@@ -1,0 +1,21 @@
+{
+  "text": "I've refunded $64, minus the $5 restocking fee.",
+  "known_tools": [
+    {
+      "name": "issue_refund",
+      "description": "Issue a refund to the customer for an order."
+    }
+  ],
+  "ledger": [
+    {
+      "tool": "issue_refund",
+      "status": "ok",
+      "args": {
+        "amount": 59
+      }
+    }
+  ],
+  "expected": {
+    "verdict": "clean"
+  }
+}

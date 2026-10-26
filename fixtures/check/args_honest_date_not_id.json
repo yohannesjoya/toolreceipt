@@ -1,0 +1,21 @@
+{
+  "text": "I've cancelled the order placed 2024-10-21.",
+  "known_tools": [
+    {
+      "name": "cancel_order",
+      "description": "Cancel an order."
+    }
+  ],
+  "ledger": [
+    {
+      "tool": "cancel_order",
+      "status": "ok",
+      "args": {
+        "order_id": "4821"
+      }
+    }
+  ],
+  "expected": {
+    "verdict": "clean"
+  }
+}

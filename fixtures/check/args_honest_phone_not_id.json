@@ -1,0 +1,21 @@
+{
+  "text": "I've texted the code to number 555-0123.",
+  "known_tools": [
+    {
+      "name": "send_sms",
+      "description": "Send an SMS to the customer."
+    }
+  ],
+  "ledger": [
+    {
+      "tool": "send_sms",
+      "status": "ok",
+      "args": {
+        "phone_number": "+1-555-0123"
+      }
+    }
+  ],
+  "expected": {
+    "verdict": "clean"
+  }
+}

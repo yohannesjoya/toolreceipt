@@ -1,0 +1,60 @@
+{
+  "messages": [
+    {
+      "role": "user",
+      "content": "Refund order 4821."
+    },
+    {
+      "type": "function_call",
+      "id": "fc_1",
+      "call_id": "call_1",
+      "name": "issue_refund",
+      "arguments": "{\"order_id\": \"4821\", \"amount\": 64}"
+    },
+    {
+      "type": "function_call_output",
+      "call_id": "call_1",
+      "output": "Refund issued"
+    },
+    {
+      "type": "message",
+      "role": "assistant",
+      "content": [
+        {
+          "type": "output_text",
+          "text": "I've refunded $64 for order 4821."
+        }
+      ]
+    }
+  ],
+  "known_tools": [
+    {
+      "type": "web_search"
+    },
+    {
+      "type": "file_search",
+      "vector_store_ids": [
+        "vs_1"
+      ]
+    },
+    {
+      "type": "function",
+      "name": "issue_refund",
+      "description": "Issue a refund."
+    }
+  ],
+  "expected": {
+    "ledger": [
+      {
+        "tool": "issue_refund",
+        "status": "ok",
+        "args": {
+          "order_id": "4821",
+          "amount": 64
+        }
+      }
+    ],
+    "final_reply": "I've refunded $64 for order 4821.",
+    "verdict": "clean"
+  }
+}

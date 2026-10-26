@@ -1,0 +1,21 @@
+{
+  "text": "I've cancelled order 4821.",
+  "known_tools": [
+    {
+      "name": "cancel_order",
+      "description": "Cancel an order."
+    }
+  ],
+  "ledger": [
+    {
+      "tool": "cancel_order",
+      "status": "ok",
+      "args": {
+        "order": "ORD-2024-4821"
+      }
+    }
+  ],
+  "expected": {
+    "verdict": "clean"
+  }
+}

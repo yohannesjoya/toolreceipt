@@ -1,0 +1,47 @@
+{
+  "claims": [
+    {
+      "text": "I've refunded $64",
+      "verb": "other",
+      "candidates": [
+        "issue_refund"
+      ],
+      "confidence": "medium",
+      "source": "llm"
+    }
+  ],
+  "ledger": [
+    {
+      "tool": "issue_refund",
+      "status": "ok",
+      "args": {
+        "amount": 32
+      }
+    }
+  ],
+  "known_tools": [
+    "issue_refund"
+  ],
+  "ignore_tools": [],
+  "expected": {
+    "verdict": "unreported",
+    "ok": true,
+    "confirmed": [],
+    "claimed_but_never_ran": [],
+    "unmatched": [],
+    "suspected": [
+      {
+        "tool": "issue_refund",
+        "reason": "args_mismatch",
+        "observed": {
+          "amount": 32
+        },
+        "source": "llm"
+      }
+    ],
+    "ran_but_unreported": [
+      "issue_refund"
+    ],
+    "summary": "No claims; 1 tool ran unreported: issue_refund; 1 suspected (LLM only): issue_refund (\"I've refunded $64\", ledger amount=32)."
+  }
+}

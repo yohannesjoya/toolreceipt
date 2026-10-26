@@ -1,0 +1,34 @@
+{
+  "text": "I've refunded $64 for order 4821.",
+  "known_tools": [
+    {
+      "name": "issue_refund",
+      "description": "Issue a refund to the customer for an order."
+    },
+    {
+      "name": "refund_payment",
+      "description": "Refund a payment to the customer."
+    }
+  ],
+  "ledger": [
+    {
+      "tool": "issue_refund",
+      "status": "ok",
+      "args": {
+        "order_id": "4821",
+        "amount": 32
+      }
+    },
+    {
+      "tool": "refund_payment",
+      "status": "ok",
+      "args": {
+        "order_id": "4821",
+        "amount": 64
+      }
+    }
+  ],
+  "expected": {
+    "verdict": "unreported"
+  }
+}

@@ -14,6 +14,9 @@ REQUIRED = {
     "llm_suspected_tool_failed", "llm_blocks_fabricated", "llm_blocks_tool_failed",
     "llm_blocks_sibling_demoted", "llm_default_sibling_stays_suspected",
     "llm_confirmed_clears_unreported", "llm_ignore_tools_unmatched", "llm_row2_verb_keeps_llm_path",
+    "args_mismatch_rule_claim", "args_mismatch_llm_claim_suspected",
+    "args_mismatch_llm_claim_blocks", "args_mismatch_tool_stays_unreported",
+    "args_mismatch_behind_not_called", "args_check_off", "observed_is_none_elsewhere",
 }
 
 
@@ -29,7 +32,7 @@ def test_diff_fixture(stem, case):
     ledger = Ledger.from_dict(case["ledger"])
     r = diff(
         claims, ledger, known_tools=case["known_tools"], ignore_tools=case["ignore_tools"],
-        llm_blocks=case.get("llm_blocks", False),
+        llm_blocks=case.get("llm_blocks", False), check_args=case.get("check_args", True),
     )
     exp = case["expected"]
     assert r.verdict == exp["verdict"]

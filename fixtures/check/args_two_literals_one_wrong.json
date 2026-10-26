@@ -1,0 +1,31 @@
+{
+  "text": "I've refunded $64 for order 4821.",
+  "known_tools": [
+    {
+      "name": "issue_refund",
+      "description": "Issue a refund to the customer for an order."
+    }
+  ],
+  "ledger": [
+    {
+      "tool": "issue_refund",
+      "status": "ok",
+      "args": {
+        "amount": 64,
+        "order_id": "4822"
+      }
+    }
+  ],
+  "expected": {
+    "verdict": "fabricated",
+    "claimed_but_never_ran": [
+      {
+        "tool": "issue_refund",
+        "reason": "args_mismatch",
+        "observed": {
+          "order_id": "4822"
+        }
+      }
+    ]
+  }
+}
