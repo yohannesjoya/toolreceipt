@@ -9,6 +9,7 @@ from dataclasses import replace
 from typing import Any, Protocol
 
 from toolreceipt.claims import (
+    Claim,
     ClaimExtractor,
     NamedTool,
     RuleExtractor,
@@ -44,6 +45,25 @@ def _merge_tools(*groups: Iterable[ToolSpec]) -> list[ToolSpec]:
     return [ToolSpec(name, description) for name, description in merged.items()]
 
 
+def _specs(known: list[ToolSpec], ledger: Ledger) -> list[ToolSpec]:
+    """Known tools plus every tool the ledger saw, by name."""
+    return _merge_tools(known, (ToolSpec(name, "") for name in sorted(ledger.tools())))
+
+
+def _diff(
+    claims: list[Claim],
+    ledger: Ledger,
+    specs: list[ToolSpec],
+    ignore_tools: Collection[str],
+    llm_blocks: bool,
+    check_args: bool,
+) -> Receipt:
+    return diff(
+        claims, ledger, known_tools=[s.name for s in specs], ignore_tools=ignore_tools,
+        llm_blocks=llm_blocks, check_args=check_args,
+    )
+
+
 def _check(
     reply: str,
     ledger: Ledger,
@@ -53,12 +73,9 @@ def _check(
     llm_blocks: bool = False,
     check_args: bool = True,
 ) -> Receipt:
-    specs = _merge_tools(known, (ToolSpec(name, "") for name in sorted(ledger.tools())))
+    specs = _specs(known, ledger)
     claims = (extractor or RuleExtractor()).extract(reply, specs)
-    return diff(
-        claims, ledger, known_tools=[s.name for s in specs], ignore_tools=ignore_tools,
-        llm_blocks=llm_blocks, check_args=check_args,
-    )
+    return _diff(claims, ledger, specs, ignore_tools, llm_blocks, check_args)
 
 
 async def _acheck(
@@ -71,16 +88,13 @@ async def _acheck(
     check_args: bool = True,
 ) -> Receipt:
     """``_check`` that awaits an extractor's ``aextract`` coroutine when it has one."""
-    specs = _merge_tools(known, (ToolSpec(name, "") for name in sorted(ledger.tools())))
+    specs = _specs(known, ledger)
     aextract = getattr(extractor, "aextract", None)
     if inspect.iscoroutinefunction(aextract):
         claims = await aextract(reply, specs)
     else:
         claims = (extractor or RuleExtractor()).extract(reply, specs)
-    return diff(
-        claims, ledger, known_tools=[s.name for s in specs], ignore_tools=ignore_tools,
-        llm_blocks=llm_blocks, check_args=check_args,
-    )
+    return _diff(claims, ledger, specs, ignore_tools, llm_blocks, check_args)
 
 
 def check(
