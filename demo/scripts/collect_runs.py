@@ -2,10 +2,12 @@
 
 Usage (from ``demo/``)::
 
-    uv run python scripts/collect_runs.py --mode pressure --n 10 --out replays
+    uv run python scripts/collect_runs.py --mode pressure --n 10 --out replays [--llm]
 
 Each successful live run is saved as ``{out}/{mode}-{index:03d}.json`` in the exact
-``run_scenario`` return shape. Only live results are saved: the replay fallback is pointed at
+``run_scenario`` return shape. With ``--llm`` the extractor model also runs on each reply
+and its raw output is saved as ``llm_output``, so the replay goes through ``LLMExtractor``
+when served. Only live results are saved: the replay fallback is pointed at
 an empty directory, so a failed run raises instead of returning a recorded one. Runs are
 spaced out for Groq's free tier, with a longer back-off after a rate-limit error.
 """
@@ -49,11 +51,16 @@ def _next_index(out: Path, mode: str) -> int:
     return max(taken, default=0) + 1
 
 
-def _live_once(app: Any, mode: str, failures: _FailureNames) -> dict[str, Any] | None:
+def _live_once(
+    app: Any, mode: str, failures: _FailureNames, llm: bool = False
+) -> dict[str, Any] | None:
     """One live run; ``None`` after a failure (the app logs the exception type)."""
     failures.names.clear()
     try:
-        result: dict[str, Any] = app.run_scenario(mode, model=app.make_model())
+        result: dict[str, Any] = app.run_scenario(
+            mode, model=app.make_model(), llm=llm,
+            extractor_model=app.make_extractor_model() if llm else None,
+        )
     except FileNotFoundError:  # the empty replay dir: the live run failed
         return None
     if result.get("source") != "live":
@@ -66,6 +73,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--mode", required=True, choices=("honest", "pressure"))
     parser.add_argument("--n", type=int, default=10)
     parser.add_argument("--out", type=Path, default=DEMO / "replays")
+    parser.add_argument("--llm", action="store_true", help="also record the extractor's output")
     args = parser.parse_args(argv)
 
     load_dotenv(DEMO.parent / ".env")
@@ -85,13 +93,13 @@ def main(argv: list[str] | None = None) -> int:
     for run in range(args.n):
         if run:
             time.sleep(PAUSE_SECONDS)
-        result = _live_once(app, args.mode, failures)
+        result = _live_once(app, args.mode, failures, args.llm)
         backoffs = 0
         while result is None and backoffs < MAX_BACKOFFS and "RateLimitError" in failures.names:
             backoffs += 1
             print(f"run {run + 1}: rate limited, backing off {BACKOFF_SECONDS:g} s", flush=True)
             time.sleep(BACKOFF_SECONDS)
-            result = _live_once(app, args.mode, failures)
+            result = _live_once(app, args.mode, failures, args.llm)
         if result is None:
             print(f"run {run + 1}: failed ({', '.join(failures.names) or 'unknown'})", flush=True)
             continue

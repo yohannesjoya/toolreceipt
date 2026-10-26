@@ -711,7 +711,7 @@ def test_demo_pins_the_released_library():
 
     pyproject = (demo_app.HERE / "pyproject.toml").read_text(encoding="utf-8")
     pin = re.search(r'"toolreceipt\[langgraph\]==([\d.]+)"', pyproject)
-    assert pin is not None and pin.group(1) == toolreceipt.__version__ == "0.3.0"
+    assert pin is not None and pin.group(1) == toolreceipt.__version__ == "0.3.1"
     # Render installs from its own command, not from pyproject: the two pins must agree.
     render = (demo_app.HERE.parent / "render.yaml").read_text(encoding="utf-8")
     render_pin = re.search(r'toolreceipt\[langgraph\]==([\d.]+)', render)
@@ -733,3 +733,49 @@ def test_unknown_example_is_404_json(name):
 def test_examples_are_not_rate_limited():
     client = TestClient(demo_app.app)
     assert [client.get("/examples/clean").status_code for _ in range(3)] == [200, 200, 200]
+
+
+# ---------------------------------------------------------------------------
+# PRD 04 §9.4: collect_runs.py --llm records the extractor model's output
+# ---------------------------------------------------------------------------
+
+
+def test_run_scenario_uses_extractor_model_when_given():
+    extraction = json.dumps({"claims": [{"text": "Refund issued", "tool": "issue_refund"}]})
+    agent = fake(calls(REFUND, EMAIL), AIMessage(content="Refund issued."))
+    extractor = fake(AIMessage(content=extraction))
+    result = demo_app.run_scenario(
+        "pressure", model=agent, llm=True, extractor_model=extractor
+    )
+    assert result["source"] == "live" and result["llm_output"] == extraction
+    assert len(agent.seen) == 2 and len(extractor.seen) == 1
+
+
+def test_collect_runs_llm_flag_saves_llm_output(tmp_path, monkeypatch):
+    import importlib.util
+    from pathlib import Path
+
+    script = Path(demo_app.__file__).resolve().parent / "scripts" / "collect_runs.py"
+    spec = importlib.util.spec_from_file_location("collect_runs", script)
+    assert spec is not None and spec.loader is not None
+    collect_runs = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(collect_runs)
+
+    seen: list[dict[str, Any]] = []
+
+    def run_scenario(mode: str, **kwargs: Any) -> dict[str, Any]:
+        seen.append(kwargs)
+        return {
+            "mode": mode, "source": "live", "llm": True, "llm_error": None,
+            "reply": "Refund issued.", "ledger": [], "receipt": {"verdict": "clean", "ok": True},
+            "claims": [], "llm_output": '{"claims": []}',
+        }
+
+    monkeypatch.setenv("GROQ_API_KEY", "test-key-for-the-flag-only")
+    monkeypatch.setattr(demo_app, "run_scenario", run_scenario)
+    monkeypatch.setattr(demo_app, "make_model", lambda: "agent-model")
+    monkeypatch.setattr(demo_app, "make_extractor_model", lambda: "extractor-model")
+    assert collect_runs.main(["--mode", "honest", "--n", "1", "--out", str(tmp_path), "--llm"]) == 0
+    assert seen == [{"model": "agent-model", "llm": True, "extractor_model": "extractor-model"}]
+    saved = json.loads((tmp_path / "honest-001.json").read_text())
+    assert saved["llm_output"] == '{"claims": []}'

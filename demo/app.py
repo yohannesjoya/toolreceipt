@@ -264,13 +264,18 @@ def _run_live(
 
 
 def run_scenario(
-    mode: str, *, model: BaseChatModel | None = None, llm: bool = False
+    mode: str,
+    *,
+    model: BaseChatModel | None = None,
+    llm: bool = False,
+    extractor_model: BaseChatModel | None = None,
 ) -> dict[str, Any]:
     """Run the support desk agent live; on any failure serve a replay instead.
 
-    ``llm`` also runs ``LLMExtractor`` on the reply: one extra model call, on a temperature-0
-    JSON-mode model (or the injected ``model`` in tests). If that call fails the run is still
-    served, with the rule claims only and ``llm_error`` set.
+    ``llm`` also runs ``LLMExtractor`` on the reply: one extra model call, on
+    ``extractor_model`` when given, else on a temperature-0 JSON-mode model (or the injected
+    ``model`` in tests). If that call fails the run is still served, with the rule claims
+    only and ``llm_error`` set.
 
     Without an injected ``model`` the run uses Groq: a missing ``GROQ_API_KEY`` serves a
     replay without using a live slot, and once ``LIVE_RUNS_PER_MINUTE`` is spent a replay is
@@ -290,7 +295,8 @@ def run_scenario(
         live_model = model if model is not None else make_model()
         extractor = None
         if llm:
-            extractor_model = model if model is not None else make_extractor_model()
+            if extractor_model is None:
+                extractor_model = model if model is not None else make_extractor_model()
             extractor = LLMExtractor.from_chat_model(extractor_model)  # on_error="fallback"
         future = _executor.submit(_run_live, mode, live_model, deadline, extractor)
         try:
