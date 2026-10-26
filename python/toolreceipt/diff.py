@@ -25,6 +25,7 @@ def _copy(claim: Claim, **changes: Any) -> Claim:
     out = replace(claim, **changes)
     out._object_matched = claim._object_matched
     out._clause = claim._clause
+    out._sentence = claim._sentence
     return out
 
 
@@ -59,7 +60,9 @@ def _mismatch(claim: Claim, ok_entries: Sequence[LedgerEntry]) -> dict[str, Any]
     family_entries = [
         e for e in ok_entries if e.tool not in candidates and family_ran(claim.verb, [e.tool])
     ]
-    return args_verdict(claim, hit_entries, family_entries, _default_lexicon())
+    return args_verdict(
+        claim, hit_entries, family_entries, _default_lexicon(), context=ok_entries
+    )
 
 
 def diff(

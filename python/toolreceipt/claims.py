@@ -71,6 +71,9 @@ class Claim:
         # The reply clause the claim's literals are read from by the argument check, when
         # the extractor knows it (an LLM span may run across clauses); None means ``text``.
         self._clause: str | None = None
+        # The reply sentence the clause came from; the argument check counts amounts over
+        # it, since a clause split at a comma hides the second amount. None means ``text``.
+        self._sentence: str | None = None
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> Claim:
@@ -101,9 +104,12 @@ def normalize_tool_specs(
         if isinstance(tool, str):
             specs.append(ToolSpec(tool, ""))
         elif isinstance(tool, Mapping):
-            inner = tool.get("function")
+            inner = tool.get("function") or tool.get("custom")
             src: Mapping[str, Any] = inner if isinstance(inner, Mapping) else tool
-            specs.append(ToolSpec(str(src["name"]), str(src.get("description") or "")))
+            name = src.get("name")
+            if not isinstance(name, str) or not name:
+                continue  # a built-in tool spec such as {"type": "web_search"} names no tool
+            specs.append(ToolSpec(name, str(src.get("description") or "")))
         elif isinstance(tool, (tuple, list)):
             name, *rest = tool
             specs.append(ToolSpec(name, rest[0] if rest else ""))
@@ -939,5 +945,6 @@ class RuleExtractor:
                     candidates=candidates, confidence=confidence,
                 )
                 claim._object_matched = matched
+                claim._sentence = sentence
                 claims.append(claim)
         return _dedupe(claims)

@@ -303,7 +303,10 @@ def _guard(
         source="llm",
     )
     claim._object_matched = True
-    claim._clause = clauses[0]  # the argument check reads literals from this clause only
+    # The argument check reads literals from this clause and counts amounts over its sentence.
+    claim._clause = clauses[0]
+    located = _locate(loose_span, reply)
+    claim._sentence = located[0] if located is not None else span
     return claim
 
 
@@ -411,6 +414,7 @@ def _merge(rules: list[Claim], llm: list[Claim]) -> list[Claim]:
                 candidates=list(claim.candidates), confidence="medium", source="llm",
             )
             resolved._object_matched = True
+            resolved._sentence = r._sentence
             replaced.append(id(r))
             kept.append(resolved)
         else:

@@ -12,6 +12,14 @@
   ],
   "ledger": [
     {
+      "tool": "issue_refund",
+      "status": "ok",
+      "args": {
+        "order_id": "4821",
+        "amount": 32
+      }
+    },
+    {
       "tool": "refund_payment",
       "status": "ok",
       "args": {

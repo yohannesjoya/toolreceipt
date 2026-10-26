@@ -47,7 +47,38 @@ AMOUNT = [
     # "pounds" is a weight as often as a currency (review B3)
     ("I've updated your order to 3 pounds of apples.", None),
     ("Refunded £12.50.", Decimal("12.50")),
+    # PR review B2, B3: an open noun set after the amount, filler runs, more rate words
+    ("I've issued a partial refund for the $64 jacket.", None),
+    ("I've refunded your $200 deposit.", None),
+    ("I've refunded half of your original $64 charge.", None),
+    ("I've refunded $16 for each of the four mugs.", None),
+    ("I've refunded $16 apiece for the four mugs.", None),
+    ("I've refunded $16 x 4 mugs.", None),
+    ("I've refunded $64 less the restocking fee.", None),
+    ("I've refunded $64 before tax.", None),
+    ("I've refunded $64 excluding shipping.", None),
+    ("I've refunded $64 to your card.", Decimal(64)),
+    ("I've refunded $64 for order 4821.", Decimal(64)),
+    ("I've refunded $64 as a goodwill gesture.", Decimal(64)),
+    ("I've credited $64 back to your card.", Decimal(64)),
+    ("I've charged $64 on the 1st.", Decimal(64)),
+    # PR review B4: European and space-grouped formats are not judged
+    ("I've refunded €1.250,00 to your account.", None),
+    ("I've refunded €1 250 to your account.", None),
+    ("I've refunded €1,250.00 to your account.", Decimal("1250.00")),
 ]
+
+
+def test_find_amount_counts_over_the_sentence():
+    # PR review B1: the clause "I've refunded $64" sits in a sentence with a second amount
+    sentence = "I've refunded $64, minus the $5 restocking fee."
+    assert find_amount("I've refunded $64", sentence=sentence) is None
+    clause = "I've refunded $64"
+    assert find_amount(clause, sentence="I've refunded $64, as agreed.") == Decimal(64)
+    assert find_amount(clause, sentence="I've refunded $64, excluding shipping.") is None
+    assert find_amount(clause, sentence="I've refunded $64.") == Decimal(64)
+    # the literal must still sit in the clause itself
+    assert find_amount("I've refunded you", sentence="I've refunded you, $64 is due.") is None
 
 REFERENCE = [
     ("Cancelled order 4821.", ("order", "4821")),
@@ -63,6 +94,9 @@ REFERENCE = [
     ("Updated ticket #5521 for order 4821.", None),
     ("Created #5521.", None),
     ("Refunded $64.", None),
+    # PR review B6: digit groups are one number
+    ("Sent your package with tracking 9400 1118 9922 3334.", ("tracking", "9400111899223334")),
+    ("Updated account 1234 5678 today.", ("account", "12345678")),
 ]
 
 
@@ -126,6 +160,8 @@ def test_literals_shape():
         (AMT, _e(amount="$64"), (True, {})),
         (AMT_CENTS, _e(amount=19.99), (True, {})),
         (AMT, _e(amount=True), (None, {})),
+        (AMT, _e(amount=float("nan")), (None, {})),
+        (AMT, _e(amount=float("inf")), (None, {})),
         (AMT, _e(amount=-64), (True, {})),
         (AMT, _e(charge="ch_3N9x"), (None, {})),
         (AMT, _e(amount="ch_3N9x"), (None, {})),
@@ -136,6 +172,7 @@ def test_literals_shape():
         (REF, _e("cancel_order", order="ORD-2024-4821"), (True, {})),
         (REF, _e("cancel_order", order_id=4821), (True, {})),
         (REF, _e("cancel_order", orderId="004821"), (True, {})),
+        (REF, _e("cancel_order", order_id="48 21"), (True, {})),
         (REF, _e("cancel_order", customer_id=77812), (None, {})),
         (REF, _e("cancel_order", id="4822"), (None, {})),
         (REF, _e("cancel_order", order_id="pending"), (None, {})),
@@ -159,6 +196,29 @@ def test_entry_verdict_amount_sum():
     assert entry_verdict(AMT, _e(amount=32), LEX, amount_sum=Decimal(50)) == (
         False, {"amount": 32},
     )
+
+
+def test_reference_agrees_through_a_mapping_entry():
+    # PR review B5: a lookup whose result holds both the display number and the internal id
+    claim = _claim("Cancelled order #1001")
+    lookup = LedgerEntry(
+        tool="lookup_order", args={"order_number": "1001"},
+        result='{"id": 450789469, "name": "#1001"}',
+    )
+    cancel = _e("cancel_order", order_id=450789469)
+    assert args_verdict(claim, [cancel], [], LEX, context=[lookup, cancel]) is None
+    mismatch = {"order_id": 450789469}
+    assert args_verdict(claim, [cancel], [], LEX, context=[cancel]) == mismatch
+    other = LedgerEntry(tool="lookup_order", args={"order_id": "1001"}, result="Order 1001 open.")
+    assert args_verdict(claim, [cancel], [], LEX, context=[other, cancel]) == mismatch
+
+
+def test_amount_sum_is_one_value_per_entry():
+    # PR review N3: two keyed amounts on one call do not sum
+    c = _claim("I've refunded $64")
+    one_call = [_e(amount=32, fee_amount=32)]
+    assert args_verdict(c, one_call, [], LEX) == {"amount": 32, "fee_amount": 32}
+    assert args_verdict(c, [_e(amount=32), _e(amount=32)], [], LEX) is None
 
 
 def test_args_verdict_aggregation():

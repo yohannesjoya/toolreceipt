@@ -1,0 +1,21 @@
+{
+  "text": "I've refunded your $200 deposit, minus cleaning.",
+  "known_tools": [
+    {
+      "name": "issue_refund",
+      "description": "Issue a refund to the customer for an order."
+    }
+  ],
+  "ledger": [
+    {
+      "tool": "issue_refund",
+      "status": "ok",
+      "args": {
+        "amount": 150
+      }
+    }
+  ],
+  "expected": {
+    "verdict": "clean"
+  }
+}

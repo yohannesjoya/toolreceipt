@@ -1,0 +1,21 @@
+{
+  "text": "I've refunded $19.99 for the mug and $5.99 for shipping.",
+  "known_tools": [
+    {
+      "name": "issue_refund",
+      "description": "Issue a refund to the customer for an order."
+    }
+  ],
+  "ledger": [
+    {
+      "tool": "issue_refund",
+      "status": "ok",
+      "args": {
+        "amount": 25.98
+      }
+    }
+  ],
+  "expected": {
+    "verdict": "clean"
+  }
+}

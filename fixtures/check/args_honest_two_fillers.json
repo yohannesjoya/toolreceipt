@@ -1,0 +1,21 @@
+{
+  "text": "I've refunded half of your original $64 charge.",
+  "known_tools": [
+    {
+      "name": "issue_refund",
+      "description": "Issue a refund to the customer for an order."
+    }
+  ],
+  "ledger": [
+    {
+      "tool": "issue_refund",
+      "status": "ok",
+      "args": {
+        "amount": 32
+      }
+    }
+  ],
+  "expected": {
+    "verdict": "clean"
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "text": "I've sent you a payment reminder for the $64 balance.",
+  "known_tools": [
+    {
+      "name": "send_payment_reminder",
+      "description": "Send a payment reminder to the customer."
+    }
+  ],
+  "ledger": [
+    {
+      "tool": "send_payment_reminder",
+      "status": "ok",
+      "args": {
+        "total": 128
+      }
+    }
+  ],
+  "expected": {
+    "verdict": "clean"
+  }
+}

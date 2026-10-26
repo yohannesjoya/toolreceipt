@@ -1,0 +1,21 @@
+{
+  "text": "I've sent your package with tracking 9400 1118 9922 3334.",
+  "known_tools": [
+    {
+      "name": "send_package",
+      "description": "Send a package to the customer."
+    }
+  ],
+  "ledger": [
+    {
+      "tool": "send_package",
+      "status": "ok",
+      "args": {
+        "tracking_number": "9400111899223334"
+      }
+    }
+  ],
+  "expected": {
+    "verdict": "clean"
+  }
+}

@@ -16,7 +16,7 @@ REQUIRED = {
     "llm_confirmed_clears_unreported", "llm_ignore_tools_unmatched", "llm_row2_verb_keeps_llm_path",
     "args_mismatch_rule_claim", "args_mismatch_llm_claim_suspected",
     "args_mismatch_llm_claim_blocks", "args_mismatch_tool_stays_unreported",
-    "args_mismatch_behind_not_called", "args_check_off",
+    "args_mismatch_behind_not_called", "args_check_off", "observed_is_none_elsewhere",
 }
 
 
