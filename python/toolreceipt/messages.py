@@ -214,7 +214,7 @@ def _settled(message: Any) -> LedgerEntry | None:
             f"a settled transcript entry's status must be 'ok' or 'error', got {shown} in "
             f"{_shape(message)}"
         )
-    error = _get(message, "error")
+    error = _as_text(_get(message, "error"))
     if status == "error" and not error:
         error = NO_RESULT
     call_id = _get(message, "call_id")
@@ -222,13 +222,38 @@ def _settled(message: Any) -> LedgerEntry | None:
         tool=tool,
         status=status,
         args=coerce_args(_get(message, "args")),
-        result=_get(message, "result"),
-        error=error if status == "error" else _get(message, "error"),
+        result=_as_text(_get(message, "result")),
+        error=error,
         call_id=str(call_id) if call_id is not None else None,
         parent_run_id=_get(message, "parent_run_id"),
-        started_at=_get(message, "started_at"),
-        ended_at=_get(message, "ended_at"),
+        started_at=_timestamp(message, "started_at"),
+        ended_at=_timestamp(message, "ended_at"),
     )
+
+
+def _as_text(value: Any) -> str | None:
+    """A result or error as the ledger stores it: a string as is, ``None`` as is, anything
+    else (a structured tool result) as JSON text, with the tolerance ``coerce_args`` has."""
+    if value is None or isinstance(value, str):
+        return value
+    try:
+        return json.dumps(value, default=str)
+    except (TypeError, ValueError, RecursionError):
+        return str(value)
+
+
+def _timestamp(message: Any, key: str) -> float | None:
+    """A settled entry's ``started_at``/``ended_at``: a number or ``None``; anything else
+    (an ISO string, a bool) raises, because ``Ledger.entries`` sorts by it."""
+    value = _get(message, key)
+    if value is None:
+        return None
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ValueError(
+            f"a settled transcript entry's {key} must be a number or null, got "
+            f"{type(value).__name__} in {_shape(message)}"
+        )
+    return value
 
 
 def _pair(messages: Iterable[Any]) -> list[LedgerEntry]:

@@ -22,6 +22,7 @@ REQUIRED = {
     "responses_custom_tool_call_rejected", "responses_mcp_call_rejected",
     "openai_image_only_user_continues_run", "responses_builtin_tool_in_list",
     "transcript_settled_entries_last_run", "transcript_settled_entry_after_reply",
+    "transcript_settled_entry_structured_result",
 }
 
 

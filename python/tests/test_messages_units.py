@@ -133,6 +133,24 @@ def test_settled_entry_defaults_and_errors():
             _settled(bad)
 
 
+def test_settled_entry_structured_result_and_error_become_text():
+    e = _settled({"tool": "lookup_order", "result": {"id": "450789469", "name": "#1001"}})
+    assert e.result == '{"id": "450789469", "name": "#1001"}'
+    e = _settled({"tool": "x", "status": "error", "error": {"code": 504}})
+    assert e.error == '{"code": 504}'
+    assert _settled({"tool": "x", "result": "plain"}).result == "plain"
+    assert _settled({"tool": "x"}).result is None
+
+
+def test_settled_entry_timestamps_must_be_numbers():
+    e = _settled({"tool": "x", "started_at": 1, "ended_at": 1.5})
+    assert (e.started_at, e.ended_at) == (1, 1.5)
+    assert _settled({"tool": "x"}).started_at is None
+    for bad in ({"tool": "x", "started_at": "2026-10-31T10:00"}, {"tool": "x", "ended_at": True}):
+        with pytest.raises(ValueError):
+            _settled(bad)
+
+
 def test_settled_entry_errors_do_not_leak_the_entry():
     secret = "dana.reyes@example.com owes $64"
     leaky = (

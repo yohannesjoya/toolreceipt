@@ -1,0 +1,20 @@
+{
+  "messages": [
+    {
+      "role": "user",
+      "content": "Hi"
+    },
+    {
+      "tool": "lookup_order",
+      "started_at": "2026-10-31T10:00"
+    },
+    {
+      "role": "assistant",
+      "content": "Hi."
+    }
+  ],
+  "known_tools": [
+    "lookup_order"
+  ],
+  "raises": "ValueError"
+}
