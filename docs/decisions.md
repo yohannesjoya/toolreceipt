@@ -176,10 +176,42 @@ comes back as an image-only user message; both continue the run), because a whol
 conversation would mark every earlier turn's tools `ran_but_unreported` and compare the last
 reply's amounts with earlier calls. The final reply is `""` when the run ends on a tool call,
 so an abandoned run checks as "no claims, tools unreported" rather than against an earlier
-preamble; the LangChain `final_reply` keeps returning the last text until 0.4 aligns it. A
+preamble; 0.4.0 aligned the LangChain `final_reply` the same way. A
 tool result is `ok` unless Anthropic's explicit `is_error` says otherwise: reading "Error:"
 out of a result would turn a successful call into `tool_failed`. Recognised but unsupported
 shapes (the legacy `function_call` field, `role: "function"`, custom and MCP tool calls,
 LangChain message objects) raise rather than yield an empty ledger that would make every
 claim `not_called` or every run `clean` silently. A built-in tool spec in the `tools` list
 names no tool and is skipped.
+
+## Per-turn receipts are a pure function of the message prefix; the window closes at the next assistant turn with text
+
+`check_turns` gives one receipt per assistant message with text. Receipt *n* is computed from
+turn *n*'s text and the tool calls made from the start of the list through the message just
+before turn *n+1*, so the windows partition the list and a call made right after the sentence
+that claims it still confirms the claim. A claim whose call only lands after the next assistant
+turn is `not_called` on its own receipt: that is a true statement about what had happened when
+the sentence was spoken, and the reporter on issue #4 agreed on the boundary. A call with no
+result at the end of the last window is `tool_failed`, so a run that ends on a pending call
+reports the turn that claimed it, where `check_messages` returns `clean` (no reply to check).
+The ledger is cumulative over the whole conversation, not per run as `check_messages` scopes
+it, because a per-run ledger flags every honest restatement after a later user message ("As I
+mentioned, your refund has been issued."); the cost is recall on an agent that claims to repeat
+an earlier action without calling the tool again, which precision-first accepts.
+`ran_but_unreported` is scoped to the turn's own window, so a read tool from turn 1 is not
+reported again on every later turn; an entry confirmed by a later turn still shows as
+unreported on its own turn, because that receipt is a function of its prefix. The entry's
+window is decided by the call's position, never by when the result arrived. There is no grace
+window, revisable verdict or live callback: the reporter's traces are recorded transcripts, and
+their parity check needs every receipt to be a pure function of the trace; appending messages
+never changes an earlier receipt, with the rule extractor or any deterministic extractor.
+Identity verification ("I've verified your identity") is not a claim in the lexicon, so a
+dishonest "silence mid-auth" turn is out of reach; the reporter was told before labelling.
+Consecutive assistant text messages are not merged into one turn, so a transcript must carry
+one assistant line per spoken turn and no silent progress updates as assistant lines.
+
+## The LangChain `final_reply` is `""` when the run ends on a tool call
+
+PRD 04's review (F9) showed that checking an earlier message's text against the whole ledger
+compares the wrong turn; the message-list `final_reply` returned `""` from 0.3.1 and the
+LangChain one was aligned in 0.4.0, a minor version, because it changes a shipped result.

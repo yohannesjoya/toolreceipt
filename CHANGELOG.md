@@ -13,6 +13,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   replay (`run_scenario(extractor_model=)`), so recorded runs replay through `LLMExtractor`.
   The demo is pinned to toolreceipt 0.3.1.
 
+## [0.4.0] - 2026-10-31
+
+### Added
+
+- `check_turns()`, `acheck_turns()` and `TurnReceipt` (`toolreceipt.turns`): one receipt per
+  assistant turn with text over a whole recorded conversation, in the message lists
+  `check_messages` reads. Receipt *n* checks turn *n*'s text against every tool call made
+  before turn *n+1*; the ledger is cumulative over the conversation, `ran_but_unreported` is
+  scoped to the turn's own window, the last turn closes as-is (a pending call is
+  `tool_failed`), and each receipt is a pure function of the messages up to the end of its
+  window. `TurnReceipt` adds `turn`, `message_index` and `text` to `Receipt`.
+- Transcript shape in `toolreceipt.messages`: `{"role", "content"}` lines with settled ledger
+  entries (`{"tool": ..., "status": "ok" | "error", ...}`) placed where the tool settled,
+  read by `check_turns` and `check_messages` alike. A settled entry with a bad `status` or an
+  empty `tool` raises `ValueError`.
+- Fixtures: `fixtures/turns/` (19 hand-written stems and 8 honest multi-turn transcripts
+  derived from the demo replays) and a corpus test that rebuilds every held-out reply, demo
+  replay and demo example as a one-turn transcript and checks it equals `check()`.
+
+### Changed
+
+- `toolreceipt.langgraph.final_reply` returns `""` when the last `AIMessage` with text carries
+  a tool call or is followed by one, as `toolreceipt.messages.final_reply` already did: a run
+  that ends on a tool call has no final reply. `toolreceipt.messages.final_reply` likewise
+  returns `""` when a settled transcript entry follows the last assistant line.
+
 ## [0.3.1] - 2026-10-30
 
 ### Added
