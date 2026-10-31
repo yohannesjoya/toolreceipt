@@ -5,7 +5,7 @@ services:
     plan: free
     buildFilter:
       paths: ["demo/**"]
-    buildCommand: pip install "toolreceipt[langgraph]==0.3.1" fastapi "uvicorn[standard]" "langchain-groq>=1.1" python-dotenv
+    buildCommand: pip install "toolreceipt[langgraph]==0.4.0" fastapi "uvicorn[standard]" "langchain-groq>=1.1" python-dotenv
     startCommand: cd demo && python -m uvicorn app:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /healthz
     envVars:
