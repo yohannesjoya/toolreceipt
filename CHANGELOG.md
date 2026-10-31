@@ -7,12 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
-
-- Demo: `scripts/collect_runs.py --llm` records the extractor model's raw output into each
-  replay (`run_scenario(extractor_model=)`), so recorded runs replay through `LLMExtractor`.
-  The demo is pinned to toolreceipt 0.3.1.
-
 ## [0.4.0] - 2026-10-31
 
 ### Added
@@ -31,6 +25,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixtures: `fixtures/turns/` (24 hand-written stems and 8 honest multi-turn transcripts
   derived from the demo replays) and a corpus test that rebuilds every held-out reply, demo
   replay and demo example as a one-turn transcript and checks it equals `check()`.
+- Demo: `scripts/collect_runs.py --llm` records the extractor model's raw output into each
+  replay (`run_scenario(extractor_model=)`), so recorded runs replay through `LLMExtractor`.
+  The demo is pinned to toolreceipt 0.4.0.
 
 ### Changed
 
