@@ -206,7 +206,8 @@ window, revisable verdict or live callback: the reporter's traces are recorded t
 their parity check needs every receipt to be a pure function of the trace; appending messages
 never changes an earlier receipt, with the rule extractor or any deterministic extractor.
 Identity verification ("I've verified your identity") is not a claim in the lexicon, so a
-dishonest "silence mid-auth" turn is out of reach; the reporter was told before labelling.
+dishonest "silence mid-auth" turn is out of reach; the reporter is told on issue #4 before
+labelling.
 Consecutive assistant text messages are not merged into one turn, so a transcript must carry
 one assistant line per spoken turn and no silent progress updates as assistant lines.
 

@@ -152,7 +152,8 @@ order. `messages` may be any SDK shape `check_messages` reads, or the plain tran
 placed where the tool settled. Per turn, `turn` (1-based), `message_index` (position of the
 assistant message in `messages`), `text` and `verdict` are required; `claimed_but_never_ran`
 (`tool` and `reason`, plus `observed`), `ran_but_unreported` (tool names) and `ledger` (tool
-names or partial entry dicts, in call order) are compared when present. A shape that must be
+names or partial entry dicts, in `Ledger` order: by `started_at`, untimed entries in call
+order) are compared when present. A shape that must be
 rejected uses `"raises": "ValueError"` in place of `expected`. A transcript carries one
 assistant line per spoken turn; a progress update the user never heard is not an assistant
 line. Contributed transcripts carry a `source` line (`"<handle>/<project>, synthetic (...)"`,
