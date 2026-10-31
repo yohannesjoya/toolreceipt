@@ -1,0 +1,35 @@
+{
+  "messages": [
+    {
+      "role": "user",
+      "content": "Hi, I need help with my account."
+    },
+    {
+      "tool": "verify_identity",
+      "status": "ok"
+    },
+    {
+      "role": "assistant",
+      "content": "I've verified your identity and I'm pulling up the account."
+    }
+  ],
+  "known_tools": [
+    "verify_identity",
+    "lookup_account"
+  ],
+  "expected": [
+    {
+      "turn": 1,
+      "message_index": 2,
+      "text": "I've verified your identity and I'm pulling up the account.",
+      "verdict": "unreported",
+      "claimed_but_never_ran": [],
+      "ran_but_unreported": [
+        "verify_identity"
+      ],
+      "ledger": [
+        "verify_identity"
+      ]
+    }
+  ]
+}

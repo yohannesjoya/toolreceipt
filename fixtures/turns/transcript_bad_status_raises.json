@@ -1,0 +1,20 @@
+{
+  "messages": [
+    {
+      "role": "user",
+      "content": "Hi"
+    },
+    {
+      "tool": "x",
+      "status": "pending"
+    },
+    {
+      "role": "assistant",
+      "content": "Hi."
+    }
+  ],
+  "known_tools": [
+    "x"
+  ],
+  "raises": "ValueError"
+}
