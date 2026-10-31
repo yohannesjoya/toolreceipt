@@ -300,7 +300,9 @@ def ledger_from_messages(messages: Sequence[Any]) -> Ledger:
 
 
 def final_reply(result: Mapping[str, Any] | Sequence[Any]) -> str:
-    """Text of the last ``AIMessage`` with non-empty text, else ``""``.
+    """Text of the last ``AIMessage`` with non-empty text, or ``""`` when the run ends on a
+    tool call: that message carries ``tool_calls``, or an ``AIMessage`` with ``tool_calls``
+    or a ``ToolMessage`` follows it (as ``toolreceipt.messages.final_reply``).
 
     Accepts a graph result dict with ``messages`` or a messages list.
     """
@@ -308,7 +310,11 @@ def final_reply(result: Mapping[str, Any] | Sequence[Any]) -> str:
     if not isinstance(messages, Sequence):
         return ""
     for message in reversed(messages):
+        if isinstance(message, ToolMessage):
+            return ""
         if isinstance(message, AIMessage):
+            if message.tool_calls:
+                return ""
             text = str(message.text)
             if text.strip():
                 return text

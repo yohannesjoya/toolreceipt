@@ -40,6 +40,13 @@ dependencies beyond the standard library.
   result and a display number a lookup mapped to the id (`#1001` to `450789469`) all agree.
   Measured on the 19 recorded demo runs, the 6 demo examples and the held-out replies: no
   honest reply flagged. `check_args=False` turns it off.
+- **Claims in a run that never finished.** `check_turns` gives one receipt per assistant turn
+  of a recorded conversation. A turn that says "Your refund has been issued." with no
+  `issue_refund` call before the next assistant turn is `fabricated` on its own receipt, even
+  when the conversation ends there (the caller hung up, the agent died mid-call). A claim whose
+  call only lands after the next assistant turn is `not_called` on that turn: at the moment the
+  sentence was spoken, the action had not happened. Progress statements ("your refund is being
+  issued", "I'm issuing it now") are not claims, like the future tense.
 
 Precision comes before recall. Negation ("I did not send"), the future ("I'll send"),
 advice ("you can create a ticket"), conditionals and offers are not claims.
@@ -55,7 +62,8 @@ advice ("you can create a ticket"), conditionals and offers are not claims.
 - **Quantities.** "Updated 3 rows" against one call is recorded as a count on the claim, never judged.
 - **Non-English replies.** The default extractor is English only. `LLMExtractor` reads
   other languages, but its guards are English only (see below).
-- **Streaming and mid-run checks.** Only the final reply is checked.
+- **Live mid-run checks.** `check_turns` reads a finished message list; there is no
+  turn-boundary callback for a run in progress.
 - **Tool names without a verb, when the description does not lead with one.** A tool
   called `jira` or `email_customer` is matched through the first verb of its description
   ("Create a ticket in Jira", "Email the customer"). Only the first word counts, and a
@@ -236,6 +244,7 @@ on one model round trip (one to three seconds on Groq).
 | **Claim** | One assertion in the reply that an action was performed: quoted `text`, `verb`, `object`, `count`, candidate `tool`s; `observed` holds the contradicting arguments of an `args_mismatch` claim. |
 | **Receipt** | The result of diffing claims against the ledger. |
 | **Verdict** | `clean`, `unreported` or `fabricated`. Only `fabricated` is blocking (`receipt.ok` is `False`). |
+| **Turn** | An assistant message with non-empty text. `check_turns` returns one `TurnReceipt` per turn; its window runs to the next turn. |
 
 `Claim.text` is the clause after normalisation (curly quotes straightened, runs of whitespace
 folded), so it can differ from the raw substring of the reply.
@@ -275,6 +284,43 @@ legacy `function_call` shape, custom and MCP tool calls (not read yet) and LangC
 objects raise a `ValueError` instead of producing an empty ledger. A built-in tool in the
 `tools` list (`{"type": "web_search"}`) is skipped. `acheck_messages` is the async twin.
 
+To check every assistant turn of a recorded conversation, not only the final reply:
+
+```python
+from toolreceipt import check_turns
+
+receipts = check_turns(messages, known_tools=tools)   # one TurnReceipt per assistant turn with text
+for r in receipts:
+    if not r.ok:
+        print(r.turn, r.text, r.summary)
+# 2 Your refund has been issued. 1 claimed action never ran: issue_refund ("Your refund has been issued").
+
+# a plain transcript: role/content lines with settled tool entries where they happened
+transcript = [
+    {"role": "user", "content": "Refund order 4821."},
+    {"role": "assistant", "content": "Let me check that order."},
+    {"tool": "lookup_order", "status": "ok", "args": {"order_id": "4821"}},
+    {"role": "assistant", "content": "Your refund has been issued."},
+]
+receipts = check_turns(transcript, known_tools=["lookup_order", "issue_refund"])
+# receipt 1 unreported (lookup_order), receipt 2 fabricated (issue_refund not_called)
+```
+
+`check_turns` reads the same message lists as `check_messages`, plus a plain transcript shape:
+`{"role": ..., "content": ...}` lines with settled ledger entries (`{"tool": "issue_refund",
+"status": "ok" | "error"}`, optionally `args`, `result`, `error`, `call_id`) placed where the
+tool settled. A `TurnReceipt` is a `Receipt` plus `turn` (1-based), `message_index` and `text`.
+Receipt *n* checks turn *n*'s text against every tool call made before turn *n+1*, so the
+ledger is cumulative over the whole conversation (an honest restatement after a later user
+message is confirmed), while `ran_but_unreported` lists only the calls made in that turn's own
+window. `check_messages` reads the last run only, and returns `clean` on a run that ends on a
+pending tool call (no reply to check) where `check_turns` reports the turn that claimed it.
+Each receipt is a pure function of the messages up to the end of its window, with the rule
+extractor or any deterministic extractor: appending messages never changes an earlier receipt.
+A transcript needs one assistant line per spoken turn; a progress update the user never heard
+must not be recorded as an assistant line, or it closes the previous turn's window early.
+`acheck_turns` is the async twin.
+
 With LangChain messages from a finished run, build the ledger with the adapter:
 
 ```python
@@ -286,9 +332,8 @@ receipt = check(final_reply(result), ledger, known_tools=["issue_refund", "send_
 ```
 
 `ledger_from_messages` pairs each `AIMessage` tool call with its `ToolMessage`. A call with
-no result is recorded as an error. Timestamps are `None` on this path. This `final_reply`
-returns the last `AIMessage` with text even when a tool call follows it; the message-list
-one returns `""` then.
+no result is recorded as an error. Timestamps are `None` on this path. Like the message-list
+one, this `final_reply` returns `""` when the run ends on a tool call.
 
 Pass `known_tools`. A ledger only knows the tools that ran, so without `known_tools` a claim
 about a tool that was never called ("I emailed you" when `send_email` never ran) has nothing
@@ -355,11 +400,12 @@ With `capture_results=False` no argument is stored and nothing is quoted.
 
 Done in 0.2: LLM-backed extractor behind the existing `ClaimExtractor` protocol. Done in
 0.3: async API; verbless tool names matched through their descriptions; framework-free
-message input; argument check for amounts and reference numbers.
+message input; argument check for amounts and reference numbers. Done in 0.4: per-turn
+receipts over a whole conversation, and a plain transcript shape.
 
 - TypeScript port, sharing the JSON fixtures as the contract
 - Adapters: Mastra, CrewAI, Vercel AI SDK
-- Per-turn receipts for runs that end without a final reply
+- `check_turns` over a LangGraph result (a LangChain-to-message-list converter)
 
 ## Contributing
 

@@ -161,6 +161,15 @@ def test_final_reply_edge_cases():
     assert final_reply({"messages": [HumanMessage("x"), CALLS, FINAL]}) == FINAL.content
     assert final_reply([HumanMessage("x"), CALLS]) == ""
     assert final_reply({"messages": []}) == ""
+    # PRD 05 §8.1: a run that ends on a tool call has no final reply, as in toolreceipt.messages
+    text_and_call = AIMessage(
+        content="I've issued your refund.",
+        tool_calls=[{"name": "issue_refund", "args": {}, "id": "c9"}],
+    )
+    assert final_reply([HumanMessage("x"), text_and_call]) == ""
+    result = ToolMessage(content="ok", tool_call_id="c1")
+    assert final_reply([HumanMessage("x"), FINAL, CALLS, result]) == ""
+    assert final_reply([HumanMessage("x"), CALLS, result, FINAL]) == FINAL.content
 
 
 def test_handler_thread_safety_and_flush():

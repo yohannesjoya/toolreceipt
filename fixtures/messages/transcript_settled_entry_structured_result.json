@@ -1,0 +1,71 @@
+{
+  "messages": [
+    {
+      "role": "user",
+      "content": "Refund order #1001."
+    },
+    {
+      "tool": "lookup_order",
+      "status": "ok",
+      "args": {
+        "order_number": "1001"
+      },
+      "result": {
+        "id": "450789469",
+        "name": "#1001"
+      }
+    },
+    {
+      "tool": "issue_refund",
+      "status": "ok",
+      "args": {
+        "order_id": "450789469",
+        "amount": 64
+      },
+      "result": {
+        "refund_id": "R-7731",
+        "amount": 64
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "I've refunded order #1001."
+    }
+  ],
+  "known_tools": [
+    {
+      "type": "function",
+      "function": {
+        "name": "lookup_order",
+        "description": "Look up an order by its id."
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "issue_refund",
+        "description": "Issue a refund to the customer for an order."
+      }
+    }
+  ],
+  "expected": {
+    "ledger": [
+      {
+        "tool": "lookup_order",
+        "status": "ok",
+        "result": "{\"id\": \"450789469\", \"name\": \"#1001\"}"
+      },
+      {
+        "tool": "issue_refund",
+        "status": "ok",
+        "args": {
+          "order_id": "450789469",
+          "amount": 64
+        },
+        "result": "{\"refund_id\": \"R-7731\", \"amount\": 64}"
+      }
+    ],
+    "final_reply": "I've refunded order #1001.",
+    "verdict": "unreported"
+  }
+}

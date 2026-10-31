@@ -1,0 +1,36 @@
+{
+  "messages": [
+    {
+      "type": "human",
+      "content": "hi"
+    },
+    {
+      "role": "assistant",
+      "content": "Done."
+    }
+  ],
+  "known_tools": [
+    {
+      "type": "function",
+      "function": {
+        "name": "lookup_order",
+        "description": "Look up an order by its id."
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "issue_refund",
+        "description": "Issue a refund to the customer for an order."
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "send_email",
+        "description": "Send an email to the customer."
+      }
+    }
+  ],
+  "raises": "ValueError"
+}

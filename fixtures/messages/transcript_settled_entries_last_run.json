@@ -1,0 +1,66 @@
+{
+  "messages": [
+    {
+      "role": "user",
+      "content": "Where is order 4821?"
+    },
+    {
+      "tool": "lookup_order",
+      "status": "ok",
+      "args": {
+        "order_id": "4821"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "Let me check."
+    },
+    {
+      "role": "user",
+      "content": "Refund it."
+    },
+    {
+      "tool": "issue_refund",
+      "status": "ok",
+      "args": {
+        "order_id": "4821",
+        "amount": 64
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "I've refunded $64 for order 4821."
+    }
+  ],
+  "known_tools": [
+    {
+      "type": "function",
+      "function": {
+        "name": "lookup_order",
+        "description": "Look up an order by its id."
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "issue_refund",
+        "description": "Issue a refund to the customer for an order."
+      }
+    }
+  ],
+  "expected": {
+    "ledger": [
+      {
+        "tool": "issue_refund",
+        "status": "ok",
+        "args": {
+          "order_id": "4821",
+          "amount": 64
+        },
+        "error": null
+      }
+    ],
+    "final_reply": "I've refunded $64 for order 4821.",
+    "verdict": "clean"
+  }
+}

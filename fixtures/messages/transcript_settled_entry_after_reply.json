@@ -1,0 +1,35 @@
+{
+  "messages": [
+    {
+      "role": "user",
+      "content": "Refund order 4821."
+    },
+    {
+      "role": "assistant",
+      "content": "I've issued your refund."
+    },
+    {
+      "tool": "issue_refund",
+      "status": "ok"
+    }
+  ],
+  "known_tools": [
+    {
+      "type": "function",
+      "function": {
+        "name": "issue_refund",
+        "description": "Issue a refund to the customer for an order."
+      }
+    }
+  ],
+  "expected": {
+    "ledger": [
+      {
+        "tool": "issue_refund",
+        "status": "ok"
+      }
+    ],
+    "final_reply": "",
+    "verdict": "unreported"
+  }
+}

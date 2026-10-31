@@ -1,0 +1,47 @@
+{
+  "messages": [
+    {
+      "role": "user",
+      "content": "Where is order 4821?"
+    },
+    {
+      "tool": "lookup_order"
+    },
+    {
+      "tool": "x",
+      "status": "error"
+    },
+    {
+      "role": "assistant",
+      "content": "Anything else?"
+    }
+  ],
+  "known_tools": [
+    "lookup_order",
+    "x"
+  ],
+  "expected": [
+    {
+      "turn": 1,
+      "message_index": 3,
+      "text": "Anything else?",
+      "verdict": "unreported",
+      "claimed_but_never_ran": [],
+      "ran_but_unreported": [
+        "lookup_order"
+      ],
+      "ledger": [
+        {
+          "tool": "lookup_order",
+          "status": "ok",
+          "call_id": null
+        },
+        {
+          "tool": "x",
+          "status": "error",
+          "error": "no result"
+        }
+      ]
+    }
+  ]
+}

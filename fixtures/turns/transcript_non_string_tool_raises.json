@@ -1,0 +1,19 @@
+{
+  "messages": [
+    {
+      "role": "user",
+      "content": "Hi"
+    },
+    {
+      "tool": 5
+    },
+    {
+      "role": "assistant",
+      "content": "Hi."
+    }
+  ],
+  "known_tools": [
+    "lookup_order"
+  ],
+  "raises": "ValueError"
+}

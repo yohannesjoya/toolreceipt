@@ -6,8 +6,9 @@ from toolreceipt.llm import LLMExtractor
 from toolreceipt.messages import acheck_messages, check_messages
 from toolreceipt.receipt import Receipt, Verdict
 from toolreceipt.receipts import Receipts, acheck, check
+from toolreceipt.turns import TurnReceipt, acheck_turns, check_turns
 
-__version__ = "0.3.1"
+__version__ = "0.4.0"
 
 __all__ = [
     "Claim",
@@ -19,10 +20,13 @@ __all__ = [
     "Receipts",
     "RuleExtractor",
     "ToolSpec",
+    "TurnReceipt",
     "Verdict",
     "__version__",
     "acheck",
     "acheck_messages",
+    "acheck_turns",
     "check",
     "check_messages",
+    "check_turns",
 ]

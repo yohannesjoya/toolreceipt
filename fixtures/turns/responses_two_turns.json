@@ -1,0 +1,88 @@
+{
+  "messages": [
+    {
+      "role": "user",
+      "content": "Where is order 4821?"
+    },
+    {
+      "type": "message",
+      "role": "assistant",
+      "content": [
+        {
+          "type": "output_text",
+          "text": "Let me look into that."
+        }
+      ]
+    },
+    {
+      "type": "function_call",
+      "call_id": "call_1",
+      "name": "lookup_order",
+      "arguments": "{\"order_id\": \"4821\"}"
+    },
+    {
+      "type": "function_call_output",
+      "call_id": "call_1",
+      "output": "Order 4821: 1x ceramic table lamp, paid $64.00, status delivered."
+    },
+    {
+      "type": "message",
+      "role": "assistant",
+      "content": [
+        {
+          "type": "output_text",
+          "text": "Order 4821 was delivered on Monday."
+        }
+      ]
+    }
+  ],
+  "known_tools": [
+    {
+      "type": "function",
+      "function": {
+        "name": "lookup_order",
+        "description": "Look up an order by its id."
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "issue_refund",
+        "description": "Issue a refund to the customer for an order."
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "send_email",
+        "description": "Send an email to the customer."
+      }
+    }
+  ],
+  "expected": [
+    {
+      "turn": 1,
+      "message_index": 1,
+      "text": "Let me look into that.",
+      "verdict": "unreported",
+      "claimed_but_never_ran": [],
+      "ran_but_unreported": [
+        "lookup_order"
+      ],
+      "ledger": [
+        "lookup_order"
+      ]
+    },
+    {
+      "turn": 2,
+      "message_index": 4,
+      "text": "Order 4821 was delivered on Monday.",
+      "verdict": "clean",
+      "claimed_but_never_ran": [],
+      "ran_but_unreported": [],
+      "ledger": [
+        "lookup_order"
+      ]
+    }
+  ]
+}

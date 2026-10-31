@@ -21,6 +21,8 @@ REQUIRED = {
     "anthropic_tool_result_with_text_user", "openai_custom_tool_call_rejected",
     "responses_custom_tool_call_rejected", "responses_mcp_call_rejected",
     "openai_image_only_user_continues_run", "responses_builtin_tool_in_list",
+    "transcript_settled_entries_last_run", "transcript_settled_entry_after_reply",
+    "transcript_settled_entry_structured_result",
 }
 
 
@@ -43,7 +45,8 @@ def test_messages_fixture(stem, case):
     for entry, want in zip(entries, exp["ledger"], strict=True):
         for key, value in want.items():
             assert getattr(entry, key) == value, (key, entry.to_dict())
-        assert entry.call_id is not None and entry.started_at is None
+        assert entry.started_at is None
+        assert entry.call_id is not None or stem.startswith("transcript_")
     assert final_reply(messages) == exp["final_reply"]
     receipt = check_messages(messages, known_tools=case["known_tools"])
     assert receipt.verdict == exp["verdict"], receipt.to_dict()
