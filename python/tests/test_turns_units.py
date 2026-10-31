@@ -139,3 +139,25 @@ def test_llm_claim_lands_in_its_turn_only():
     r1, r2 = check_turns(msgs, known_tools=["send_email"], extractor=Llm())
     assert r1.suspected == []
     assert [c.tool for c in r2.suspected] == ["send_email"] and r2.ok
+
+
+def test_ignore_tools_across_windows():
+    msgs = [
+        U("a"), {"tool": "lookup_order"}, A("Let me check."), {"tool": "lookup_order"},
+        A("Anything else?"),
+    ]
+    r1, r2 = check_turns(msgs, known_tools=["lookup_order"], ignore_tools=["lookup_order"])
+    assert (r1.verdict, r2.verdict) == ("clean", "clean")
+    assert r1.ran_but_unreported == [] and r2.ran_but_unreported == []
+
+
+def test_known_tools_forms_match_check_messages():
+    tools = [
+        {"type": "function", "name": "issue_refund", "description": "Issue a refund."},
+        {"type": "web_search"},
+    ]
+    msgs = [U("a"), A("I've issued your refund.")]
+    [r] = check_turns(msgs, known_tools=tools)
+    assert r.verdict == "fabricated" and r.known_tools == ["issue_refund"]
+    got = {k: v for k, v in r.to_dict().items() if k not in {"turn", "message_index", "text"}}
+    assert got == check_messages(msgs, known_tools=tools).to_dict()

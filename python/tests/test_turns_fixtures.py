@@ -46,7 +46,9 @@ REQUIRED = {
     "transcript_bad_status_raises", "langchain_objects_rejected",
     "transcript_settled_entries_out_of_time_order", "transcript_settled_entry_after_claim",
     "readme_transcript_example", "transcript_empty_tool_raises",
-    "transcript_silence_mid_auth_no_entry",
+    "transcript_silence_mid_auth_no_entry", "transcript_settled_entry_structured_result",
+    "transcript_bad_timestamp_raises", "transcript_non_string_tool_raises",
+    "transcript_tool_none_is_not_an_entry",
 }
 
 
@@ -79,7 +81,8 @@ def test_turns_fixture(stem, case):
         unreported = [e.tool for e in r.ran_but_unreported]
         assert unreported == want.get("ran_but_unreported", []), r.to_dict()
         if "ledger" in want:
-            entries = list(r.ledger)  # Ledger order == call order here (untimed or chronological)
+            # Ledger order: by started_at, untimed entries in call order (CONTRIBUTING)
+            entries = list(r.ledger)
             assert len(entries) == len(want["ledger"]), r.to_dict()
             pairs = zip(entries, want["ledger"], strict=True)
             assert all(_entry_matches(e, w) for e, w in pairs), r.to_dict()
