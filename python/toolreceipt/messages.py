@@ -5,6 +5,9 @@ Reads OpenAI Chat Completions messages (``role``, ``content``, ``tool_calls``,
 ``function_call_output``; ``call_id``) and Anthropic Messages (``tool_use`` and
 ``tool_result`` content blocks) as plain dicts or SDK objects, by key and attribute, with no
 SDK imported. Only the last turn is read: the messages after the last ``user`` message.
+A plain transcript shape is read too: role/content lines with settled ledger entries
+(``{"tool": ..., "status": "ok" | "error", ...}``) at the position where the tool settled
+(PRD 05 §7.5); ``toolreceipt.turns`` builds per-turn receipts on the same pieces.
 """
 
 from __future__ import annotations
@@ -168,6 +171,92 @@ def _results(message: Any) -> list[tuple[str, str, bool]]:
     return out
 
 
+def _is_turn(message: Any) -> bool:
+    """An assistant message with non-empty text: a Chat Completions ``assistant`` message, a
+    Responses ``message`` item with ``role == "assistant"``, an Anthropic assistant message
+    with a ``text`` block. A tool-call-only assistant message is not a turn."""
+    return _get(message, "role") == "assistant" and bool(_text(_get(message, "content")).strip())
+
+
+_STATUSES = frozenset({"ok", "error"})
+
+
+def _settled(message: Any) -> LedgerEntry | None:
+    """The ``LedgerEntry`` a settled transcript entry records, else ``None``.
+
+    A settled entry is an item whose ``tool`` is a non-empty string and whose ``role`` and
+    ``type`` are absent or ``None`` (``_get`` cannot tell the two apart). It is read with the
+    ``LedgerEntry.to_dict()`` keys. Two deliberate differences from ``LedgerEntry.from_dict``:
+    a ``status`` other than ``ok`` or ``error`` raises, and an ``error`` entry with no
+    ``error`` text gets ``NO_RESULT``. A ``tool`` that is present but empty or not a string
+    raises rather than being skipped silently.
+    """
+    tool = _get(message, "tool")
+    if tool is None or _get(message, "role") is not None or _get(message, "type") is not None:
+        return None
+    if not isinstance(tool, str) or not tool:
+        raise ValueError(f"a settled transcript entry needs a non-empty string tool: {message!r}")
+    status = _get(message, "status")
+    if status is None:
+        status = "ok"
+    if status not in _STATUSES:
+        raise ValueError(
+            f"a settled transcript entry's status must be 'ok' or 'error', got {status!r}: "
+            f"{message!r}"
+        )
+    error = _get(message, "error")
+    if status == "error" and not error:
+        error = NO_RESULT
+    call_id = _get(message, "call_id")
+    return LedgerEntry(
+        tool=tool,
+        status=status,
+        args=coerce_args(_get(message, "args")),
+        result=_get(message, "result"),
+        error=error if status == "error" else _get(message, "error"),
+        call_id=str(call_id) if call_id is not None else None,
+        parent_run_id=_get(message, "parent_run_id"),
+        started_at=_get(message, "started_at"),
+        ended_at=_get(message, "ended_at"),
+    )
+
+
+def _pair(messages: Iterable[Any]) -> list[LedgerEntry]:
+    """One entry per tool call of ``messages``, in call order, paired with its result by id.
+
+    A call with no result is ``status="error", error="no result"``; a result with no call is
+    ignored; a call whose id is empty pairs with the next result whose id is empty; a
+    repeated id pairs first-in, first-out. Status is ``ok`` for every result except an
+    Anthropic ``tool_result`` with ``is_error: true`` (nothing is inferred from result text).
+    A settled transcript entry is appended at its position and never pairs. Raises
+    ``ValueError`` on an unsupported shape (``_reject_unsupported``).
+    """
+    entries: list[LedgerEntry] = []
+    open_calls: dict[str, deque[LedgerEntry]] = {}
+    for message in messages:
+        _reject_unsupported(message)
+        settled = _settled(message)
+        if settled is not None:
+            entries.append(settled)
+            continue
+        for call_id, name, args in _calls(message):
+            entry = LedgerEntry(
+                tool=name, status="error", args=args, error=NO_RESULT, call_id=call_id
+            )
+            entries.append(entry)
+            open_calls.setdefault(call_id, deque()).append(entry)
+        for call_id, text, is_error in _results(message):
+            queue = open_calls.get(call_id)
+            if not queue:
+                continue
+            entry = queue.popleft()
+            if is_error:
+                entry.error = text
+            else:
+                entry.status, entry.error, entry.result = "ok", None, text
+    return entries
+
+
 def _run_messages(messages: Sequence[Any]) -> list[Any]:
     """The last turn: the messages after the last user message that carries no tool result
     (§7.4); all when there is none."""
@@ -185,36 +274,18 @@ def ledger_from_messages(messages: Sequence[Any]) -> Ledger:
     ignored; a call whose id is empty pairs with the next result whose id is empty; a
     repeated id pairs first-in, first-out. Status is ``ok`` for every result except an
     Anthropic ``tool_result`` with ``is_error: true`` (nothing is inferred from result text).
-    Timestamps are ``None``. Raises ``ValueError`` on a legacy OpenAI function-call message
-    or a LangChain message object.
+    Timestamps are ``None`` unless a settled transcript entry carries them. Raises
+    ``ValueError`` on a legacy OpenAI function-call message or a LangChain message object.
     """
-    entries: list[LedgerEntry] = []
-    open_calls: dict[str, deque[LedgerEntry]] = {}
-    for message in _run_messages(messages):
-        _reject_unsupported(message)
-        for call_id, name, args in _calls(message):
-            entry = LedgerEntry(
-                tool=name, status="error", args=args, error=NO_RESULT, call_id=call_id
-            )
-            entries.append(entry)
-            open_calls.setdefault(call_id, deque()).append(entry)
-        for call_id, text, is_error in _results(message):
-            queue = open_calls.get(call_id)
-            if not queue:
-                continue
-            entry = queue.popleft()
-            if is_error:
-                entry.error = text
-            else:
-                entry.status, entry.error, entry.result = "ok", None, text
-    return Ledger(entries)
+    return Ledger(_pair(_run_messages(messages)))
 
 
 def final_reply(messages: Sequence[Any]) -> str:
-    """Text of the last turn's last assistant message when no tool call follows it or sits
-    in it, else ``""`` (a run that ends on a tool call has no final reply)."""
+    """Text of the last turn's last assistant message when no tool call or settled entry
+    follows it or sits in it, else ``""`` (a run that ends on a tool call has no final
+    reply)."""
     for message in reversed(_run_messages(messages)):
-        if _calls(message):
+        if _calls(message) or _settled(message) is not None:
             return ""
         if _get(message, "role") == "assistant":
             return _text(_get(message, "content"))
