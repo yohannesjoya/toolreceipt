@@ -178,7 +178,11 @@ def _is_turn(message: Any) -> bool:
     return _get(message, "role") == "assistant" and bool(_text(_get(message, "content")).strip())
 
 
-_STATUSES = frozenset({"ok", "error"})
+def _shape(message: Any) -> str:
+    """``dict(keys: ...)`` or the type name: enough to find the item, no values."""
+    if isinstance(message, dict):
+        return f"dict(keys: {', '.join(sorted(str(k) for k in message))})"
+    return type(message).__name__
 
 
 def _settled(message: Any) -> LedgerEntry | None:
@@ -194,15 +198,21 @@ def _settled(message: Any) -> LedgerEntry | None:
     tool = _get(message, "tool")
     if tool is None or _get(message, "role") is not None or _get(message, "type") is not None:
         return None
+    # Error messages name the shape, never the payload: args, result and error text are
+    # customer data (README "Privacy").
     if not isinstance(tool, str) or not tool:
-        raise ValueError(f"a settled transcript entry needs a non-empty string tool: {message!r}")
+        raise ValueError(
+            "a settled transcript entry needs a non-empty string tool, got "
+            f"{type(tool).__name__} in {_shape(message)}"
+        )
     status = _get(message, "status")
     if status is None:
         status = "ok"
-    if status not in _STATUSES:
+    if status not in ("ok", "error"):
+        shown = repr(status) if isinstance(status, str) else type(status).__name__
         raise ValueError(
-            f"a settled transcript entry's status must be 'ok' or 'error', got {status!r}: "
-            f"{message!r}"
+            f"a settled transcript entry's status must be 'ok' or 'error', got {shown} in "
+            f"{_shape(message)}"
         )
     error = _get(message, "error")
     if status == "error" and not error:
