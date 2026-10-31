@@ -28,7 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   entries (`{"tool": ..., "status": "ok" | "error", ...}`) placed where the tool settled,
   read by `check_turns` and `check_messages` alike. A settled entry with a bad `status` or an
   empty `tool` raises `ValueError`.
-- Fixtures: `fixtures/turns/` (19 hand-written stems and 8 honest multi-turn transcripts
+- Fixtures: `fixtures/turns/` (24 hand-written stems and 8 honest multi-turn transcripts
   derived from the demo replays) and a corpus test that rebuilds every held-out reply, demo
   replay and demo example as a one-turn transcript and checks it equals `check()`.
 
