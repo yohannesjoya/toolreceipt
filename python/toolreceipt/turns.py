@@ -12,11 +12,11 @@ last turn closes as-is: a call with no result is ``tool_failed``.
 
 from __future__ import annotations
 
-from collections.abc import Collection, Iterable, Sequence
+from collections.abc import Collection, Iterable, Iterator, Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
-from toolreceipt.claims import ClaimExtractor, ToolSpec, normalize_tool_specs
+from toolreceipt.claims import ClaimExtractor, normalize_tool_specs
 from toolreceipt.ledger import Ledger, LedgerEntry
 from toolreceipt.messages import _get, _is_turn, _pair, _text
 from toolreceipt.receipt import Receipt, Verdict, render_summary
@@ -96,14 +96,23 @@ def _reduce(
     )
 
 
-def _plan(
-    messages: Sequence[Any], known_tools: Iterable[ToolLike]
-) -> tuple[list[Any], list[ToolSpec], list[tuple[int, int]]]:
-    """Validate every message up front (an unsupported shape anywhere raises before any
-    receipt is produced), normalise the specs once, and cut the windows."""
+def _turn_inputs(
+    messages: Sequence[Any],
+) -> Iterator[tuple[int, int, str, list[LedgerEntry], list[LedgerEntry]]]:
+    """``(turn, message_index, text, prefix entries, window entries)`` per turn.
+
+    Every message is validated up front (an unsupported shape anywhere raises before any
+    receipt is produced). The prefix is re-paired per turn, so each receipt is a function of
+    its prefix by construction; the window's entries are the prefix entries added since the
+    previous turn, in call order.
+    """
     items = list(messages)
     _pair(items)
-    return items, normalize_tool_specs(known_tools), _windows(items)
+    seen = 0
+    for n, (index, end) in enumerate(_windows(items), start=1):
+        entries = _pair(items[:end])
+        window, seen = entries[seen:], len(entries)
+        yield n, index, _text(_get(items[index], "content")), entries, window
 
 
 def check_turns(
@@ -122,13 +131,9 @@ def check_turns(
     next turn is ``not_called`` on its own receipt. The last turn closes as-is. Raises
     ``ValueError`` on an unsupported message shape anywhere in the list.
     """
-    items, specs, windows = _plan(messages, known_tools)
+    specs = normalize_tool_specs(known_tools)
     receipts: list[TurnReceipt] = []
-    seen = 0
-    for n, (index, end) in enumerate(windows, start=1):
-        entries = _pair(items[:end])
-        window, seen = entries[seen:], len(entries)
-        text = _text(_get(items[index], "content"))
+    for n, index, text, entries, window in _turn_inputs(messages):
         receipt = _check(
             text, Ledger(entries), specs, ignore_tools, extractor, llm_blocks, check_args
         )
@@ -146,13 +151,9 @@ async def acheck_turns(
     check_args: bool = True,
 ) -> list[TurnReceipt]:
     """``check_turns`` for async code: awaits the extractor once per turn, in order."""
-    items, specs, windows = _plan(messages, known_tools)
+    specs = normalize_tool_specs(known_tools)
     receipts: list[TurnReceipt] = []
-    seen = 0
-    for n, (index, end) in enumerate(windows, start=1):
-        entries = _pair(items[:end])
-        window, seen = entries[seen:], len(entries)
-        text = _text(_get(items[index], "content"))
+    for n, index, text, entries, window in _turn_inputs(messages):
         receipt = await _acheck(
             text, Ledger(entries), specs, ignore_tools, extractor, llm_blocks, check_args
         )
