@@ -57,7 +57,8 @@ def test_turns_fixture(stem, case):
     assert len(receipts) == len(case["expected"]), [r.to_dict() for r in receipts]
     for r, want in zip(receipts, case["expected"], strict=True):
         got = (r.turn, r.message_index, r.text, r.verdict)
-        assert got == (want["turn"], want["message_index"], want["text"], want["verdict"]), r.to_dict()
+        exp = (want["turn"], want["message_index"], want["text"], want["verdict"])
+        assert got == exp, r.to_dict()
         assert r.ok == (want["verdict"] != "fabricated")
         never = want.get("claimed_but_never_ran", [])
         assert [(c.tool, c.reason) for c in r.claimed_but_never_ran] == [
@@ -66,11 +67,13 @@ def test_turns_fixture(stem, case):
         for claim, w in zip(r.claimed_but_never_ran, never, strict=True):
             if "observed" in w:
                 assert claim.observed == w["observed"]
-        assert [e.tool for e in r.ran_but_unreported] == want.get("ran_but_unreported", []), r.to_dict()
+        unreported = [e.tool for e in r.ran_but_unreported]
+        assert unreported == want.get("ran_but_unreported", []), r.to_dict()
         if "ledger" in want:
             entries = list(r.ledger)  # Ledger order == call order here (untimed or chronological)
             assert len(entries) == len(want["ledger"]), r.to_dict()
-            assert all(_entry_matches(e, w) for e, w in zip(entries, want["ledger"], strict=True)), r.to_dict()
+            pairs = zip(entries, want["ledger"], strict=True)
+            assert all(_entry_matches(e, w) for e, w in pairs), r.to_dict()
         if "summary" in want:
             assert r.summary == want["summary"]
 
