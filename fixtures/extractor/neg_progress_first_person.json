@@ -1,0 +1,10 @@
+{
+  "text": "I'm issuing it now.",
+  "known_tools": [
+    {
+      "name": "issue_refund",
+      "description": "Issue a refund to the customer for an order"
+    }
+  ],
+  "expected": []
+}
