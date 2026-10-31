@@ -87,3 +87,17 @@ def test_single_turn_equals_check_messages():
 
 def test_fixture_coverage():
     assert REQUIRED <= {stem for stem, _ in CASES}
+
+
+@pytest.mark.parametrize(
+    "stem,case", [(s, c) for s, c in CASES if c.get("expected")],
+    ids=lambda c: c if isinstance(c, str) else "",
+)
+def test_turn_receipts_are_prefix_pure(stem, case):
+    """PRD 05 §7.4: a receipt never changes when messages are appended after its window."""
+    msgs, tools = case["messages"], case["known_tools"]
+    full = [r.to_dict() for r in check_turns(msgs, known_tools=tools)]
+    for j in range(len(msgs) + 1):
+        partial = [r.to_dict() for r in check_turns(msgs[:j], known_tools=tools)]
+        settled = partial if j == len(msgs) else partial[:-1]  # the last window may be cut at j
+        assert settled == full[: len(settled)], (j, stem)
