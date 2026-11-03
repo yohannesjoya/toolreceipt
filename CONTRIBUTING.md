@@ -16,6 +16,16 @@ uv run mypy
 CI runs the same three commands on Python 3.10 to 3.13. The core package (everything but
 `toolreceipt/langgraph.py`) imports only the standard library. Keep it that way.
 
+## Two languages, one fixture set
+
+The TypeScript package under `typescript/` ports the core and runs the same fixtures
+(`cd typescript && npm ci && npm run check`). A fixture you add or change must pass in both
+suites. `python/toolreceipt/lexicon.json` is the only hand-edited lexicon; `scripts/sync_readme.py`
+copies it into `typescript/src/`, and `--check` fails in CI when the copy drifts. A Python
+behaviour change also regenerates `fixtures/recorded/parity.json` with
+`python/.venv/bin/python scripts/record_parity.py` and must keep the TypeScript suite green:
+the port follows Python, never the other way round.
+
 ## Principle: precision over recall
 
 A guard that cries wolf gets removed. A reply that is not a clear claim of a completed action

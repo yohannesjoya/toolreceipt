@@ -216,3 +216,22 @@ one assistant line per spoken turn and no silent progress updates as assistant l
 PRD 04's review (F9) showed that checking an earlier message's text against the whole ledger
 compares the wrong turn; the message-list `final_reply` returned `""` from 0.3.1 and the
 LangChain one was aligned in 0.4.0, a minor version, because it changes a shipped result.
+
+## The TypeScript port reproduces Python string semantics in one module and is gated by the fixtures and a recorded parity set
+
+The TypeScript package is a function-for-function port of the Python core. Every place where
+JavaScript and CPython differ on strings, regular expressions, numbers or JSON goes through
+`typescript/src/pystr.ts` (Python's whitespace class, Unicode `\b`, `\w` and `\d`, `splitlines`,
+code-point lengths and ordering, `repr(float)`, `json.dumps` defaults) or
+`typescript/src/decimal.ts` (`Decimal` arithmetic), so the deliberate divergences from idiomatic
+JavaScript are in one place. The port is accepted when every shared fixture passes with the
+Python runners' assertions and every recorded `extract`, `diff` and `check` output in
+`fixtures/recorded/parity.json` deep-equals; a difference is a bug in the port, never a
+special case. The accepted divergences from Python, none reachable by a current fixture:
+Unicode version skew between the CPython build and Node's ICU; `isdigit()` restricted to `Nd`
+(a run of superscript digits after a reference number); a JavaScript number is a Python `int`
+iff it is integer-valued, so a ledger value written `4821.0` is judged as a reference in
+TypeScript and not in Python, and echoes as `4821`; integers above 2^53 lose digits at
+`JSON.parse`; `TypeError` messages name the JavaScript type (`got number`) and the `str()`
+fallbacks of `normalizeToolSpecs` and `coerceArgs` use `String()`; `acheck` awaits any
+`aextract` function, where Python ignores a synchronous one.

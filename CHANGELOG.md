@@ -5,9 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## TypeScript
 
-## [0.4.0] - 2026-10-31
+### [Unreleased]
+
+- Core port under `typescript/` (not yet published): `check`, `acheck`, `diff`, `Ledger`,
+  `LedgerEntry`, `Claim`, `ToolSpec`, `RuleExtractor`, `Receipt`, `renderSummary`,
+  `normalizeToolSpecs`, `loadLexicon`, `coerceArgs`, `truncate`. Zero runtime dependencies,
+  ESM and CJS, Node 18+. Reads the same `lexicon.json` and passes every fixture under
+  `fixtures/extractor`, `diff`, `check`, `heldout` and `descriptions` with the Python runners'
+  assertions, plus whole-receipt equality against `fixtures/recorded/parity.json`. Python
+  string, regex, number and JSON semantics live in `src/pystr.ts` and `src/decimal.ts`; the
+  accepted divergences are listed in `docs/decisions.md`.
+
+## Python
+
+### [Unreleased]
+
+- Fixtures: `fixtures/demo/tools.json` (the demo's tool specs) and
+  `fixtures/recorded/parity.json` (the Python package's extract, diff and check output for
+  every shared case), both written by `scripts/record_parity.py` and pinned by
+  `python/tests/test_recorded_parity_current.py`. `scripts/sync_readme.py` also copies the
+  lexicon and LICENSE into `typescript/`.
+
+### [0.4.0] - 2026-10-31
 
 ### Added
 
@@ -36,7 +57,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   that ends on a tool call has no final reply. `toolreceipt.messages.final_reply` likewise
   returns `""` when a settled transcript entry follows the last assistant line.
 
-## [0.3.1] - 2026-10-30
+### [0.3.1] - 2026-10-30
 
 ### Added
 
@@ -76,7 +97,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `1 claimed action never ran: issue_refund ("I've refunded $64", ledger amount=32).`
 - `NO_RESULT` lives in `toolreceipt.ledger` (still importable from `toolreceipt.langgraph`).
 
-## [0.3.0] - 2026-10-30
+### [0.3.0] - 2026-10-30
 
 ### Added
 
@@ -116,7 +137,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 0.2.0 shipped these public names without listing them: `toolreceipt.llm.build_prompt`,
   `parse_output`, `message_text` and `MAX_SPAN_CHARS`.
 
-## [0.2.0] - 2026-10-22
+### [0.2.0] - 2026-10-22
 
 ### Added
 
@@ -143,7 +164,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Claim.to_dict()` emits `source` and `Receipt.to_dict()` emits `suspected` (additive).
   Rules-only behaviour is otherwise byte-identical to 0.1.1.
 
-## [0.1.1] - 2026-10-20
+### [0.1.1] - 2026-10-20
 
 ### Fixed
 
@@ -151,7 +172,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `BaseTool`. Passing one used to raise `TypeError: expected string or bytes-like object`.
   An entry of any other shape now raises a `TypeError` that names `known_tools`.
 
-## [0.1.0] - 2026-10-20
+### [0.1.0] - 2026-10-20
 
 ### Added
 
