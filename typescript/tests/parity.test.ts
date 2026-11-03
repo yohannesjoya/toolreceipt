@@ -32,7 +32,9 @@ function heldout(file: string, id: string): HeldoutCase {
 
 /** Resolve a recording `source` to its inputs. */
 function inputs(source: string): { text: string; known_tools: unknown[]; ledger: Record<string, unknown>[] } {
-  const [dir, rest] = source.split("/", 2) as [string, string];
+  const slash = source.indexOf("/");
+  const dir = source.slice(0, slash);
+  const rest = source.slice(slash + 1);
   if (dir === "extractor" || dir === "check") {
     const c = readJson<ExtractorCase & Partial<CheckCase>>(join(FIXTURES, dir, `${rest}.json`));
     return { text: c.text, known_tools: c.known_tools, ledger: c.ledger ?? [] };
