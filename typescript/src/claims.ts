@@ -201,3 +201,30 @@ export function normalizeToolSpecs(tools: Iterable<ToolLike>): ToolSpec[] {
   }
   return specs;
 }
+
+// ---------------------------------------------------------------------------
+// STUBS (Task 5): replaced by the rule extractor port in Tasks 6 and 7.
+// ---------------------------------------------------------------------------
+
+function notPorted(): never {
+  throw new Error("not ported yet");
+}
+
+export class RuleExtractor implements ClaimExtractor {
+  constructor(_lexicon?: unknown) {}
+  extract(_text: string, _knownTools: readonly ToolSpec[]): Claim[] {
+    return notPorted();
+  }
+}
+export function descriptionFamily(_description: string, _lexicon?: unknown): string | null {
+  return notPorted();
+}
+export function descriptionObject(_description: string, _lexicon?: unknown): string[] {
+  return notPorted();
+}
+export function stemVerb(_word: string): string {
+  return notPorted();
+}
+export function toolVerbTokens(_spec: ToolSpec, _lexicon?: unknown): Set<string> {
+  return notPorted();
+}

@@ -22,3 +22,26 @@ export function loadCases<T = Record<string, unknown>>(subdir: string): Array<[s
     .sort()
     .map((f) => [f.slice(0, -5), readJson<T>(join(dir, f))]);
 }
+
+export type ToolDict = { name: string; description: string };
+export type ExtractorCase = { text: string; known_tools: ToolDict[]; expected: Record<string, unknown>[] };
+export type LedgerDict = Record<string, unknown>;
+export type CheckCase = {
+  text: string; known_tools: ToolDict[]; ledger: LedgerDict[];
+  expected: { verdict: string; claimed_but_never_ran?: Record<string, unknown>[]; summary?: string };
+};
+export type DiffCase = {
+  claims: Record<string, unknown>[]; ledger: LedgerDict[]; known_tools: string[]; ignore_tools: string[];
+  llm_blocks?: boolean; check_args?: boolean;
+  expected: Record<string, unknown> & { verdict: string; ok: boolean; summary: string; ran_but_unreported: string[] };
+};
+export type HeldoutCase = { id: string; text: string; known_tools: ToolDict[]; ledger?: LedgerDict[]; expected: unknown[] };
+
+/** The demo support desk's tool specs (fixtures/demo/tools.json, written by scripts/record_parity.py). */
+export function demoTools(): Array<[string, string]> {
+  return readJson<ToolDict[]>(join(FIXTURES, "demo", "tools.json")).map((t) => [t.name, t.description]);
+}
+
+export function listJson(dir: string): string[] {
+  return readdirSync(dir).filter((f) => f.endsWith(".json")).sort().map((f) => join(dir, f));
+}
