@@ -1,9 +1,9 @@
 /** Claim data model, extractor interface, tool specs and the rule extractor (port of claims.py). */
 
-import type { Lexicon } from "./lexicon";
+import { type Family, type Lexicon, defaultLexicon } from "./lexicon";
 import {
-  cpCompare, cpFirst, cpLast, fullmatch, isAlnum, matchAt0, pyInt, pyLower, pyLstrip, pyRegex, pyRstrip, pySplit,
-  pySplitlines, pyStrip, reEscape,
+  cpCompare, cpFirst, cpLast, cpLength, cpSlice, fullmatch, isAlnum, matchAt0, pyInt, pyLower, pyLstrip, pyRegex,
+  pyRstrip, pySplit, pySplitlines, pyStrip, reEscape,
 } from "./pystr";
 import type { Json } from "./types";
 
@@ -549,28 +549,468 @@ export function clean(clause: string): string {
 }
 
 // ---------------------------------------------------------------------------
-// STUBS (Task 5): replaced by the rule extractor port in Tasks 6 and 7.
+// Tool matching (step 6; see docs/decisions.md). claims.py:453-950.
 // ---------------------------------------------------------------------------
 
-function notPorted(): never {
-  throw new Error("not ported yet");
-}
+// ASCII classes in Python too: a non-ASCII character is a separator, never a token.
+const NAME_PART = /[A-Z]+(?=[A-Z][a-z])|[A-Z]?[a-z0-9]+|[A-Z]+[0-9]*/g;
+const NAME_SPLIT = /[^A-Za-z0-9]+/;
+const WORD = /[a-z0-9]+/g;
+// Words that never identify a tool (object filler, pronouns, prepositions).
+const MATCH_STOP = new Set([
+  "a", "an", "the", "to", "for", "of", "in", "on", "at", "by", "with", "from", "into",
+  "and", "or", "it", "its", "this", "that", "these", "those", "you", "your", "me", "my",
+  "i", "we", "us", "our", "they", "them", "their", "he", "she", "him", "her", "is", "are",
+  "was", "were", "be", "been", "has", "have", "had", "all", "any", "some", "up", "out",
+  "now", "again", "just", "already", "also", "as", "so", "here", "there",
+]);
+const SUBJECT_BOUNDARY = new Set([...SUBJECT_DETERMINERS, ...OBJECT_STRIP, ...FIRST_PERSON, "that", "which", "who"]);
+const SUBJECT_PREPOSITIONS = new Set(["to", "for", "of", "from", "with"]);
 
-export class RuleExtractor implements ClaimExtractor {
-  constructor(_lexicon?: unknown) {}
-  extract(_text: string, _knownTools: readonly ToolSpec[]): Claim[] {
-    return notPorted();
+/** A term is a tuple of stemmed words; `termKey` gives it set semantics. */
+type Term = readonly string[];
+const termKey = (t: Term): string => t.join("\u0000");
+
+class TermSet {
+  private readonly map = new Map<string, Term>();
+  add(t: Term): void {
+    this.map.set(termKey(t), t);
+  }
+  has(t: Term): boolean {
+    return this.map.has(termKey(t));
+  }
+  addAll(ts: Iterable<Term>): void {
+    for (const t of ts) this.add(t);
+  }
+  values(): Term[] {
+    return [...this.map.values()];
+  }
+  get size(): number {
+    return this.map.size;
   }
 }
-export function descriptionFamily(_description: string, _lexicon?: unknown): string | null {
-  return notPorted();
+
+function famOf(lexicon: Lexicon, family: string): Family {
+  return lexicon.families[family] ?? { forms: [], tokens: [] };
 }
-export function descriptionObject(_description: string, _lexicon?: unknown): string[] {
-  return notPorted();
+
+/** Lowercase and strip one plural `s` ("tickets" -> "ticket"; keeps "address", "sms"). */
+export function stem(word: string): string {
+  const w = pyLower(word);
+  return cpLength(w) > 3 && w.endsWith("s") && !w.endsWith("ss") ? cpSlice(w, 0, -1) : w;
 }
-export function stemVerb(_word: string): string {
-  return notPorted();
+
+export function words(text: string): string[] {
+  return [...pyLower(normalize(text)).matchAll(WORD)].map((m) => stem(m[0]));
 }
-export function toolVerbTokens(_spec: ToolSpec, _lexicon?: unknown): Set<string> {
-  return notPorted();
+
+/** `stem` plus third-person handling: "searches" -> "search", "queries" -> "query", "closes" -> "close". */
+export function stemVerb(word: string): string {
+  const w = pyLower(word);
+  if (w.length > 4 && w.endsWith("ies")) return w.slice(0, -3) + "y";
+  if (w.length > 4 && w.endsWith("es") && /(?:sh|ch|x|z|ss|o)$/.test(w.slice(0, -2))) return w.slice(0, -2);
+  return stem(w);
+}
+
+const LEAD_PREFIX = pyRegex("^\\s*[A-Za-z0-9_-]+:\\s*");
+const LEAD_NOUN_FOLLOWERS = new Set([
+  "the", "a", "an", "your", "our", "my", "his", "her", "their", "its", "this", "that",
+  "these", "those", "me", "you", "us", "them", "it", "all", "each", "every", "any", "one",
+]);
+const CLAUSE_END = /[.;]| and /;
+
+/** Text up to the first `.`, `;` or ` and `. */
+function descriptionClause(description: string): string {
+  const text = normalize(description);
+  const m = CLAUSE_END.exec(text);
+  return m === null ? text : text.slice(0, m.index);
+}
+
+/** Lowercase words of the first clause after an optional single-word `<Name>:` prefix and
+ * one skip phrase (longest first). */
+function leadWords(description: string, skip: readonly string[]): string[] {
+  let text = pyStrip(pyLower(descriptionClause(description).replace(LEAD_PREFIX, "")));
+  for (const p of [...skip].sort((a, b) => b.length - a.length)) {
+    if (text === p || text.startsWith(p + " ")) {
+      text = pyStrip(text.slice(p.length));
+      break;
+    }
+  }
+  return [...text.matchAll(WORD)].map((m) => m[0]);
+}
+
+/**
+ * The family named by a description's lead verb (PRD 03 §7.2 rule 2), or `null`. The lead
+ * verb is the first content word of the first clause, after an optional `<Name>:` prefix and
+ * one `description_lead_skip` phrase; a read verb anywhere in the first clause gives `null`.
+ */
+export function descriptionFamily(description: string, lexicon: Lexicon = defaultLexicon()): string | null {
+  const ws = leadWords(description, lexList(lexicon, "description_lead_skip"));
+  if (ws.length === 0) return null;
+  const reads = new Set(lexList(lexicon, "read_verbs").map(stem));
+  if (ws.some((w) => reads.has(stemVerb(w)))) return null;
+  const two = ws.slice(0, 2).map(stemVerb).join(" ");
+  for (const [name, fam] of Object.entries(lexicon.families)) {
+    if (fam.forms.some((f) => f.includes(" ") && f.split(" ").map(stemVerb).join(" ") === two)) return name;
+  }
+  const s = stemVerb(ws[0]!);
+  for (const [name, fam] of Object.entries(lexicon.families)) {
+    const single = new Set(fam.forms.filter((f) => !f.includes(" ")).map(stem));
+    if (verbTokens(name, lexicon).has(s) || single.has(s)) return name;
+  }
+  // A noun token is an imperative verb only when an object follows it ("Email the customer").
+  const follower = ws[1];
+  const leadNouns = new Set(lexList(lexicon, "description_lead_nouns").map(stem));
+  if (leadNouns.has(s) && follower !== undefined && LEAD_NOUN_FOLLOWERS.has(follower)) {
+    return nounFamilies(lexicon).get(s) ?? null;
+  }
+  return null;
+}
+
+// Words that end a description's direct object: prepositions and clause openers.
+const OBJECT_END = new Set([
+  "to", "for", "of", "in", "on", "at", "by", "with", "from", "into", "about", "through",
+  "via", "as", "using", "when", "if", "that", "which", "who", "where", "so", "or",
+]);
+
+/** Stemmed words of the lead verb's direct object (PRD 03 §7.2 rule 3), or `[]`. */
+export function descriptionObject(description: string, lexicon: Lexicon = defaultLexicon()): string[] {
+  if (descriptionFamily(description, lexicon) === null) return [];
+  const ws = leadWords(description, lexList(lexicon, "description_lead_skip"));
+  const two = ws.slice(0, 2).map(stemVerb).join(" ");
+  const twoWordForms = new Set(
+    Object.values(lexicon.families).flatMap((fam) =>
+      fam.forms.filter((f) => f.includes(" ")).map((f) => f.split(" ").map(stemVerb).join(" ")),
+    ),
+  );
+  const obj: string[] = [];
+  for (const w of twoWordForms.has(two) ? ws.slice(2) : ws.slice(1)) {
+    if (OBJECT_END.has(w)) break;
+    if (!LEAD_NOUN_FOLLOWERS.has(w)) obj.push(stem(w));
+  }
+  return obj;
+}
+
+/** Split a tool name on `_`, `-`, other separators and camelCase; lowercase, singular. */
+export function tokenizeToolName(name: string): string[] {
+  return name.split(NAME_SPLIT).flatMap((chunk) => [...chunk.matchAll(NAME_PART)].map((m) => stem(m[0])));
+}
+
+/** Indices of `words` covered by contiguous occurrences of `term`. */
+function occurs(term: Term, ws: readonly string[]): Set<number> {
+  const n = term.length;
+  const hits = new Set<number>();
+  for (let i = 0; i + n <= ws.length; i++) {
+    let same = true;
+    for (let j = 0; j < n; j++) if (ws[i + j] !== term[j]) { same = false; break; }
+    if (same) for (let j = 0; j < n; j++) hits.add(i + j);
+  }
+  return hits;
+}
+
+export function synonymGroups(lexicon: Lexicon): TermSet[] {
+  const synonyms = (lexicon["synonyms"] ?? {}) as Record<string, string[]>;
+  return Object.entries(synonyms).map(([key, values]) => {
+    const group = new TermSet();
+    for (const w of [key, ...values]) group.add(words(w));
+    return group;
+  });
+}
+
+/** Noun-like family tokens ("email", "issue", "record") mapped to their family. */
+export function nounFamilies(lexicon: Lexicon): Map<string, string> {
+  const nouns = new Set(lexList(lexicon, "noun_tokens"));
+  const out = new Map<string, string>();
+  for (const [name, fam] of Object.entries(lexicon.families)) {
+    for (const tok of fam.tokens) if (nouns.has(tok)) out.set(stem(tok), name);
+  }
+  return out;
+}
+
+/** A family's verb tokens: its name and every token not listed in `noun_tokens`. */
+export function verbTokens(family: string, lexicon: Lexicon): Set<string> {
+  const nouns = new Set(lexList(lexicon, "noun_tokens"));
+  const out = new Set([stem(family)]);
+  for (const t of famOf(lexicon, family).tokens) if (!nouns.has(t)) out.add(stem(t));
+  return out;
+}
+
+/** True when any of `tools` carries a verb token of `family` in its name. */
+export function familyRan(family: string, tools: Iterable<string>, lexicon: Lexicon = defaultLexicon()): boolean {
+  if (!Object.hasOwn(lexicon.families, family)) return false;
+  const verbs = verbTokens(family, lexicon);
+  for (const t of tools) if (tokenizeToolName(t).some((tok) => verbs.has(tok))) return true;
+  return false;
+}
+
+/** True when a tool name carries a verb token of any family or a read verb. */
+function isVerbNamed(nameTokens: readonly string[], lexicon: Lexicon): boolean {
+  const toks = new Set(nameTokens);
+  const reads = new Set(lexList(lexicon, "read_verbs").map(stem));
+  if (intersects(toks, reads)) return true;
+  return Object.keys(lexicon.families).some((f) => intersects(toks, verbTokens(f, lexicon)));
+}
+
+/** `(tokens the tool is matched on, byDescription)` (PRD 03 §7.2 rule 1). */
+export function eligibility(spec: ToolSpec, lexicon: Lexicon): [Set<string>, boolean] {
+  const name = tokenizeToolName(spec.name);
+  if (isVerbNamed(name, lexicon)) return [new Set(name), false];
+  const family = descriptionFamily(spec.description, lexicon);
+  return [family ? verbTokens(family, lexicon) : new Set<string>(), true];
+}
+
+/** The tokens a tool is matched on; see `eligibility`. */
+export function toolVerbTokens(spec: ToolSpec, lexicon: Lexicon = defaultLexicon()): Set<string> {
+  return eligibility(spec, lexicon)[0];
+}
+
+/** True when the tool's tokens say it does something else than the claim: a read verb, or a
+ * verb of another family without one of the claim's own. */
+function conflicts(family: string, name: Iterable<string>, lexicon: Lexicon): boolean {
+  const toks = new Set(name);
+  const reads = new Set(lexList(lexicon, "read_verbs").map(stem));
+  if (intersects(toks, reads)) return true;
+  if (intersects(toks, verbTokens(family, lexicon))) return false;
+  return Object.keys(lexicon.families).some((other) => other !== family && intersects(toks, verbTokens(other, lexicon)));
+}
+
+/** Family tokens; verb tokens are also expanded through every synonym group holding them. */
+function familyTerms(family: string, lexicon: Lexicon): Term[] {
+  const verbs = verbTokens(family, lexicon);
+  const terms = new TermSet();
+  for (const v of verbs) terms.add([v]);
+  for (const t of famOf(lexicon, family).tokens) terms.add(words(t));
+  for (const group of synonymGroups(lexicon)) {
+    if (group.values().some((term) => term.length === 1 && verbs.has(term[0]!))) terms.addAll(group.values());
+  }
+  return terms.values().filter((t) => t.length > 0);
+}
+
+/** Content words of the object plus synonyms of any group they (or a phrase) hit. Expansion
+ * never yields another family's noun token. */
+function objectTerms(family: string, ws: readonly string[], lexicon: Lexicon): Term[] {
+  const foreign = new Set([...nounFamilies(lexicon)].filter(([, fam]) => fam !== family).map(([n]) => n));
+  const content = ws.filter((w) => !MATCH_STOP.has(w));
+  const terms = new TermSet();
+  for (const w of content) terms.add([w]);
+  for (const group of synonymGroups(lexicon)) {
+    if (group.values().some((member) => member.length > 0 && occurs(member, content).size > 0)) {
+      for (const m of group.values()) if (m.length > 0 && !foreign.has(m.join(" "))) terms.add(m);
+    }
+  }
+  return terms.values();
+}
+
+/** True when the claim's verb stem is the object of the tool name: its last token, after
+ * another token of the family ("refunded" -> the `refund` of `issue_refund`). */
+function namesObject(verbStemWord: string | null, name: readonly string[], familyTokens: Set<string>): boolean {
+  return (
+    verbStemWord !== null && name.length > 1 && name.at(-1) === verbStemWord && name.slice(0, -1).some((t) => familyTokens.has(t))
+  );
+}
+
+function union(sets: Iterable<Set<number>>): Set<number> {
+  const out = new Set<number>();
+  for (const s of sets) for (const v of s) out.add(v);
+  return out;
+}
+
+/** `(score, object component earned)`; see `scoreTool`. */
+function score(
+  family: string,
+  objectWords: readonly string[],
+  spec: ToolSpec,
+  lexicon: Lexicon,
+  verbStemWord: string | null = null,
+  byDescription = false,
+): [number, boolean] {
+  const name = tokenizeToolName(spec.name);
+  const famTerms = familyTerms(family, lexicon);
+  const objTerms = objectTerms(family, objectWords.map(stem), lexicon);
+  const famHits = union(famTerms.map((t) => occurs(t, name)));
+  const objHits = union(objTerms.map((t) => occurs(t, name)));
+  let objectMatched = objHits.size > 0 && (famHits.size === 0 || union([famHits, objHits]).size > 1);
+  if (byDescription) {
+    // PRD 03 §7.2 rule 3: the lead verb earns the family component; an object word in the
+    // name or in the description's direct object earns the object component, once.
+    const directObject = descriptionObject(spec.description, lexicon);
+    const descHit = objTerms.some((t) => occurs(t, directObject).size > 0 && occurs(t, name).size === 0);
+    objectMatched = objHits.size > 0 || descHit;
+    return [2 + (objectMatched ? 2 : 0), objectMatched];
+  }
+  const desc = words(spec.description);
+  const descHit = objTerms.some((t) => occurs(t, desc).size > 0 && occurs(t, name).size === 0);
+  let total = (famHits.size > 0 ? 2 : 0) + (objectMatched ? 2 : 0);
+  if (descHit) total += 1;
+  // Evidence only, never score: a sibling `<verb>_<stem>` tool must not outrank the tool that ran.
+  const familyTokens = new Set(famOf(lexicon, family).tokens.map(stem));
+  return [total, objectMatched || namesObject(verbStemWord, name, familyTokens)];
+}
+
+/** Score a claim against one tool: +2 family token in the name, +2 object word in the name,
+ * +1 object word in the description that the name lacks. */
+export function scoreTool(family: string, objectWords: readonly string[], spec: ToolSpec, lexicon: Lexicon): number {
+  return score(family, objectWords, spec, lexicon)[0];
+}
+
+/** `matchTools` plus whether the candidates earned the object component. */
+export function matchCandidates(
+  family: string,
+  obj: string | null,
+  knownTools: readonly ToolSpec[],
+  lexicon: Lexicon,
+  verbStemWord: string | null = null,
+): [string[], Confidence | null, boolean] {
+  const ws = obj ? words(obj) : [];
+  const verbs = verbTokens(family, lexicon);
+  const scored: Array<[string, number, boolean]> = [];
+  const described: ToolSpec[] = [];
+  for (const spec of knownTools) {
+    const [toks, byDescription] = eligibility(spec, lexicon);
+    if (!intersects(verbs, toks) || conflicts(family, toks, lexicon)) continue;
+    if (byDescription) described.push(spec);
+    else scored.push([spec.name, ...score(family, ws, spec, lexicon, verbStemWord)]);
+  }
+  // PRD 03 §7.2 rule 4: a description-eligible tool joins the scoring only when no verb-named
+  // tool scored, or when the claim's object names it ("a ticket in Jira").
+  const namedBest = Math.max(0, ...scored.map(([, s]) => s));
+  const wordSet = new Set(ws);
+  for (const spec of described) {
+    if (namedBest < 2 || tokenizeToolName(spec.name).some((t) => wordSet.has(t))) {
+      let [s, matched] = score(family, ws, spec, lexicon, verbStemWord, true);
+      if (namedBest >= 2) {
+        // It may join a name match as a tie, never displace it.
+        [s, matched] = [Math.min(s, namedBest), matched && s <= namedBest];
+      }
+      scored.push([spec.name, s, matched]);
+    }
+  }
+  const best = Math.max(0, ...scored.map(([, s]) => s));
+  if (best < 2) return [[], null, false];
+  const top = scored.filter(([, s]) => s === best);
+  const candidates = [...new Set(top.map(([name]) => name))];
+  return [candidates, best >= 3 ? "high" : "medium", top.some(([, , m]) => m)];
+}
+
+/** All tools at the maximum score (ties kept, in `knownTools` order) when it is at least 2;
+ * `high` confidence from 3. */
+export function matchTools(
+  family: string,
+  obj: string | null,
+  knownTools: readonly ToolSpec[],
+  lexicon: Lexicon,
+): [string[], Confidence | null] {
+  const [candidates, confidence] = matchCandidates(family, obj, knownTools, lexicon);
+  return [candidates, confidence];
+}
+
+/** The noun phrase ending the subject tokens, cut at the first preposition. */
+function subjectPhrase(subject: readonly string[]): string | null {
+  let head = [...subject];
+  for (let i = 0; i < head.length; i++) {
+    if (SUBJECT_PREPOSITIONS.has(head[i]!)) {
+      head = head.slice(0, i);
+      break;
+    }
+  }
+  const out: string[] = [];
+  for (const tok of [...head].reverse()) {
+    if (SUBJECT_BOUNDARY.has(tok) || out.length === 4) break;
+    out.unshift(tok);
+  }
+  return out.length > 0 ? out.join(" ") : null;
+}
+
+function longest(found: string[]): string | null {
+  if (found.length === 0) return null;
+  return found.reduce((a, b) => (b.length > a.length ? b : a));
+}
+
+/** The family verb token a matched form is built on ("refunded" -> "refund"). */
+function verbStem(form: string, family: string, lexicon: Lexicon): string | null {
+  const compact = pyLower(form).replace(/[^a-z]/g, "");
+  return longest([...verbTokens(family, lexicon)].filter((v) => compact.startsWith(v)));
+}
+
+/** The noun token a matched form is built on ("emailed" -> "email", "texted" -> "text"). */
+function surfaceStem(form: string, family: string, lexicon: Lexicon): string | null {
+  const compact = pyLower(form).replace(/[^a-z]/g, "");
+  const stems = [...nounFamilies(lexicon)].filter(([, fam]) => fam === family).map(([n]) => n);
+  return longest(stems.filter((n) => compact.startsWith(n) && n !== stem(family)));
+}
+
+/** One claim per candidate set; unmatched claims collapse on `(verb, object)`. The first
+ * claim's span is kept, but it carries object evidence when any duplicate has it. */
+export function dedupe(claims: readonly Claim[]): Claim[] {
+  const seen = new Map<string, Claim>();
+  const out: Claim[] = [];
+  for (const claim of claims) {
+    const key =
+      claim.candidates.length > 0
+        ? ["tools", ...[...claim.candidates].sort(cpCompare)].join("\u0000")
+        : ["verb", claim.verb, claim.object ?? "\u0001null"].join("\u0000");
+    const first = seen.get(key);
+    if (first === undefined) {
+      seen.set(key, claim);
+      out.push(claim);
+    } else if (claim.evidence().objectMatched) {
+      first.setEvidence({ objectMatched: true });
+    }
+  }
+  return out;
+}
+
+/** Deterministic, dependency-free claim extractor driven by the lexicon. */
+export class RuleExtractor implements ClaimExtractor {
+  private readonly lexicon: Lexicon;
+
+  constructor(lexicon?: Lexicon) {
+    this.lexicon = lexicon ?? defaultLexicon();
+  }
+
+  private sentenceFiltered(sentence: string): boolean {
+    return conditionalLead(sentence, this.lexicon);
+  }
+
+  extract(text: string, knownTools: readonly ToolSpec[]): Claim[] {
+    const lex = this.lexicon;
+    const claims: Claim[] = [];
+    for (const sentence of splitSentences(normalize(text))) {
+      if (this.sentenceFiltered(sentence)) continue;
+      let prevOther = false;
+      for (const clause of splitClauses(sentence)) {
+        const action = scan(clause, lex);
+        if (action === null) {
+          prevOther = carryOther(prevOther, clause, lex);
+          continue;
+        }
+        const kind = subjectKind(action, clause, lex);
+        // A subject-less clause carries the previous clause's non-agent subject.
+        const inherited = kind === "implicit" && prevOther;
+        if (kind !== "implicit") prevOther = kind === "other";
+        if (inherited || kind === "other" || kind === "state" || lexicallyFiltered(clause, lex)) continue;
+        const extracted = extractObject(clause, action.end, lex);
+        let obj = extracted[0];
+        const count = extracted[1];
+        let matchText = obj;
+        if (kind === "passive") {
+          // "Your refund has been issued": the subject names the object.
+          const subject = subjectPhrase(action.subject);
+          obj = obj ?? subject;
+          matchText = [subject, matchText].filter((p): p is string => !!p).join(" ") || null;
+        }
+        // "I emailed you": the verb itself names the channel.
+        const form = clause.slice(action.start, action.end);
+        const surface = surfaceStem(form, action.family, lex);
+        matchText = [matchText, surface].filter((p): p is string => !!p).join(" ") || null;
+        const [candidates, confidence, matched] = matchCandidates(
+          action.family, matchText, knownTools, lex, verbStem(form, action.family, lex),
+        );
+        const claim = new Claim({ text: clean(clause), verb: action.family, object: obj, count, candidates, confidence });
+        claim.setEvidence({ objectMatched: matched, sentence });
+        claims.push(claim);
+      }
+    }
+    return dedupe(claims);
+  }
 }

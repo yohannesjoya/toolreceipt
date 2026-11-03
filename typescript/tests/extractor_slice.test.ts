@@ -54,3 +54,18 @@ describe("extractObject", () => {
     expect(extractObject("I sent it.", 6, LEX)).toEqual(["it", null]);
   });
 });
+
+describe("tool names and families (Task 7)", async () => {
+  const { familyRan, tokenizeToolName } = await import("../src/claims");
+  it("tokenizes names with ASCII classes only (Review Focus 4)", () => {
+    expect(tokenizeToolName("send_\u{1F4E7}_now")).toEqual(["send", "now"]);
+    expect(tokenizeToolName("sendEmailV2")).toEqual(["send", "email", "v2"]);
+    expect(tokenizeToolName("lookup-orders")).toEqual(["lookup", "order"]);
+    expect(tokenizeToolName("HTTPRequest")).toEqual(["http", "request"]);
+  });
+  it("familyRan uses verb tokens only", () => {
+    expect(familyRan("send", ["email_customer"])).toBe(false);
+    expect(familyRan("send", ["notify_user"])).toBe(true);
+    expect(familyRan("nope", ["send_email"])).toBe(false);
+  });
+});
