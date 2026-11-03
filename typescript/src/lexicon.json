@@ -1,0 +1,81 @@
+{
+  "families": {
+    "send": {
+      "forms": ["sent", "emailed", "e-mailed", "mailed", "notified", "messaged", "texted", "forwarded", "dispatched"],
+      "tokens": ["send", "email", "mail", "notify", "message", "text", "forward", "dispatch"]
+    },
+    "create": {
+      "forms": ["created", "opened", "filed", "raised", "logged", "added", "generated", "set up"],
+      "tokens": ["create", "open", "file", "raise", "log", "make", "add", "new", "generate"]
+    },
+    "update": {
+      "forms": ["updated", "modified", "changed", "edited", "amended", "revised", "patched", "assigned"],
+      "tokens": ["update", "modify", "change", "edit", "amend", "revise", "patch", "set"]
+    },
+    "delete": {
+      "forms": ["deleted", "removed", "cancelled", "canceled", "erased", "dropped", "archived"],
+      "tokens": ["delete", "remove", "cancel", "close", "erase", "drop", "archive", "destroy"]
+    },
+    "refund": {
+      "forms": ["refunded", "reimbursed", "credited", "issued", "processed"],
+      "tokens": ["refund", "reimburse", "credit", "issue", "process", "payment"]
+    },
+    "charge": {
+      "forms": ["charged", "paid", "billed"],
+      "tokens": ["charge", "pay", "bill", "invoice"]
+    },
+    "schedule": {
+      "forms": ["scheduled", "booked", "rescheduled", "arranged", "reserved"],
+      "tokens": ["schedule", "book", "reschedule", "arrange", "reserve", "calendar", "appointment"]
+    },
+    "save": {
+      "forms": ["saved", "stored", "recorded", "wrote", "written", "persisted", "uploaded", "exported"],
+      "tokens": ["save", "store", "record", "write", "persist", "upload", "export"]
+    },
+    "submit": {
+      "forms": ["submitted", "posted", "published"],
+      "tokens": ["submit", "post", "publish", "apply", "register", "enroll", "form"]
+    },
+    "trigger": {
+      "forms": ["triggered", "launched", "started", "ran", "executed", "initiated", "kicked off", "deployed", "invoked"],
+      "tokens": ["trigger", "launch", "start", "run", "execute", "initiate", "deploy", "invoke"]
+    }
+  },
+  "exclusions": ["found", "checked", "looked", "saw", "noticed", "verified", "reviewed", "read", "confirmed", "located", "retrieved", "fetched", "searched", "analysed", "analyzed", "understood", "received", "logged in", "logged out", "ran into"],
+  "negation": ["not", "n't", "never", "unable", "failed to", "couldn't", "could not", "cannot", "can't", "wasn't able", "was not able", "didn't", "did not", "nothing", "none"],
+  "future": ["will", "would", "can ", "could ", "shall", "going to", "once ", "if ", "when you", "should i", "let me know", "would you like", "'ll"],
+  "advice": ["you can", "please", "you may", "you should", "you'll need"],
+  "other_subject": ["you sent", "you created", "they sent", "the customer sent"],
+  "conditional_lead": ["if", "once", "unless", "as soon as", "in case", "should you"],
+  "non_agent_nouns": ["customer", "customers", "client", "clients", "user", "users", "buyer", "buyers", "member", "members", "subscriber", "subscribers"],
+  "filter_exempt": ["can confirm", "please note", "please be advised", "happy to confirm"],
+  "time_markers": [
+    "\\byesterday\\b", "\\blast (?:night|week|month|year|time|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\\b",
+    "\\bago\\b", "\\bearlier\\b", "\\bthis (?:morning|afternoon|evening)\\b",
+    "\\bon (?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)\\b",
+    "\\bon the \\d{1,2}(?:st|nd|rd|th)\\b",
+    "\\bon (?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]* \\d{1,2}\\b",
+    "\\bat \\d{1,2}(?::\\d{2})? ?(?:am|pm)\\b", "\\bat \\d{1,2}:\\d{2}\\b"
+  ],
+  "by_exempt": ["me", "us", "our", "myself", "ourselves", "email", "e-mail", "sms", "text", "phone", "mail", "post", "fax", "today", "tomorrow", "tonight", "end", "noon"],
+  "synonyms": {
+    "email": ["mail", "notify", "message", "reach out", "confirmation"],
+    "refund": ["reimburse", "reimbursement", "money back"],
+    "order": ["purchase"],
+    "row": ["record", "entry"],
+    "sms": ["text", "text message"]
+  },
+  "noun_tokens": ["email", "mail", "message", "text", "file", "log", "new", "issue", "payment", "invoice", "appointment", "calendar", "record", "form", "post"],
+  "read_verbs": ["get", "read", "fetch", "lookup", "look", "list", "search", "find", "check", "view", "query", "show", "retrieve"],
+  "description_lead_skip": ["use this tool to", "a tool to", "tool to", "tool that", "this tool", "allows you to", "lets you"],
+  "description_lead_nouns": ["email", "mail", "message", "text", "file", "log", "record", "issue"],
+  "amount_keys": ["amount", "total", "cents", "minor"],
+  "id_cues": ["order", "ticket", "case", "invoice", "booking", "reservation", "account", "confirmation", "tracking", "reference"],
+  "number_words": {"one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10, "a": 1, "an": 1},
+  "llm_exclusions": [
+    "\\b(?:tried|trying|attempted|attempting|meant) to\\b",
+    "\\bon hold\\b",
+    "\\b(?:still )?pending\\b",
+    "\\b(?:normally|usually|typically|generally|automatically)\\b"
+  ]
+}

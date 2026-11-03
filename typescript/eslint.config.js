@@ -1,0 +1,26 @@
+// @ts-check
+import tseslint from "typescript-eslint";
+
+export default tseslint.config(
+  { ignores: ["dist/**", "node_modules/**", "coverage/**"] },
+  ...tseslint.configs.recommendedTypeChecked,
+  {
+    languageOptions: {
+      parserOptions: { projectService: true, tsconfigRootDir: import.meta.dirname },
+    },
+  },
+  {
+    files: ["src/**/*.ts"],
+    rules: {
+      // The core imports nothing but the JS runtime and its own files (PRD 06 §13).
+      "no-restricted-imports": [
+        "error",
+        { patterns: [{ group: ["node:*", "fs", "path", "fs/*"], message: "no Node built-ins in src/" }] },
+      ],
+    },
+  },
+  {
+    files: ["eslint.config.js", "tsup.config.ts", "vitest.config.ts"],
+    extends: [tseslint.configs.disableTypeChecked],
+  },
+);

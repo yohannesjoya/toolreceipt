@@ -1,8 +1,11 @@
-"""Generate python/README.md from the root README.md with absolute URLs, and copy
-LICENSE into python/ so the wheel and sdist ship it.
+"""Generate python/README.md from the root README.md with absolute URLs, copy LICENSE
+into python/ and typescript/ so both packages ship it, and copy the lexicon into the
+TypeScript package.
 
 PyPI renders the package README without the repository checkout, so relative
-links and images must point at GitHub. Usage: sync_readme.py [--check].
+links and images must point at GitHub. ``python/toolreceipt/lexicon.json`` is the only
+hand-edited lexicon; ``typescript/src/lexicon.json`` is this script's byte-identical copy.
+Usage: sync_readme.py [--check].
 """
 
 from __future__ import annotations
@@ -16,6 +19,9 @@ SOURCE = ROOT / "README.md"
 TARGET = ROOT / "python" / "README.md"
 LICENSE = ROOT / "LICENSE"
 LICENSE_TARGET = ROOT / "python" / "LICENSE"
+TS_LICENSE_TARGET = ROOT / "typescript" / "LICENSE"
+LEXICON = ROOT / "python" / "toolreceipt" / "lexicon.json"
+LEXICON_TARGET = ROOT / "typescript" / "src" / "lexicon.json"
 RAW = "https://raw.githubusercontent.com/yohannesjoya/toolreceipt/main/"
 BLOB = "https://github.com/yohannesjoya/toolreceipt/blob/main/"
 # Plain links/images, plus badge links of the form [![alt](img)](target).
@@ -39,6 +45,8 @@ def main(argv: list[str]) -> int:
     outputs = {
         TARGET: render(SOURCE.read_text(encoding="utf-8")),
         LICENSE_TARGET: LICENSE.read_text(encoding="utf-8"),
+        TS_LICENSE_TARGET: LICENSE.read_text(encoding="utf-8"),
+        LEXICON_TARGET: LEXICON.read_text(encoding="utf-8"),
     }
     if "--check" in argv:
         stale = [
@@ -51,6 +59,7 @@ def main(argv: list[str]) -> int:
     for path, expected in outputs.items():
         if path.is_symlink():
             path.unlink()
+        path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(expected, encoding="utf-8")
     return 0
 
