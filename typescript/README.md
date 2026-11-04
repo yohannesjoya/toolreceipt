@@ -52,7 +52,7 @@ are planned.
 | `Receipt` | `confirmed`, `claimedButNeverRan`, `unmatched`, `suspected`, `ranButUnreported`, `verdict`, `ok`, `summary`, `ledger`, `knownTools`. |
 | `RuleExtractor`, `ClaimExtractor` | The default deterministic extractor and the interface any extractor implements. |
 | `ToolSpec`, `normalizeToolSpecs` | A tool's `name` and `description`; accepts names, pairs, OpenAI-style tool dicts and tool objects. |
-| `renderSummary`, `loadLexicon`, `defaultLexicon`, `coerceArgs`, `truncate` | The summary line, the lexicon (a fresh copy or the shared default), and the ledger helpers. |
+| `renderSummary`, `loadLexicon`, `coerceArgs`, `truncate` | The summary line, a fresh copy of the bundled lexicon, and the ledger helpers. |
 
 Property names are camelCase; every `toDict()` emits the Python snake_case keys in the Python
 order, so a TypeScript receipt serialises to the same JSON as a Python one. Types `Verdict`,
