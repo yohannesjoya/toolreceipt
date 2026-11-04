@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { defaultLexicon, loadLexicon } from "../src/lexicon";
+import { pyRegex } from "../src/pystr";
 import { PYTHON_LEXICON, readJson } from "./helpers";
 
 type Lex = ReturnType<typeof loadLexicon>;
@@ -45,6 +46,13 @@ describe("lexicon", () => {
     expect(new Set(tokens).size).toBe(tokens.length);
     for (const noun of lex["noun_tokens"] as string[]) expect(tokens).toContain(noun);
     expect(lex["read_verbs"] as string[]).toContain("get");
+  });
+
+  it("every regex entry compiles through pyRegex (N4)", () => {
+    const lex = loadLexicon();
+    const entries = [...(lex["time_markers"] as string[]), ...(lex["llm_exclusions"] as string[])];
+    expect(entries.length).toBeGreaterThan(10);
+    for (const p of entries) expect(() => pyRegex(p), p).not.toThrow();
   });
 
   it("argument keys are present", () => {
