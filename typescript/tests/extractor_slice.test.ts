@@ -1,8 +1,11 @@
 /** Small pins for the extractor internals; the fixtures and the parity recording are the real test. */
 import { describe, expect, it } from "vitest";
 
-import { extractObject, phrase, scan, splitClauses, splitSentences, subjectKind } from "../src/claims";
-import { defaultLexicon } from "../src/lexicon";
+import {
+  RuleExtractor, extractObject, familyRan, normalizeToolSpecs, phrase, scan, splitClauses, splitSentences, subjectKind,
+  tokenizeToolName,
+} from "../src/claims";
+import { defaultLexicon, loadLexicon } from "../src/lexicon";
 import { pyRegex } from "../src/pystr";
 
 const LEX = defaultLexicon();
@@ -55,8 +58,18 @@ describe("extractObject", () => {
   });
 });
 
-describe("tool names and families (Task 7)", async () => {
-  const { familyRan, tokenizeToolName } = await import("../src/claims");
+describe("a lexicon edited after the first extract is seen (N3)", () => {
+  it("rebuilds the scan entries per call, as Python does", () => {
+    const lex = loadLexicon();
+    const ex = new RuleExtractor(lex);
+    const tools = normalizeToolSpecs(["send_email"]);
+    expect(ex.extract("I zapped the email.", tools)).toEqual([]);
+    lex.families["send"]!.forms.push("zapped");
+    expect(ex.extract("I zapped the email.", tools).map((c) => c.verb)).toEqual(["send"]);
+  });
+});
+
+describe("tool names and families (Task 7)", () => {
   it("tokenizes names with ASCII classes only (Review Focus 4)", () => {
     expect(tokenizeToolName("send_\u{1F4E7}_now")).toEqual(["send", "now"]);
     expect(tokenizeToolName("sendEmailV2")).toEqual(["send", "email", "v2"]);

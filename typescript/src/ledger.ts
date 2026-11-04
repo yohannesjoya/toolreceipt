@@ -59,8 +59,10 @@ export class LedgerEntry {
 
   static fromDict(data: Record<string, unknown>): LedgerEntry {
     const args = data["args"];
+    const tool = data["tool"];
+    if (typeof tool !== "string") throw new TypeError("ledger entry needs a string 'tool'"); // Python: KeyError('tool')
     return new LedgerEntry({
-      tool: data["tool"] as string,
+      tool,
       status: (data["status"] as Status | undefined) ?? "ok",
       args: args && typeof args === "object" ? { ...(args as Record<string, Json>) } : {},
       result: (data["result"] as string | null | undefined) ?? null,

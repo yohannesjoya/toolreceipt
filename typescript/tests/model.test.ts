@@ -21,6 +21,16 @@ describe("LedgerEntry", () => {
   });
 });
 
+describe("fromDict rejects a missing required key (N2)", () => {
+  it("LedgerEntry needs tool; Claim needs text and verb", () => {
+    expect(() => LedgerEntry.fromDict({ status: "ok" })).toThrow(TypeError);
+    expect(() => LedgerEntry.fromDict({ status: "ok" })).toThrow("tool");
+    expect(() => Claim.fromDict({ verb: "send" })).toThrow("text");
+    expect(() => Claim.fromDict({ text: "x" })).toThrow("verb");
+    expect(JSON.stringify(LedgerEntry.fromDict({ tool: "x" }).toDict())).toContain('"tool":"x"');
+  });
+});
+
 describe("Ledger", () => {
   it("sorts timed entries first by startedAt, untimed after in insertion order", () => {
     const l = new Ledger([

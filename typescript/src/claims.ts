@@ -107,9 +107,13 @@ export class Claim {
   }
 
   static fromDict(data: Record<string, unknown>): Claim {
+    const text = data["text"];
+    const verb = data["verb"];
+    if (typeof text !== "string") throw new TypeError("claim needs a string 'text'"); // Python: KeyError('text')
+    if (typeof verb !== "string") throw new TypeError("claim needs a string 'verb'"); // Python: KeyError('verb')
     return new Claim({
-      text: data["text"] as string,
-      verb: data["verb"] as string,
+      text,
+      verb,
       object: (data["object"] as string | null | undefined) ?? null,
       count: (data["count"] as number | null | undefined) ?? null,
       candidates: (data["candidates"] as string[] | null | undefined) ?? [],
@@ -358,17 +362,14 @@ function completed(subject: string[], aux: string[]): boolean {
 }
 
 type Entry = [form: string, family: string | null];
-const ENTRY_CACHE = new WeakMap<Lexicon, Entry[]>();
 
+/** The `(form, family)` list, longest form first. Rebuilt on every call, as Python does, so a
+ * lexicon edited after the extractor was built is seen (compiled phrases are cached by text). */
 function scanEntries(lexicon: Lexicon): Entry[] {
-  let entries = ENTRY_CACHE.get(lexicon);
-  if (!entries) {
-    entries = [];
-    for (const [name, fam] of Object.entries(lexicon.families)) for (const form of fam.forms) entries.push([form, name]);
-    for (const form of lexList(lexicon, "exclusions")) entries.push([form, null]);
-    entries.sort((a, b) => b[0].length - a[0].length); // stable, as Python's sort
-    ENTRY_CACHE.set(lexicon, entries);
-  }
+  const entries: Entry[] = [];
+  for (const [name, fam] of Object.entries(lexicon.families)) for (const form of fam.forms) entries.push([form, name]);
+  for (const form of lexList(lexicon, "exclusions")) entries.push([form, null]);
+  entries.sort((a, b) => cpLength(b[0]) - cpLength(a[0])); // stable, as Python's sort; code points
   return entries;
 }
 
