@@ -18,7 +18,12 @@ export default tseslint.config(
       // The core imports nothing but the JS runtime and its own files (PRD 06 §13).
       "no-restricted-imports": [
         "error",
-        { patterns: [{ group: ["node:*", "fs", "path", "fs/*"], message: "no Node built-ins in src/" }] },
+        {
+          patterns: [
+            { group: ["node:*", "fs", "path", "fs/*"], message: "no Node built-ins in src/" },
+            { regex: "^[^./]", message: "src/ imports only its own files (zero runtime dependencies)" },
+          ],
+        },
       ],
     },
   },
