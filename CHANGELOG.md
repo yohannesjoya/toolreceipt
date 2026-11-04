@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### [Unreleased]
 
+#### Added
+
 - Core port under `typescript/` (not yet published): `check`, `acheck`, `diff`, `Ledger`,
   `LedgerEntry`, `Claim`, `ToolSpec`, `RuleExtractor`, `Receipt`, `renderSummary`,
   `normalizeToolSpecs`, `loadLexicon`, `coerceArgs`, `truncate`. Zero runtime dependencies,
@@ -22,6 +24,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### [Unreleased]
 
+#### Added
+
 - Fixtures: `fixtures/demo/tools.json` (the demo's tool specs) and
   `fixtures/recorded/parity.json` (the Python package's extract, diff and check output for
   every shared case), both written by `scripts/record_parity.py` and pinned by
@@ -30,7 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### [0.4.0] - 2026-10-31
 
-### Added
+#### Added
 
 - `check_turns()`, `acheck_turns()` and `TurnReceipt` (`toolreceipt.turns`): one receipt per
   assistant turn with text over a whole recorded conversation, in the message lists
@@ -50,7 +54,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   replay (`run_scenario(extractor_model=)`), so recorded runs replay through `LLMExtractor`.
   The demo is pinned to toolreceipt 0.4.0.
 
-### Changed
+#### Changed
 
 - `toolreceipt.langgraph.final_reply` returns `""` when the last `AIMessage` with text carries
   a tool call or is followed by one, as `toolreceipt.messages.final_reply` already did: a run
@@ -59,7 +63,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### [0.3.1] - 2026-10-30
 
-### Added
+#### Added
 
 - `check_messages()` and `acheck_messages()` (`toolreceipt.messages`): a receipt from a plain
   message list with no framework installed. OpenAI Chat Completions messages, OpenAI
@@ -87,7 +91,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `from_chat_model` wires the model's `ainvoke` too. `extract()` on an async-only extractor
   raises `TypeError`.
 
-### Changed
+#### Changed
 
 - Verdicts can change for ledgers that carry arguments: a `clean` 0.3.0 receipt becomes
   `fabricated` when a confirmed claim's amount or reference number contradicts the call.
@@ -99,7 +103,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### [0.3.0] - 2026-10-30
 
-### Added
+#### Added
 
 - `acheck()` and `Receipts.acheck()`: the same receipt as `check()` for async code. An
   extractor's `aextract` coroutine is awaited when it defines one; the rules alone do no I/O.
@@ -121,7 +125,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   real descriptions.
 - Public helper `toolreceipt.claims.description_family(description, lexicon)`.
 
-### Changed
+#### Changed
 
 - `ReceiptCallbackHandler.run_inline = True`: async callers no longer pay one executor hop
   per callback event. Sync `invoke` is unaffected.
@@ -132,14 +136,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   tools `tool_b` and `tool_c` are now matchable; the numbers match the estimate made before
   implementation. LLM rows unchanged.
 
-### Documented
+#### Documented
 
 - 0.2.0 shipped these public names without listing them: `toolreceipt.llm.build_prompt`,
   `parse_output`, `message_text` and `MAX_SPAN_CHARS`.
 
 ### [0.2.0] - 2026-10-22
 
-### Added
+#### Added
 
 - `LLMExtractor` (`toolreceipt.llm`): an opt-in extractor that runs the rules first and asks
   any chat model for the claims they cannot see (outcome phrasing, synonyms, passive voice,
@@ -159,14 +163,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   tuning) with committed model recordings replayed offline by `tests/test_probe_replay.py`,
   and `scripts/eval_llm.py` to re-record them; `fixtures/llm/` pins the guards and the merge.
 
-### Changed
+#### Changed
 
 - `Claim.to_dict()` emits `source` and `Receipt.to_dict()` emits `suspected` (additive).
   Rules-only behaviour is otherwise byte-identical to 0.1.1.
 
 ### [0.1.1] - 2026-10-20
 
-### Fixed
+#### Fixed
 
 - `known_tools` accepts tool objects with a `name` and a `description`, such as LangChain's
   `BaseTool`. Passing one used to raise `TypeError: expected string or bytes-like object`.
@@ -174,7 +178,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### [0.1.0] - 2026-10-20
 
-### Added
+#### Added
 
 - `Ledger` and `LedgerEntry`: JSON-safe record of tool calls, with truncation of results and errors.
 - `Claim` and `ClaimExtractor` protocol, with `RuleExtractor`, a deterministic, key-free,
