@@ -6,6 +6,7 @@ import { Claim } from "../src/claims";
 import { Dec } from "../src/decimal";
 import { diff } from "../src/diff";
 import { Ledger } from "../src/ledger";
+import { check } from "../src/receipts";
 
 describe("findAmount", () => {
   it("one cued amount, qualified by its neighbours", () => {
@@ -47,5 +48,16 @@ describe("whole-number floats in ledger arguments (accepted divergence, PRD 06 Â
   it("never judges a non-integer number as a reference (Python float)", () => {
     const r = diff([claim()], Ledger.fromDict([{ tool: "cancel_order", status: "ok", args: { order_id: 4822.5 } }]));
     expect(r.verdict).toBe("clean");
+  });
+});
+
+describe("non-ASCII decimal digits in an amount (N1)", () => {
+  const ledger = (amount: unknown) => Ledger.fromDict([{ tool: "issue_refund", status: "ok", args: { amount } }]);
+  it("is judged like Python, never thrown on", () => {
+    expect(check("I've refunded $\u0666\u0664.", ledger(64), { knownTools: ["issue_refund"] }).verdict).toBe("clean");
+    const r = check("I've refunded $\u0666\u0664.", ledger(32), { knownTools: ["issue_refund"] });
+    expect(r.verdict).toBe("fabricated");
+    expect(r.summary).toBe('1 claimed action never ran: issue_refund ("I\'ve refunded $\u0666\u0664", ledger amount=32).');
+    expect(check("I've refunded $\uff16\uff14.", ledger("\u0666\u0664"), { knownTools: ["issue_refund"] }).verdict).toBe("clean");
   });
 });

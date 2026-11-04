@@ -28,6 +28,12 @@ describe("Dec", () => {
     expect(Dec.parse("1.2.3")).toBeNull();
   });
 
+  it("reads any Nd digits, as Decimal does (N1)", () => {
+    expect(d("\u0666\u0664").equals(d("64"))).toBe(true);           // Decimal("٦٤") == 64
+    expect(d("\uff16\uff14").equals(d("64"))).toBe(true);           // Decimal("６４") == 64
+    expect(d("\u0666\u0664.5e1").equals(d("645"))).toBe(true);
+  });
+
   it("fromNumber uses String(n), null for non-finite", () => {
     expect(Dec.fromNumber(32.1)!.equals(d("32.1"))).toBe(true);   // Decimal(str(32.1))
     expect(Dec.fromNumber(32)!.equals(d("32.00"))).toBe(true);

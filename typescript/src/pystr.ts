@@ -59,14 +59,26 @@ export function reEscape(text: string): string {
   return text.replace(/[\^$\\.*+?()[\]{}|/]/g, "\\$&");
 }
 
-/** `re.fullmatch(re, s)`. */
+const FULL_CACHE = new WeakMap<RegExp, RegExp>();
+const AT0_CACHE = new WeakMap<RegExp, RegExp>();
+
+function anchored(cache: WeakMap<RegExp, RegExp>, re: RegExp, suffix: string): RegExp {
+  let out = cache.get(re);
+  if (!out) {
+    out = new RegExp(`^(?:${re.source})${suffix}`, re.flags.replace("g", ""));
+    cache.set(re, out);
+  }
+  return out;
+}
+
+/** `re.fullmatch(re, s)`. The anchored variant is compiled once per pattern. */
 export function fullmatch(re: RegExp, s: string): RegExpExecArray | null {
-  return new RegExp(`^(?:${re.source})$`, re.flags.replace("g", "")).exec(s);
+  return anchored(FULL_CACHE, re, "$").exec(s);
 }
 
 /** `re.match(re, s)`: anchored at position 0 only. */
 export function matchAt0(re: RegExp, s: string): RegExpExecArray | null {
-  return new RegExp(`^(?:${re.source})`, re.flags.replace("g", "")).exec(s);
+  return anchored(AT0_CACHE, re, "").exec(s);
 }
 
 // ---------------------------------------------------------------------------
@@ -184,15 +196,25 @@ export function cpCompare(a: string, b: string): number {
 
 const ND = /\p{Nd}/u;
 
-/** `int(digits)` for any run of Nd digits: each Nd block is ten contiguous code points. */
+/** The value 0 to 9 of one Nd digit: each Nd block is ten contiguous code points in order. */
+function digitValue(ch: string): number {
+  const cp = ch.codePointAt(0)!;
+  let start = cp;
+  while (start > 0 && ND.test(String.fromCodePoint(start - 1))) start--;
+  return (cp - start) % 10;
+}
+
+/** Every Nd digit replaced by its ASCII digit; other characters unchanged. */
+export function pyAsciiDigits(s: string): string {
+  let out = "";
+  for (const ch of s) out += ND.test(ch) ? String(digitValue(ch)) : ch;
+  return out;
+}
+
+/** `int(digits)` for any run of Nd digits. */
 export function pyInt(digits: string): number {
   let value = 0;
-  for (const ch of digits) {
-    const cp = ch.codePointAt(0)!;
-    let start = cp;
-    while (start > 0 && ND.test(String.fromCodePoint(start - 1))) start--;
-    value = value * 10 + ((cp - start) % 10);
-  }
+  for (const ch of digits) value = value * 10 + digitValue(ch);
   return value;
 }
 

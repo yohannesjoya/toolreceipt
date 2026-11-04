@@ -98,8 +98,8 @@ export function findAmount(clause: string, sentence?: string | null): Dec | null
     offset = 0;
   }
   if (!qualified(low, offset + m.index, offset + m.index + m[0].length)) return null;
-  const group = m.slice(1).find((g) => g !== undefined && g !== "")!;
-  return Dec.parse(group.replaceAll(",", ""))!.abs();
+  const group = m.slice(1).find((g) => g !== undefined && g !== "") ?? "";
+  return Dec.parse(group.replaceAll(",", ""))?.abs() ?? null;
 }
 
 function refTokens(low: string): string[] {
@@ -171,7 +171,7 @@ function amountValue(value: unknown): Dec | null {
   if (typeof value === "number") return Dec.fromNumber(value)?.abs() ?? null;
   if (typeof value === "string" && cpLength(value) <= MAX_VALUE_CHARS) {
     const m = VALUE_AMOUNT_FULL.exec(pyLower(pyStrip(value)));
-    if (m) return Dec.parse(m[1]!.replaceAll(",", ""))!.abs();
+    if (m) return Dec.parse(m[1]!.replaceAll(",", ""))?.abs() ?? null;
   }
   return null;
 }

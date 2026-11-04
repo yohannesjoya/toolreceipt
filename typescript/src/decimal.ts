@@ -3,7 +3,9 @@
  * `decimal.Decimal`. Value = digits / 10^scale. Only what `_args.py` needs.
  */
 
-const DECIMAL = /^(-?)(\d*)(?:\.(\d+))?(?:[eE]([+-]?\d+))?$/;
+import { pyAsciiDigits } from "./pystr";
+
+const DECIMAL = /^(-?)(\d*)(?:\.(\d+))?(?:[eE]([+-]?\d+))?$/u;
 
 export class Dec {
   private constructor(
@@ -13,7 +15,7 @@ export class Dec {
 
   /** `Decimal(text)` for `-?\d+(\.\d+)?([eE][+-]?\d+)?` and `-?\.\d+`; `null` for anything else. */
   static parse(text: string): Dec | null {
-    const m = DECIMAL.exec(text);
+    const m = DECIMAL.exec(pyAsciiDigits(text)); // Decimal() reads any Nd digits
     if (!m) return null;
     const [, sign, intPart = "", frac = "", exp] = m;
     if (intPart === "" && frac === "") return null;
