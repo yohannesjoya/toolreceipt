@@ -1,6 +1,8 @@
 /**
  * Whole-object parity with the Python package (PRD 06 §10.2): every extract(), diff() and
  * check() output recorded by scripts/record_parity.py must deep-equal the TypeScript output.
+ *
+ * Compared as JSON text: same keys, same order, `null` never `undefined` (PRD 06 §13).
  */
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -62,7 +64,7 @@ describe("parity with the Python recording", () => {
   it.each(REC.extract.map((e) => [e.source, e] as const))("extract %s", (_source, e) => {
     const { text, known_tools } = inputs(e.source);
     const claims = new RuleExtractor().extract(text, normalizeToolSpecs(known_tools as never));
-    expect(claims.map((c) => c.toDict())).toEqual(e.claims);
+    expect(JSON.stringify(claims.map((c) => c.toDict()))).toBe(JSON.stringify(e.claims));
   });
 
   it.each(REC.diff.map((e) => [e.source, e] as const))("diff %s", (_source, e) => {
@@ -74,12 +76,12 @@ describe("parity with the Python recording", () => {
       llmBlocks: c.llm_blocks ?? false,
       checkArgs: c.check_args ?? true,
     });
-    expect(r.toDict()).toEqual(e.receipt);
+    expect(JSON.stringify(r.toDict())).toBe(JSON.stringify(e.receipt));
   });
 
   it.each(REC.check.map((e) => [e.source, e] as const))("check %s", (_source, e) => {
     const { text, known_tools, ledger } = inputs(e.source);
     const r = check(text, Ledger.fromDict(ledger), { knownTools: known_tools as never });
-    expect(r.toDict()).toEqual(e.receipt);
+    expect(JSON.stringify(r.toDict())).toBe(JSON.stringify(e.receipt));
   });
 });

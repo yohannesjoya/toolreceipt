@@ -32,7 +32,7 @@ const receipt = check("I've refunded $64 and emailed you the confirmation.", led
 
 receipt.verdict;  // "fabricated"
 receipt.ok;       // false
-receipt.summary;  // 1 claimed action never ran: issue_refund ("I've refunded $64", ledger amount=32).
+receipt.summary;  // 2 claimed actions never ran: issue_refund ("I've refunded $64", ledger amount=32).
 receipt.toDict(); // the same JSON as Python's receipt.to_dict()
 ```
 
@@ -69,11 +69,21 @@ for every case, which the TypeScript output must deep-equal. `lexicon.json` is e
 
 Python string and number semantics (its whitespace class, Unicode word boundaries, code-point
 lengths, `repr(float)`, `json.dumps` formatting, `Decimal` arithmetic) live in `src/pystr.ts`
-and `src/decimal.ts`. The accepted divergences, none reachable by a current fixture: a
-whole-number ledger argument such as `4821.0` is an integer here and a float in Python, so it
-is judged as a reference number here and not there; `isDigit` accepts `Nd` digits only;
-integers above 2^53 lose digits when the JSON is parsed; error messages name the JavaScript
-type; `acheck` awaits any `aextract` function.
+and `src/decimal.ts`. The accepted divergences, none reachable by a current fixture:
+
+- A whole-number ledger argument such as `4821.0` is an integer here and a float in Python. It
+  is judged as a reference number here and not there, which can turn a Python `clean` into
+  `fabricated`, and it echoes as `4821`.
+- Integers above 2^53 lose digits, whether from parsed JSON or as a `count` in the reply text.
+- An argument key that looks like an integer sorts first, because JavaScript objects order such
+  keys that way.
+- `isDigit` accepts `Nd` digits only. Unicode versions can differ between CPython and Node.
+- `coerceArgs` turns `NaN` into `null`, and its `str()` fallback and that of `normalizeToolSpecs`
+  use `String()`.
+- `LedgerEntry.fromDict` rejects `args` given as a list of pairs, which Python's `dict()` reads.
+- Error messages name the JavaScript type, and `fromDict` throws `TypeError` where Python
+  raises `KeyError`.
+- `acheck` awaits any `aextract` function.
 
 ## Not yet ported
 

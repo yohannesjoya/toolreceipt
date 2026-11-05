@@ -1,6 +1,6 @@
 /** Ledger of tool calls actually performed during an agent run (port of ledger.py). */
 
-import { cpLength, cpSlice } from "./pystr";
+import { cpLength, cpSlice, isMapping, pyTruthy } from "./pystr";
 import type { Json } from "./types";
 
 export type Status = "ok" | "error";
@@ -33,7 +33,8 @@ export class LedgerEntry {
 
   constructor(init: LedgerEntryInit) {
     this.tool = init.tool;
-    this.status = init.status ?? "ok";
+    // `undefined` only: Python keeps an explicit None, and that entry is neither ok nor error.
+    this.status = init.status === undefined ? "ok" : init.status;
     this.args = init.args ?? {};
     this.result = init.result ?? null;
     this.error = init.error ?? null;
@@ -59,12 +60,14 @@ export class LedgerEntry {
 
   static fromDict(data: Record<string, unknown>): LedgerEntry {
     const args = data["args"];
+    // Python: dict(data.get("args") or {}) raises on a non-empty list, a string or a number.
+    if (pyTruthy(args) && !isMapping(args)) throw new TypeError("ledger entry 'args' must be a mapping");
     const tool = data["tool"];
     if (typeof tool !== "string") throw new TypeError("ledger entry needs a string 'tool'"); // Python: KeyError('tool')
     return new LedgerEntry({
       tool,
-      status: (data["status"] as Status | undefined) ?? "ok",
-      args: args && typeof args === "object" ? { ...(args as Record<string, Json>) } : {},
+      status: data["status"] as Status | undefined,
+      args: args instanceof Map ? (Object.fromEntries(args) as Record<string, Json>) : { ...(args as Record<string, Json>) },
       result: (data["result"] as string | null | undefined) ?? null,
       error: (data["error"] as string | null | undefined) ?? null,
       callId: (data["call_id"] as string | null | undefined) ?? null,

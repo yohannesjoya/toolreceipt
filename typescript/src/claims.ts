@@ -2,8 +2,8 @@
 
 import { type Family, type Lexicon, defaultLexicon } from "./lexicon";
 import {
-  cpCompare, cpFirst, cpLast, cpLength, cpSlice, fullmatch, isAlnum, matchAt0, pyInt, pyLower, pyLstrip, pyRegex,
-  pyRstrip, pySplit, pySplitlines, pyStrip, reEscape,
+  cpCompare, cpFirst, cpLast, cpLength, cpSlice, fullmatch, isAlnum, isMapping, matchAt0, pyInt, pyLower, pyLstrip, pyRegex,
+  pyRstrip, pySplit, pySplitlines, pyStrip, pyTruthy, reEscape,
 } from "./pystr";
 import type { Json } from "./types";
 
@@ -163,14 +163,8 @@ export interface ClaimExtractor {
 const TYPE_ERROR =
   "known_tools entries must be a name, a (name, description) pair, a ToolSpec, a dict or an object with a name attribute; got ";
 
-function isPlainObject(value: unknown): value is Record<string, unknown> {
-  if (value === null || typeof value !== "object") return false;
-  const proto = Object.getPrototypeOf(value) as unknown;
-  return proto === Object.prototype || proto === null;
-}
-
 function typeName(value: unknown): string {
-  if (value === null) return "NoneType";
+  if (value === null) return "null";
   if (typeof value === "object") {
     const ctor = (value as { constructor?: { name?: string } }).constructor;
     return ctor?.name ?? "object";
@@ -189,23 +183,22 @@ export function normalizeToolSpecs(tools: Iterable<ToolLike>): ToolSpec[] {
     } else if (Array.isArray(tool)) {
       const [name, ...rest] = tool as readonly [string, ...string[]];
       specs.push(new ToolSpec(name, rest[0] ?? ""));
-    } else if (tool instanceof Map || isPlainObject(tool)) {
+    } else if (isMapping(tool)) {
       const get = (obj: unknown, key: string): unknown =>
-        obj instanceof Map ? obj.get(key) : isPlainObject(obj) ? obj[key] : undefined;
-      const inner = get(tool, "function") ?? get(tool, "custom");
-      const src = inner instanceof Map || isPlainObject(inner) ? inner : tool;
+        obj instanceof Map ? obj.get(key) : isMapping(obj) ? (obj as Record<string, unknown>)[key] : undefined;
+      const fn = get(tool, "function"); // Python: tool.get("function") or tool.get("custom")
+      const inner = pyTruthy(fn) ? fn : get(tool, "custom");
+      const src = isMapping(inner) ? inner : tool;
       const name = get(src, "name");
       if (typeof name !== "string" || name === "") continue; // a built-in tool spec such as {"type": "web_search"}
       const description = get(src, "description");
       // Python: str(src.get("description") or ""); String() is the accepted counterpart (PRD 06 §7.3 item 11).
-      // eslint-disable-next-line @typescript-eslint/no-base-to-string
-      specs.push(new ToolSpec(name, description ? String(description) : ""));
+      specs.push(new ToolSpec(name, pyTruthy(description) ? String(description) : ""));
     } else {
-      const toolName = (tool as { name?: unknown }).name;
+      const toolName = (tool as { name?: unknown } | null | undefined)?.name;
       if (typeof toolName !== "string") throw new TypeError(TYPE_ERROR + typeName(tool));
-      const description = (tool as { description?: unknown }).description;
-      // eslint-disable-next-line @typescript-eslint/no-base-to-string
-      specs.push(new ToolSpec(toolName, description ? String(description) : ""));
+      const description = (tool as unknown as { description?: unknown }).description;
+      specs.push(new ToolSpec(toolName, pyTruthy(description) ? String(description) : ""));
     }
   }
   return specs;
@@ -577,17 +570,11 @@ class TermSet {
   add(t: Term): void {
     this.map.set(termKey(t), t);
   }
-  has(t: Term): boolean {
-    return this.map.has(termKey(t));
-  }
   addAll(ts: Iterable<Term>): void {
     for (const t of ts) this.add(t);
   }
   values(): Term[] {
     return [...this.map.values()];
-  }
-  get size(): number {
-    return this.map.size;
   }
 }
 
@@ -652,7 +639,7 @@ export function descriptionFamily(description: string, lexicon: Lexicon = defaul
   if (ws.some((w) => reads.has(stemVerb(w)))) return null;
   const two = ws.slice(0, 2).map(stemVerb).join(" ");
   for (const [name, fam] of Object.entries(lexicon.families)) {
-    if (fam.forms.some((f) => f.includes(" ") && f.split(" ").map(stemVerb).join(" ") === two)) return name;
+    if (fam.forms.some((f) => f.includes(" ") && pySplit(f).map(stemVerb).join(" ") === two)) return name;
   }
   const s = stemVerb(ws[0]!);
   for (const [name, fam] of Object.entries(lexicon.families)) {
@@ -681,7 +668,7 @@ export function descriptionObject(description: string, lexicon: Lexicon = defaul
   const two = ws.slice(0, 2).map(stemVerb).join(" ");
   const twoWordForms = new Set(
     Object.values(lexicon.families).flatMap((fam) =>
-      fam.forms.filter((f) => f.includes(" ")).map((f) => f.split(" ").map(stemVerb).join(" ")),
+      fam.forms.filter((f) => f.includes(" ")).map((f) => pySplit(f).map(stemVerb).join(" ")),
     ),
   );
   const obj: string[] = [];

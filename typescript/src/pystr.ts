@@ -135,6 +135,22 @@ const ALNUM = /^[\p{L}\p{N}]+$/u;
 const ALPHA = /^\p{L}+$/u;
 const DIGIT = /^\p{Nd}+$/u;
 
+/** A mapping in the Python sense: an object literal or a `Map`, not a class instance or array. */
+export function isMapping(value: unknown): value is Record<string, unknown> | Map<unknown, unknown> {
+  if (value instanceof Map) return true;
+  if (value === null || typeof value !== "object") return false;
+  const proto = Object.getPrototypeOf(value) as unknown;
+  return proto === Object.prototype || proto === null;
+}
+
+/** Python truthiness: empty lists and mappings are false as well. */
+export function pyTruthy(value: unknown): boolean {
+  if (Array.isArray(value)) return value.length > 0;
+  if (value instanceof Map) return value.size > 0;
+  if (isMapping(value)) return Object.keys(value).length > 0;
+  return Boolean(value);
+}
+
 export function isAlnum(s: string): boolean {
   return ALNUM.test(s);
 }
