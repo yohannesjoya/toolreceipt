@@ -40,6 +40,6 @@ def test_parity_recording_is_current():
     tools = _load(FIXTURES / "demo" / "tools.json")
     current = _script().build(tools)
     # The stamps say when and from which version it was recorded; a version bump alone is not stale.
-    for key in ("extract", "diff", "check"):
+    for key in ("extract", "diff", "check", "messages", "turns"):
         assert recorded[key] == current[key], RE_RECORD
     assert recorded["recorded_at"] and recorded["toolreceipt"]

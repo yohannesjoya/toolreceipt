@@ -19,6 +19,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   assertions, plus whole-receipt equality against `fixtures/recorded/parity.json`. Python
   string, regex, number and JSON semantics live in `src/pystr.ts` and `src/decimal.ts`; the
   accepted divergences are listed in `docs/decisions.md`.
+- `checkMessages`, `acheckMessages`, `ledgerFromMessages`, `finalReply`, `checkTurns`,
+  `acheckTurns` and `TurnReceipt`: OpenAI Chat Completions, OpenAI Responses, Anthropic and plain
+  transcript lists, passing `fixtures/messages` and `fixtures/turns` with whole-receipt parity.
 
 ## Python
 

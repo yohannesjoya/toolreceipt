@@ -2,7 +2,8 @@
 
 Writes ``fixtures/recorded/parity.json`` (``extract``, ``diff`` and ``check`` output for every
 case under ``fixtures/extractor``, ``fixtures/heldout``, ``fixtures/diff``, ``fixtures/check`` and
-the demo corpus) and ``fixtures/demo/tools.json`` (the demo's tool specs, one list). Both files
+the demo corpus, plus ``messages`` and ``turns`` output for ``fixtures/messages`` and
+``fixtures/turns``) and ``fixtures/demo/tools.json`` (the demo's tool specs, one list). Both files
 are generated only by this script; ``python/tests/test_recorded_parity_current.py`` fails when
 they are stale. Usage, from the repository root::
 
@@ -25,6 +26,8 @@ import toolreceipt  # noqa: E402
 from toolreceipt import Ledger, check  # noqa: E402
 from toolreceipt.claims import Claim, RuleExtractor, normalize_tool_specs  # noqa: E402
 from toolreceipt.diff import diff  # noqa: E402
+from toolreceipt.messages import check_messages, final_reply, ledger_from_messages  # noqa: E402
+from toolreceipt.turns import check_turns  # noqa: E402
 
 FIXTURES = ROOT / "fixtures"
 DEMO = ROOT / "demo"
@@ -98,8 +101,33 @@ def build(demo_tools: list[dict[str, str]] | None = None) -> dict[str, Any]:
             case = {"text": data["reply"], "ledger": data["ledger"], "known_tools": demo_specs}
             checks.append({"source": f"demo/{sub}/{path.stem}", "receipt": _check(case).to_dict()})
 
-    version = toolreceipt.__version__
-    return {"toolreceipt": version, "extract": extract, "diff": diffs, "check": checks}
+    messages: list[dict[str, Any]] = []
+    for stem, case in _cases("messages"):
+        if "raises" in case:
+            continue
+        msgs, known = case["messages"], case["known_tools"]
+        messages.append({
+            "source": f"messages/{stem}",
+            "ledger": ledger_from_messages(msgs).to_dict(),
+            "final_reply": final_reply(msgs),
+            "receipt": check_messages(msgs, known_tools=known).to_dict(),
+        })
+
+    turns: list[dict[str, Any]] = []
+    for stem, case in _cases("turns"):
+        if "raises" in case:
+            continue
+        receipts = check_turns(case["messages"], known_tools=case["known_tools"])
+        turns.append({"source": f"turns/{stem}", "receipts": [r.to_dict() for r in receipts]})
+
+    return {
+        "toolreceipt": toolreceipt.__version__,
+        "extract": extract,
+        "diff": diffs,
+        "check": checks,
+        "messages": messages,
+        "turns": turns,
+    }
 
 
 def _dump(data: Any) -> str:
@@ -121,7 +149,8 @@ def main() -> int:
     print(f"wrote {DEMO_TOOLS.relative_to(ROOT)} ({len(tools)} tools)")
     print(
         f"wrote {PARITY.relative_to(ROOT)} (extract {len(recording['extract'])}, "
-        f"diff {len(recording['diff'])}, check {len(recording['check'])})"
+        f"diff {len(recording['diff'])}, check {len(recording['check'])}, "
+        f"messages {len(recording['messages'])}, turns {len(recording['turns'])})"
     )
     return 0
 

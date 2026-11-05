@@ -10,7 +10,9 @@ import { describe, expect, it } from "vitest";
 import { Claim, RuleExtractor, normalizeToolSpecs } from "../src/claims";
 import { diff } from "../src/diff";
 import { Ledger } from "../src/ledger";
+import { checkMessages, finalReply, ledgerFromMessages } from "../src/messages";
 import { check } from "../src/receipts";
+import { checkTurns } from "../src/turns";
 import {
   type CheckCase, DEMO, type DiffCase, type ExtractorCase, FIXTURES, type HeldoutCase, demoTools, readJson,
 } from "./helpers";
@@ -21,6 +23,8 @@ type Recording = {
   extract: Array<{ source: string; claims: unknown[] }>;
   diff: Array<{ source: string; receipt: unknown }>;
   check: Array<{ source: string; receipt: unknown }>;
+  messages: Array<{ source: string; ledger: unknown; final_reply: string; receipt: unknown }>;
+  turns: Array<{ source: string; receipts: unknown }>;
 };
 const REC = readJson<Recording>(join(FIXTURES, "recorded", "parity.json"));
 const TOOLS = demoTools();
@@ -83,5 +87,20 @@ describe("parity with the Python recording", () => {
     const { text, known_tools, ledger } = inputs(e.source);
     const r = check(text, Ledger.fromDict(ledger), { knownTools: known_tools as never });
     expect(JSON.stringify(r.toDict())).toBe(JSON.stringify(e.receipt));
+  });
+
+  type ListCase = { messages: unknown[]; known_tools: never };
+
+  it.each(REC.messages.map((e) => [e.source, e] as const))("messages %s", (_source, e) => {
+    const c = readJson<ListCase>(join(FIXTURES, `${e.source}.json`));
+    expect(JSON.stringify(ledgerFromMessages(c.messages).toDict())).toBe(JSON.stringify(e.ledger));
+    expect(finalReply(c.messages)).toBe(e.final_reply);
+    expect(JSON.stringify(checkMessages(c.messages, { knownTools: c.known_tools }).toDict())).toBe(JSON.stringify(e.receipt));
+  });
+
+  it.each(REC.turns.map((e) => [e.source, e] as const))("turns %s", (_source, e) => {
+    const c = readJson<ListCase>(join(FIXTURES, `${e.source}.json`));
+    const got = checkTurns(c.messages, { knownTools: c.known_tools }).map((r) => r.toDict());
+    expect(JSON.stringify(got)).toBe(JSON.stringify(e.receipts));
   });
 });

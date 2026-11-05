@@ -238,4 +238,6 @@ echoes out of order; `coerceArgs` turns `NaN` into `null`; `LedgerEntry.fromDict
 given as a list of pairs, which Python's `dict()` reads; errors name the JavaScript type
 (`got number`), `fromDict` throws `TypeError` where Python raises `KeyError`, and the `str()`
 fallbacks of `normalizeToolSpecs` and `coerceArgs` use `String()`; `acheck` awaits any
-`aextract` function, where Python ignores a synchronous one.
+`aextract` function, where Python ignores a synchronous one; `json.loads` reads `NaN` and
+`Infinity` in a tool call's `arguments` string while `JSON.parse` does not, so that string lands in
+`{ input: ... }`.

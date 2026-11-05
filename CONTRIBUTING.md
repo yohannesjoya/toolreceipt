@@ -22,7 +22,7 @@ The TypeScript package under `typescript/` ports the core and runs the same fixt
 (`cd typescript && npm ci && npm run check`). A fixture you add or change must pass in both
 suites. `python/toolreceipt/lexicon.json` is the only hand-edited lexicon; `scripts/sync_readme.py`
 copies it into `typescript/src/`, and `--check` fails in CI when the copy drifts. Adding or
-editing an extractor, diff, end-to-end or held-out fixture or a demo replay, or changing Python
+editing an extractor, diff, end-to-end, held-out, message-list or turn fixture or a demo replay, or changing Python
 behaviour, also regenerates `fixtures/recorded/parity.json`. Run this from the repository root,
 after `uv sync` in `python/`:
 
