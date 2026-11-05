@@ -1,0 +1,38 @@
+{
+  "name": "toolreceipt",
+  "version": "0.1.0",
+  "description": "Catch LLM agents claiming actions they never took. Ledger + claim extraction + receipt, same fixtures as the Python package.",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": { "types": "./dist/index.d.ts", "default": "./dist/index.js" },
+      "require": { "types": "./dist/index.d.cts", "default": "./dist/index.cjs" }
+    }
+  },
+  "files": ["dist", "README.md", "LICENSE"],
+  "sideEffects": false,
+  "engines": { "node": ">=18" },
+  "publishConfig": { "access": "public" },
+  "repository": { "type": "git", "url": "https://github.com/yohannesjoya/toolreceipt", "directory": "typescript" },
+  "homepage": "https://github.com/yohannesjoya/toolreceipt",
+  "keywords": ["llm", "agents", "tool-calls", "hallucination", "receipt", "langgraph", "openai", "anthropic"],
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "check": "npm run typecheck && npm run lint && npm run test && npm run build"
+  },
+  "devDependencies": {
+    "@types/node": "^22",
+    "eslint": "^9",
+    "tsup": "^8",
+    "typescript": "^5",
+    "typescript-eslint": "^8",
+    "vitest": "^3"
+  }
+}

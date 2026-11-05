@@ -1,0 +1,84 @@
+/** Small pins for the extractor internals; the fixtures and the parity recording are the real test. */
+import { describe, expect, it } from "vitest";
+
+import {
+  RuleExtractor, extractObject, familyRan, normalizeToolSpecs, phrase, scan, splitClauses, splitSentences, subjectKind,
+  tokenizeToolName,
+} from "../src/claims";
+import { defaultLexicon, loadLexicon } from "../src/lexicon";
+import { pyRegex } from "../src/pystr";
+
+const LEX = defaultLexicon();
+
+describe("splitting", () => {
+  it("splits sentences on Python line boundaries (Review Focus 1)", () => {
+    expect(splitSentences("I sent it.\x85I refunded you.")).toEqual(["I sent it.", "I refunded you."]);
+  });
+  it("strips bullets", () => {
+    expect(splitSentences("- a\n2) b\n• c")).toEqual(["a", "b", "c"]);
+  });
+  it("splits clauses on punctuation and conjunctions", () => {
+    expect(splitClauses("I sent it, and I refunded you; then I logged it")).toEqual(["I sent it", "I refunded you", "I logged it"]);
+  });
+});
+
+describe("phrase", () => {
+  it("compiles hyphenated and contraction forms under the u flag (Review Focus 2)", () => {
+    expect(pyRegex(phrase("e-mailed"), "i").test("i e-mailed you")).toBe(true);
+    expect(pyRegex(phrase("n't")).test("haven't")).toBe(true);
+    expect(pyRegex(phrase("sent")).test("consent")).toBe(false);
+  });
+});
+
+describe("scan and subject", () => {
+  it("finds the completed action with its subject and auxiliaries", () => {
+    const a = scan("I have sent the email", LEX)!;
+    expect([a.family, a.subject, a.aux]).toEqual(["send", ["i"], ["have"]]);
+  });
+  it("skips adjectival participles and exclusions that come first", () => {
+    expect(scan("your scheduled call", LEX)).toBeNull();
+    expect(scan("I checked and sent it", LEX)).toBeNull();
+  });
+  it("classifies the subject", () => {
+    const other = scan("The customer has cancelled", LEX)!;
+    expect(subjectKind(other, "The customer has cancelled", LEX)).toBe("other");
+    const headline = scan("Refund issued", LEX)!;
+    expect(subjectKind(headline, "Refund issued", LEX)).toBe("passive");
+    const state = scan("you were charged", LEX)!;
+    expect(subjectKind(state, "you were charged", LEX)).toBe("state");
+  });
+});
+
+describe("extractObject", () => {
+  it("returns the object phrase and a count", () => {
+    const clause = "I sent the two emails to you";
+    expect(extractObject(clause, clause.indexOf("sent") + 4, LEX)).toEqual(["two emails to you", 2]);
+    expect(extractObject("Deleted 3 rows", 7, LEX)).toEqual(["3 rows", 3]);
+    expect(extractObject("I sent it.", 6, LEX)).toEqual(["it", null]);
+  });
+});
+
+describe("a lexicon edited after the first extract is seen (N3)", () => {
+  it("rebuilds the scan entries per call, as Python does", () => {
+    const lex = loadLexicon();
+    const ex = new RuleExtractor(lex);
+    const tools = normalizeToolSpecs(["send_email"]);
+    expect(ex.extract("I zapped the email.", tools)).toEqual([]);
+    lex.families["send"]!.forms.push("zapped");
+    expect(ex.extract("I zapped the email.", tools).map((c) => c.verb)).toEqual(["send"]);
+  });
+});
+
+describe("tool names and families (Task 7)", () => {
+  it("tokenizes names with ASCII classes only (Review Focus 4)", () => {
+    expect(tokenizeToolName("send_\u{1F4E7}_now")).toEqual(["send", "now"]);
+    expect(tokenizeToolName("sendEmailV2")).toEqual(["send", "email", "v2"]);
+    expect(tokenizeToolName("lookup-orders")).toEqual(["lookup", "order"]);
+    expect(tokenizeToolName("HTTPRequest")).toEqual(["http", "request"]);
+  });
+  it("familyRan uses verb tokens only", () => {
+    expect(familyRan("send", ["email_customer"])).toBe(false);
+    expect(familyRan("send", ["notify_user"])).toBe(true);
+    expect(familyRan("nope", ["send_email"])).toBe(false);
+  });
+});

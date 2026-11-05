@@ -7,3 +7,8 @@ dist/
 .mypy_cache/
 .ruff_cache/
 demo/.venv/
+
+# TypeScript package
+typescript/node_modules/
+typescript/dist/
+typescript/coverage/
