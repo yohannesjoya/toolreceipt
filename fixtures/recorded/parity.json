@@ -13567,6 +13567,241 @@
       }
     },
     {
+      "source": "messages/separate_blocks_stay_separate",
+      "ledger": [],
+      "final_reply": "I have not looked yet.\nI've refunded your order.",
+      "receipt": {
+        "confirmed": [],
+        "claimed_but_never_ran": [
+          {
+            "text": "I've refunded your order",
+            "verb": "refund",
+            "object": "order",
+            "count": null,
+            "candidates": [
+              "issue_refund"
+            ],
+            "tool": "issue_refund",
+            "confidence": "high",
+            "reason": "not_called",
+            "source": "rules",
+            "observed": null
+          }
+        ],
+        "unmatched": [],
+        "suspected": [],
+        "ran_but_unreported": [],
+        "verdict": "fabricated",
+        "ok": false,
+        "summary": "1 claimed action never ran: issue_refund (\"I've refunded your order\").",
+        "ledger": [],
+        "known_tools": [
+          "issue_refund",
+          "send_email"
+        ]
+      }
+    },
+    {
+      "source": "messages/split_text_blank_block_stays_separate",
+      "ledger": [],
+      "final_reply": "I have not looked yet\n \nI've refunded your order.",
+      "receipt": {
+        "confirmed": [],
+        "claimed_but_never_ran": [
+          {
+            "text": "I've refunded your order",
+            "verb": "refund",
+            "object": "order",
+            "count": null,
+            "candidates": [
+              "issue_refund"
+            ],
+            "tool": "issue_refund",
+            "confidence": "high",
+            "reason": "not_called",
+            "source": "rules",
+            "observed": null
+          }
+        ],
+        "unmatched": [],
+        "suspected": [],
+        "ran_but_unreported": [],
+        "verdict": "fabricated",
+        "ok": false,
+        "summary": "1 claimed action never ran: issue_refund (\"I've refunded your order\").",
+        "ledger": [],
+        "known_tools": [
+          "issue_refund",
+          "send_email"
+        ]
+      }
+    },
+    {
+      "source": "messages/split_text_emoji_opener_stays_separate",
+      "ledger": [],
+      "final_reply": "I have not looked yet \n✅ I've refunded your order.",
+      "receipt": {
+        "confirmed": [],
+        "claimed_but_never_ran": [
+          {
+            "text": "✅ I've refunded your order",
+            "verb": "refund",
+            "object": "order",
+            "count": null,
+            "candidates": [
+              "issue_refund"
+            ],
+            "tool": "issue_refund",
+            "confidence": "high",
+            "reason": "not_called",
+            "source": "rules",
+            "observed": null
+          }
+        ],
+        "unmatched": [],
+        "suspected": [],
+        "ran_but_unreported": [],
+        "verdict": "fabricated",
+        "ok": false,
+        "summary": "1 claimed action never ran: issue_refund (\"✅ I've refunded your order\").",
+        "ledger": [],
+        "known_tools": [
+          "issue_refund",
+          "send_email"
+        ]
+      }
+    },
+    {
+      "source": "messages/split_text_markdown_opener_stays_separate",
+      "ledger": [],
+      "final_reply": "I have not looked yet \n**I've refunded your order.**",
+      "receipt": {
+        "confirmed": [],
+        "claimed_but_never_ran": [
+          {
+            "text": "**I've refunded your order.**",
+            "verb": "refund",
+            "object": "order.**",
+            "count": null,
+            "candidates": [
+              "issue_refund"
+            ],
+            "tool": "issue_refund",
+            "confidence": "high",
+            "reason": "not_called",
+            "source": "rules",
+            "observed": null
+          }
+        ],
+        "unmatched": [],
+        "suspected": [],
+        "ran_but_unreported": [],
+        "verdict": "fabricated",
+        "ok": false,
+        "summary": "1 claimed action never ran: issue_refund (\"**I've refunded your order.**\").",
+        "ledger": [],
+        "known_tools": [
+          "issue_refund",
+          "send_email"
+        ]
+      }
+    },
+    {
+      "source": "messages/split_text_negation_kept",
+      "ledger": [],
+      "final_reply": "I have not refunded your order yet.",
+      "receipt": {
+        "confirmed": [],
+        "claimed_but_never_ran": [],
+        "unmatched": [],
+        "suspected": [],
+        "ran_but_unreported": [],
+        "verdict": "clean",
+        "ok": true,
+        "summary": "All claims confirmed.",
+        "ledger": [],
+        "known_tools": [
+          "issue_refund",
+          "send_email"
+        ]
+      }
+    },
+    {
+      "source": "messages/split_text_new_sentence_stays_separate",
+      "ledger": [],
+      "final_reply": "I have not looked yet \nI've refunded your order.",
+      "receipt": {
+        "confirmed": [],
+        "claimed_but_never_ran": [
+          {
+            "text": "I've refunded your order",
+            "verb": "refund",
+            "object": "order",
+            "count": null,
+            "candidates": [
+              "issue_refund"
+            ],
+            "tool": "issue_refund",
+            "confidence": "high",
+            "reason": "not_called",
+            "source": "rules",
+            "observed": null
+          }
+        ],
+        "unmatched": [],
+        "suspected": [],
+        "ran_but_unreported": [],
+        "verdict": "fabricated",
+        "ok": false,
+        "summary": "1 claimed action never ran: issue_refund (\"I've refunded your order\").",
+        "ledger": [],
+        "known_tools": [
+          "issue_refund",
+          "send_email"
+        ]
+      }
+    },
+    {
+      "source": "messages/split_text_python_space_kept",
+      "ledger": [],
+      "final_reply": "I have not refunded your order yet.",
+      "receipt": {
+        "confirmed": [],
+        "claimed_but_never_ran": [],
+        "unmatched": [],
+        "suspected": [],
+        "ran_but_unreported": [],
+        "verdict": "clean",
+        "ok": true,
+        "summary": "All claims confirmed.",
+        "ledger": [],
+        "known_tools": [
+          "issue_refund",
+          "send_email"
+        ]
+      }
+    },
+    {
+      "source": "messages/split_text_space_before_part_kept",
+      "ledger": [],
+      "final_reply": "I would have emailed you the confirmation.",
+      "receipt": {
+        "confirmed": [],
+        "claimed_but_never_ran": [],
+        "unmatched": [],
+        "suspected": [],
+        "ran_but_unreported": [],
+        "verdict": "clean",
+        "ok": true,
+        "summary": "All claims confirmed.",
+        "ledger": [],
+        "known_tools": [
+          "issue_refund",
+          "send_email"
+        ]
+      }
+    },
+    {
       "source": "messages/transcript_settled_entries_last_run",
       "ledger": [
         {

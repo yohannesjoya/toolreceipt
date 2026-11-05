@@ -270,3 +270,16 @@ Python's `check()` with no source reads the newest `config()` run. A module-leve
 JavaScript server is common, and there that reads another request's ledger: a wrong verdict, and a
 receipt holding someone else's arguments and results. After a second `wrapTools`, `check` with no source
 throws. Sequential reuse pays one argument.
+
+an honest reply.
+
+## A newline joins text blocks unless they are one split sentence
+
+Two text blocks can be two paragraphs or one sentence split at a citation. A newline starts a new clause,
+so `"I have not "` + `"refunded your order yet."` lost its negation and an honest reply read as
+`fabricated`. Blocks join as written only on positive evidence of one sentence: whitespace on one side of
+the join, and a next block that opens with a lowercase letter. Anything else keeps the newline, because
+`"I have not looked yet "` + `"✅ I've refunded your order."` is two sentences, and joining them would let
+the negation swallow a real claim. Three costs remain, because nothing in the text decides them. A split
+inside a word, or before a capital, digit or symbol, can read an honest reply as `fabricated`. A lowercase
+`"i've refunded it"` after an open negation joins, and that false claim is missed.

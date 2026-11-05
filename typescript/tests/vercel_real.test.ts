@@ -307,6 +307,19 @@ for (const version of VERSIONS) {
       expect(receipts.check(result.text).verdict).toBe("clean");
     });
 
+    it("reads a sentence split across text parts the same way through all three entry points", async () => {
+      const [ai, test] = await version.load();
+      const tools = toolsOf(ai);
+      const receipts = new Receipts();
+      const content = [{ type: "text", text: "I have not " }, { type: "text", text: "refunded your order yet." }];
+      const result = await generate(ai, test, receipts.wrapTools(tools), [{ content, finishReason: finish("stop"), usage, warnings: [] }]);
+      const known = toolOptions(tools);
+      expect(result.text).toBe("I have not refunded your order yet.");
+      expect(receipts.check(result.text).verdict).toBe("clean");
+      expect(checkResult(result, known).verdict).toBe("clean");
+      expect(checkMessages(version.allMessages(result), known).verdict).toBe("clean");
+    });
+
     it("hands the tool's own output to the model unchanged", async () => {
       const [ai, test] = await version.load();
       const output = { refunded: true, nested: { id: 7 } };

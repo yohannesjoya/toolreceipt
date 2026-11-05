@@ -60,18 +60,29 @@ def _blocks(content: Any) -> list[Any] | None:
 
 
 def _text(content: Any) -> str:
-    """A string as is; a block list as its text blocks joined by newlines; else ``""``."""
+    """A string as is; a block list as its text blocks joined; else ``""``.
+
+    Blocks join with a newline, unless one side already has whitespace at the join and the next
+    block opens with a lowercase letter: that is one sentence split across blocks, and a newline
+    would cut a negation off from its verb. Anything else may open a new sentence, whose claim an
+    earlier negation must not swallow.
+    """
     if isinstance(content, str):
         return content
     blocks = _blocks(content)
     if blocks is None:
         return ""
-    parts: list[str] = []
+    joined: str | None = None
     for block in blocks:
         text = _get(block, "text")
         if _get(block, "type") in _TEXT_TYPES and isinstance(text, str):
-            parts.append(text)
-    return "\n".join(parts)
+            if joined is None:
+                joined = text
+            elif (joined[-1:].isspace() or text[:1].isspace()) and text.lstrip()[:1].islower():
+                joined += text
+            else:
+                joined += "\n" + text
+    return joined or ""
 
 
 def _is_user(message: Any) -> bool:

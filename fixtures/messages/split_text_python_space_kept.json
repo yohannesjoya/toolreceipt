@@ -1,0 +1,44 @@
+{
+  "messages": [
+    {
+      "role": "user",
+      "content": "Where is my refund?"
+    },
+    {
+      "role": "assistant",
+      "content": [
+        {
+          "type": "text",
+          "text": "I have not "
+        },
+        {
+          "type": "text",
+          "text": "refunded your order yet."
+        }
+      ]
+    }
+  ],
+  "known_tools": [
+    {
+      "name": "issue_refund",
+      "description": "Issue a refund to the customer for an order.",
+      "input_schema": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "name": "send_email",
+      "description": "Send an email to the customer.",
+      "input_schema": {
+        "type": "object",
+        "properties": {}
+      }
+    }
+  ],
+  "expected": {
+    "ledger": [],
+    "final_reply": "I have not refunded your order yet.",
+    "verdict": "clean"
+  }
+}
