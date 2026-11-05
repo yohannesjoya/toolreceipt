@@ -1,12 +1,14 @@
-"""Record the Python package's output for every shared fixture, for the TypeScript parity test.
+"""Record the Python package's output for every shared fixture, for the TypeScript parity tests.
 
-Writes ``fixtures/recorded/parity.json`` (``extract``, ``diff`` and ``check`` output for every
-case under ``fixtures/extractor``, ``fixtures/heldout``, ``fixtures/diff``, ``fixtures/check`` and
-the demo corpus, plus ``messages`` and ``turns`` output for ``fixtures/messages`` and
-``fixtures/turns``), ``fixtures/recorded/parity_llm.json`` (the prompt, plus claims and receipts for
-every ``fixtures/llm`` case and every recorded probe output) and ``fixtures/demo/tools.json`` (the demo's tool specs, one list). Both files
-are generated only by this script; ``python/tests/test_recorded_parity_current.py`` fails when
-they are stale. Usage, from the repository root::
+Writes three generated files. ``fixtures/recorded/parity.json`` holds ``extract``, ``diff``,
+``check``,
+``messages`` and ``turns`` output for ``fixtures/extractor``, ``heldout``, ``diff``, ``check``,
+``messages``, ``turns`` and the demo corpus. ``fixtures/recorded/parity_llm.json`` holds the prompt,
+plus claims and receipts for every ``fixtures/llm`` case and recorded probe output.
+``fixtures/demo/tools.json`` holds the demo's tool specs, one list.
+
+``python/tests/test_recorded_parity_current.py`` fails when they are stale. Usage, from the
+repository root::
 
     python/.venv/bin/python scripts/record_parity.py
 """

@@ -195,7 +195,7 @@ export class LLMExtractor implements ClaimExtractor {
     let error: unknown = null;
     const prompt = buildPrompt(text, knownTools);
     try {
-      raw = this.acomplete ? await this.acomplete(prompt) : await this.complete!(prompt);
+      raw = this.acomplete ? await this.acomplete(prompt) : await Promise.resolve(this.complete!(prompt));
     } catch (exc) {
       if ((exc as { name?: unknown } | null)?.name === "AbortError") throw exc; // the caller cancelled
       error = exc;
@@ -217,6 +217,8 @@ export class LLMExtractor implements ClaimExtractor {
     this.lastRaw = raw;
     this.lastError = error;
     if (error !== null) {
+      // A model client may throw anything; the caller gets it unchanged.
+      // eslint-disable-next-line @typescript-eslint/only-throw-error
       if (this.onError === "raise") throw error;
       this.logger.warn(`LLM extractor fell back to rules: ${typeName(error)}`);
       return rules;
