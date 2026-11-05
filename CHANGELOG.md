@@ -31,9 +31,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   SDK run, and the message readers now read AI SDK model messages. Nothing imports `ai`. Tested against
   the real `ai` 6 and 7 with their mock models.
 
+#### Fixed
+
+- `checkMessages` and `checkTurns` no longer lose a negation when a reply is split across text
+  blocks, as in Python.
+
 ## Python
 
 ### [Unreleased]
+
+#### Fixed
+
+- `check_messages` and `check_turns` no longer lose a negation when a reply is split across text
+  blocks. Blocks joined with a newline, so `"I have not "` + `"refunded your order yet."` became two
+  clauses and an honest reply read as `fabricated`. Blocks now join without a newline when one side
+  has whitespace at the join and the next block opens with a lowercase letter.
 
 #### Added
 

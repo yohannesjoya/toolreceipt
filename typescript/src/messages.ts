@@ -36,17 +36,34 @@ function blocks(content: unknown): unknown[] | null {
   return Array.isArray(content) ? (content as unknown[]) : null;
 }
 
-/** A string as is; a block list as its text blocks joined by newlines; else `""`. */
+/** Python's `str.isspace` for one character; `false` for an empty string. */
+function isSpace(ch: string): boolean {
+  return ch !== "" && pyStrip(ch) === "";
+}
+
+/** Whether the first non-space character of `text` is a lowercase letter, as Python's `str.islower`. */
+function opensLowercase(text: string): boolean {
+  const first = [...pyStrip(text)][0];
+  return first !== undefined && first === first.toLowerCase() && first !== first.toUpperCase();
+}
+
+/** A string as is; a block list as its text blocks joined; else `""`. Blocks join with a newline,
+ * unless one side already has whitespace at the join and the next block opens with a lowercase letter:
+ * that is one sentence split across blocks, and a newline would cut a negation off from its verb.
+ * Anything else may open a new sentence, whose claim an earlier negation must not swallow. */
 export function text(content: unknown): string {
   if (typeof content === "string") return content;
   const list = blocks(content);
   if (list === null) return "";
-  const parts: string[] = [];
+  let joined: string | null = null;
   for (const block of list) {
     const t = get(block, "text");
-    if (TEXT_TYPES.has(get(block, "type") as string) && typeof t === "string") parts.push(t);
+    if (!TEXT_TYPES.has(get(block, "type") as string) || typeof t !== "string") continue;
+    if (joined === null) joined = t;
+    else if ((isSpace(joined.slice(-1)) || isSpace(t.slice(0, 1))) && opensLowercase(t)) joined += t;
+    else joined += "\n" + t;
   }
-  return parts.join("\n");
+  return joined ?? "";
 }
 
 /** A user message that starts a turn: one with text and no `tool_result` block. Anthropic returns
