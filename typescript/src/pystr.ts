@@ -149,7 +149,14 @@ export function pyStr(value: unknown): string {
   if (value === null || value === undefined) return "None";
   if (typeof value === "boolean") return value ? "True" : "False";
   if (typeof value === "number") return pyRepr(value);
+  if (typeof value === "bigint") return value.toString();
   return pyDumps(value);
+}
+
+/** Python `repr()` for the values error messages show. */
+export function pyQuote(value: unknown): string {
+  if (typeof value !== "string") return pyStr(value);
+  return value.includes("'") && !value.includes('"') ? `"${value}"` : `'${value}'`;
 }
 
 /** Python truthiness: empty lists and mappings are false as well. */

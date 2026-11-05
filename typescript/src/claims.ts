@@ -31,7 +31,8 @@ export type ToolLike =
   | readonly [string, string]
   | Record<string, unknown>
   | Map<string, unknown>
-  | NamedTool;
+  | NamedTool
+  | { readonly type: string }; // SDK tool interfaces, which have no index signature
 
 export interface ClaimInit {
   text: string;

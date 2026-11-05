@@ -232,10 +232,41 @@ describe("edges of the message reader", () => {
     [true, "True"],
     [5, "5"],
     [[1], "[1]"],
-  ])("renders call id %j as Python's str()", (id, text) => {
+    [123n, "123"],
+  ])("renders call id %s as Python's str()", (id, text) => {
     const [e] = pair([{ role: "assistant", tool_calls: [{ id, type: "function", function: { name: "t", arguments: "{}" } }] }]);
     expect(e!.callId).toBe(text);
     expect(settled({ tool: "t", call_id: id })!.callId).toBe(text);
+  });
+
+  it("pairs a bigint call id with its string result id", () => {
+    const list = [
+      { role: "assistant", tool_calls: [{ id: 123n, type: "function", function: { name: "t", arguments: "{}" } }] },
+      { role: "tool", tool_call_id: "123", content: "x" },
+    ];
+    expect(pair(list)[0]!.status).toBe("ok");
+  });
+
+  it("rejects Vercel AI SDK messages rather than reading an empty ledger", () => {
+    const call = { role: "assistant", content: [{ type: "tool-call", toolCallId: "c1", toolName: "t", input: {} }] };
+    const result = { role: "tool", content: [{ type: "tool-result", toolCallId: "c1", toolName: "t", output: { type: "text", value: "ok" } }] };
+    const reply = { role: "assistant", content: [{ type: "text", text: "I've refunded $64." }] };
+    for (const list of [[call, result, reply], [result, reply], [call]]) {
+      expect(() => checkMessages(list, { knownTools: ["t"] })).toThrow(/Vercel AI SDK/);
+      expect(() => checkTurns(list, { knownTools: ["t"] })).toThrow(TypeError);
+    }
+    expect(checkMessages([reply]).verdict).toBe("clean"); // plain text blocks stay readable
+  });
+
+  it("rejects LangChain.js classes with no type property (@langchain/core before 1.0)", () => {
+    class OldAIMessage {
+      content = "I've refunded $64.";
+      _getType(): string {
+        return "ai";
+      }
+    }
+    expect(() => checkMessages([new OldAIMessage()])).toThrow(/LangChain/);
+    expect(() => checkTurns([new OldAIMessage()])).toThrow(TypeError);
   });
 
   it("does not pair call id [1] with result id 1, and object ids do not collide", () => {

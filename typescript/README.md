@@ -51,8 +51,8 @@ const receipt = checkMessages(messages, { knownTools: tools }); // tools: the li
 `checkMessages` reads OpenAI Chat Completions messages, OpenAI Responses items and Anthropic
 messages, as plain objects or SDK objects. Only the last turn counts. The final reply is the last
 assistant message, or `""` when the run ended on a tool call. A tool result is a success unless
-Anthropic's `is_error` says otherwise. Legacy `function_call`, custom and MCP tool calls and
-LangChain messages throw a `TypeError` instead of producing an empty ledger.
+Anthropic's `is_error` says otherwise. Legacy `function_call`, custom and MCP tool calls, LangChain
+messages and Vercel AI SDK messages throw a `TypeError` instead of producing an empty ledger.
 
 ## Per-turn receipts
 
@@ -96,7 +96,8 @@ text against every tool call made before turn *n+1*. A `TurnReceipt` is a `Recei
 
 Property names are camelCase; every `toDict()` emits the Python snake_case keys in the Python
 order, so a TypeScript receipt serialises to the same JSON as a Python one. Types `Verdict`,
-`Status`, `Reason`, `Confidence`, `Source`, `Json` are exported.
+`Status`, `Reason`, `Confidence`, `Source`, `Json`, `CheckOptions`, `MessageOptions`, `DiffOptions`,
+`ToolLike`, `Lexicon`, and the `*Init` constructor inputs are exported.
 
 ## Same fixtures as the Python package
 
@@ -133,6 +134,7 @@ and `src/decimal.ts`. The accepted divergences, none reachable by a current fixt
 - A very deep `arguments` string or a `type` that is a list or object gives a receipt here, where
   Python raises a raw error.
 - The LangChain error names no adapter, because this package has none yet.
+- Vercel AI SDK `tool-call` and `tool-result` blocks throw. Python skips those unknown blocks.
 
 ## Not yet ported
 

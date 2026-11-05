@@ -245,4 +245,6 @@ read by its properties where Python stores its `str()`, a `Date` stores its ISO 
 list and a bigint result a quoted string; a call id that is an object prints as JSON where Python
 prints its `repr()`; a very deep `arguments` string or a `type` that is a list or object gives a
 receipt where Python raises a raw error; the LangChain error names no adapter, since the package
-has none yet.
+has none yet; Vercel AI SDK `tool-call` and `tool-result` blocks throw, where Python skips those
+unknown blocks, because a JavaScript caller is likely to pass them and an empty ledger would accuse
+an honest reply.

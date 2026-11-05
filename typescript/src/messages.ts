@@ -8,7 +8,7 @@
 
 import { typeName } from "./claims";
 import { Ledger, LedgerEntry, NO_RESULT, coerceArgs } from "./ledger";
-import { cpCompare, isMapping, pyDumps, pyStr, pyStrip, pyTruthy } from "./pystr";
+import { cpCompare, isMapping, pyDumps, pyQuote, pyStr, pyStrip, pyTruthy } from "./pystr";
 import type { Receipt } from "./receipt";
 import { type CheckOptions, acheck, check } from "./receipts";
 import type { Json } from "./types";
@@ -29,12 +29,6 @@ export function get(obj: unknown, key: string): unknown {
   if (obj === null || typeof obj !== "object") return null;
   const value: unknown = obj instanceof Map ? obj.get(key) : (obj as Record<string, unknown>)[key];
   return value === undefined ? null : value;
-}
-
-/** Python `repr()` for the values these error messages show. */
-function repr(value: unknown): string {
-  if (typeof value !== "string") return pyStr(value);
-  return value.includes("'") && !value.includes('"') ? `"${value}"` : `'${value}'`;
 }
 
 function blocks(content: unknown): unknown[] | null {
@@ -73,16 +67,25 @@ function rejectUnsupported(message: unknown): void {
     throw new TypeError(`legacy OpenAI function_call messages are not supported; pass ${SUPPORTED}`);
   }
   const itemType = get(message, "type");
-  if (role === null && LANGCHAIN_TYPES.has(itemType as string)) {
+  // @langchain/core before 1.0 has `_getType()` and no `type` property.
+  if ((role === null && LANGCHAIN_TYPES.has(itemType as string)) || typeof get(message, "_getType") === "function") {
     throw new TypeError(`LangChain messages are not read here; toolreceipt reads ${SUPPORTED}`);
   }
   if (UNREAD_ITEM_TYPES.has(itemType as string)) {
     throw new TypeError(`${itemType as string} items are not supported yet; only function tool calls are read`);
   }
+  // Their tool calls sit in blocks this reader does not know, so skipping them would empty the
+  // ledger and turn an honest reply into `fabricated`.
+  for (const block of blocks(get(message, "content")) ?? []) {
+    const blockType = get(block, "type");
+    if (blockType === "tool-call" || blockType === "tool-result") {
+      throw new TypeError(`Vercel AI SDK messages are not supported yet (a ${blockType} block); pass ${SUPPORTED}`);
+    }
+  }
   for (const call of blocks(get(message, "tool_calls")) ?? []) {
     const callType = get(call, "type");
     if (callType !== null && callType !== "function") {
-      throw new TypeError(`tool calls of type ${repr(callType)} are not supported yet; only function tool calls are read`);
+      throw new TypeError(`tool calls of type ${pyQuote(callType)} are not supported yet; only function tool calls are read`);
     }
   }
 }
@@ -194,7 +197,7 @@ export function settled(item: unknown): LedgerEntry | null {
   }
   const status = get(message, "status") ?? "ok";
   if (status !== "ok" && status !== "error") {
-    const shown = typeof status === "string" ? repr(status) : typeName(status);
+    const shown = typeof status === "string" ? pyQuote(status) : typeName(status);
     throw new TypeError(`a settled transcript entry's status must be 'ok' or 'error', got ${shown} in ${shape(message)}`);
   }
   let error = asText(get(message, "error"));

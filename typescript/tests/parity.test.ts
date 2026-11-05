@@ -1,6 +1,7 @@
 /**
- * Whole-object parity with the Python package (PRD 06 §10.2): every extract(), diff() and
- * check() output recorded by scripts/record_parity.py must deep-equal the TypeScript output.
+ * Whole-object parity with the Python package (PRD 06 §10.2): every extract(), diff(),
+ * check(), message-list and per-turn output recorded by scripts/record_parity.py must equal the
+ * TypeScript output.
  *
  * Compared as JSON text: same keys, same order, `null` never `undefined` (PRD 06 §13).
  */
@@ -63,6 +64,8 @@ describe("parity with the Python recording", () => {
     expect(REC.extract.length).toBeGreaterThan(100);
     expect(REC.diff.length).toBeGreaterThanOrEqual(25);
     expect(REC.check.length).toBeGreaterThan(100);
+    expect(REC.messages.length).toBeGreaterThanOrEqual(29);
+    expect(REC.turns.length).toBeGreaterThanOrEqual(31);
   });
 
   it.each(REC.extract.map((e) => [e.source, e] as const))("extract %s", (_source, e) => {
