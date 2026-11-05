@@ -162,8 +162,8 @@ pip install "toolreceipt[langgraph]"
 The core (`pip install toolreceipt`) works with any framework through `check()`, see
 [Post-hoc usage](#post-hoc-usage). Python 3.10+.
 
-TypeScript: the core, message lists, per-turn receipts and the LLM extractor are ported on `main` and
-pass the same fixtures as the Python package; the first npm release is planned.
+TypeScript: the core, message lists, per-turn receipts, the LLM extractor, `Receipts` and the Vercel AI
+SDK are on `main`, and the ports pass the same fixtures as the Python package; the first npm release is planned.
 See [typescript/README.md](typescript/README.md).
 
 ## Quickstart

@@ -175,23 +175,30 @@ export function truncate(text: string | null, limit: number): string | null {
   return cpSlice(text, 0, limit - 1) + "…";
 }
 
-/** A result or error as the ledger stores it: a string or `null` as is, anything else as JSON. */
+/** A result or error as the ledger stores it: a string or `null` as is, anything else as JSON.
+ * Never throws: what cannot be read is `null`, a call that ran with no readable result. */
 export function asText(value: unknown): string | null {
   if (value === null || value === undefined) return null;
   if (typeof value === "string") return value;
   try {
     return pyDumps(value);
   } catch {
-    // eslint-disable-next-line @typescript-eslint/no-base-to-string
-    return String(value);
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-base-to-string
+      return String(value);
+    } catch {
+      return null;
+    }
   }
 }
 
-/** A thrown value as `error` text. Never throws: what cannot print falls back to `NO_RESULT`. */
+/** A thrown value as `error` text: an `Error` as `String(error)`, anything else as `asText`. Never
+ * throws, and never empty. */
 export function errorText(error: unknown): string {
   try {
-    return String(error) || NO_RESULT;
+    if (error instanceof Error) return String(error) || NO_RESULT;
   } catch {
     return NO_RESULT;
   }
+  return asText(error) || NO_RESULT;
 }

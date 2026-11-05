@@ -94,6 +94,41 @@ describe("wrapTools", () => {
     expect(run(wrapped.t, {}, OPTIONS)).toBe(5);
   });
 
+  it("keeps the prototype, own getters and a frozen tool's properties", async () => {
+    class Tool {
+      own = 1;
+      get description(): string { return "From the class"; }
+      needsApproval(): boolean { return true; }
+      execute(this: Tool): Promise<number> { return Promise.resolve(this.own); }
+    }
+    const receipts = new Receipts();
+    const wrapped = receipts.wrapTools({ t: new Tool(), frozen: Object.freeze({ schema: 1, execute: () => 2 }) });
+    expect(wrapped.t).toBeInstanceOf(Tool);
+    expect(wrapped.t.needsApproval()).toBe(true);
+    expect(wrapped.t.description).toBe("From the class");
+    expect(wrapped.frozen.schema).toBe(1);
+    await expect(run(wrapped.t)).resolves.toBe(1);
+    expect(run(wrapped.frozen)).toBe(2);
+    expect(receipts.ledger!.tools()).toEqual(new Set(["t", "frozen"]));
+  });
+
+  it("does not let a throwing Proxy output reach the run", async () => {
+    const value = new Proxy({}, { has() { throw new Error("no"); }, get() { throw new Error("no"); } });
+    const receipts = new Receipts();
+    const wrapped = receipts.wrapTools({ t: { execute: () => value } });
+    expect(run(wrapped.t, {}, OPTIONS)).toBe(value);
+    await Promise.resolve();
+    expect(receipts.ledger!.entries[0]!.status).toBe("ok");
+  });
+
+  it("stores a thrown plain object as JSON", async () => {
+    const receipts = new Receipts();
+    // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors
+    const wrapped = receipts.wrapTools({ t: { execute: () => Promise.reject({ code: 503 }) } });
+    await run(wrapped.t, {}, OPTIONS).catch(() => null);
+    expect(receipts.ledger!.entries[0]!.error).toBe('{"code": 503}');
+  });
+
   it("records one entry per call, closed in the ledger with times in seconds", async () => {
     const receipts = new Receipts();
     const wrapped = receipts.wrapTools({ send_email: ok("sent") });
@@ -204,6 +239,14 @@ describe("wrapTools", () => {
       expect(receipt.knownTools).toEqual([]);
     });
 
+    it("stops a wrapped sibling taking the blame for it", () => {
+      const receipts = new Receipts();
+      receipts.wrapTools({ issue_refund: { description: "Issue a refund", execute: () => 1 }, refund_order: { description: "Refund an order" } });
+      const receipt = receipts.check("I've refunded your order.");
+      expect(receipt.verdict).toBe("clean");
+      expect(receipt.unmatched.length).toBe(1);
+    });
+
     it("stays judged when the caller names it", () => {
       const receipts = new Receipts({ knownTools: ["send_email"] });
       receipts.wrapTools({ send_email: {} });
@@ -281,16 +324,28 @@ describe("wrapTools", () => {
       expect(receipts.ledger!.entries.map((e) => [e.status, e.error])).toEqual([["error", "no result"]]);
     });
 
-    it("reads the newest run by default, and a named run when asked", async () => {
+    it("reads the one run by default, and a named run when asked", async () => {
       const receipts = new Receipts();
       const first = receipts.wrapTools({ send_email: ok() });
-      const second = receipts.wrapTools({ issue_refund: { description: "Issue a refund", execute: () => 1 } });
       await run(first.send_email, {}, OPTIONS);
-      expect(receipts.ledger!.length).toBe(0);
-      expect(receipts.check("").ledger.length).toBe(0);
+      expect(receipts.check("").ledger.length).toBe(1);
+      const second = receipts.wrapTools({ issue_refund: { description: "Issue a refund", execute: () => 1 } });
       expect(receipts.check("", first).ledger.length).toBe(1);
       expect(receipts.check("", second).ledger.length).toBe(0);
       expect((await receipts.acheck("", first)).ledger.length).toBe(1);
+    });
+
+    it("refuses to guess once there are two runs, so one request never reads another's data", async () => {
+      const receipts = new Receipts();
+      const a = receipts.wrapTools({ t: { execute: () => "for A" } });
+      const b = receipts.wrapTools({ t: { execute: () => "for B" } });
+      await run(a.t, {}, OPTIONS);
+      await run(b.t, {}, OPTIONS);
+      expect(() => receipts.check("")).toThrow(TypeError);
+      expect(() => receipts.check("")).toThrow(/wrapTools/);
+      await expect(receipts.acheck("")).rejects.toThrow(TypeError);
+      expect(receipts.check("", new Ledger()).ledger.length).toBe(0);
+      expect(receipts.check("", a).ledger.entries[0]!.result).toBe("for A");
     });
 
     it("rejects a record from another instance or never wrapped", () => {

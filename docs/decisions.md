@@ -254,10 +254,19 @@ unknown blocks, because a JavaScript caller is likely to pass them and an empty 
 an honest reply; `Receipts` captures by wrapping `execute` where Python injects a LangChain callback,
 and a thrown error is stored as `String(error)` where Python stores its `repr()`.
 
-## `wrapTools` leaves a tool with no `execute` unknown
+## A tool with no `execute` is unseen, not known
 
-A provider's tool or a browser's tool runs where the wrapper cannot see it. Naming it as a known tool
-would make an honest reply about it `fabricated`, since its call can never reach the live ledger. It
-stays unknown, so that reply is unmatched instead: a missed claim costs less than a false accusation.
-`checkResult` does judge those tools, because the run's steps hold their calls. Wrapping rather than
-the SDK's callbacks keeps one code path across AI SDK 5, 6 and 7, and lists tools the run never called.
+A provider's tool or a browser's tool runs where the wrapper cannot see it, and a browser tool's call
+can sit in an earlier request, where the run's steps cannot see it either. Naming it as a known tool
+would make an honest reply about it `fabricated`. Leaving it out is no better: the extractor then pins
+the claim on the nearest tool it can see, and accuses that. So `unseenTools` shows it to the extractor,
+and a claim naming it stays unmatched unless the ledger holds the tool or `knownTools` names it. A
+missed claim costs less than a false accusation. Wrapping rather than the SDK's callbacks keeps one code
+path across AI SDK 5, 6 and 7, and lists tools the run never called.
+
+## `Receipts` refuses to guess between runs
+
+Python's `check()` with no source reads the newest `config()` run. A module-level instance on a
+JavaScript server is common, and there that reads another request's ledger: a wrong verdict, and a
+receipt holding someone else's arguments and results. After a second `wrapTools`, `check` with no source
+throws. Sequential reuse pays one argument.

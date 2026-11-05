@@ -16,7 +16,7 @@ import type { Json } from "./types";
 
 export type MessageOptions = CheckOptions;
 
-const SUPPORTED = "OpenAI Chat Completions messages, OpenAI Responses items or Anthropic messages";
+const SUPPORTED = "OpenAI Chat Completions messages, OpenAI Responses items, Anthropic messages or Vercel AI SDK model messages";
 const TEXT_TYPES = new Set(["text", "output_text", "input_text"]);
 const LANGCHAIN_TYPES = new Set(["ai", "human", "tool", "system"]);
 // Tool-call shapes this reader knows about but does not read yet: dropping them would empty the
@@ -166,25 +166,27 @@ function outputOf(output: unknown): [string, boolean] {
   }
 }
 
-/** `[call id, text, isError]` for every tool result the message carries. Anthropic's `is_error`
- * and an AI SDK `output` of an error type are the only explicit failure flags. */
-function results(message: unknown): Array<[string, string, boolean]> {
-  const out: Array<[string, string, boolean]> = [];
+/** `[call id, text, isError, tool name]` for every tool result the message carries. Anthropic's
+ * `is_error` and an AI SDK `output` of an error type are the only explicit failure flags. Only an AI
+ * SDK part names its tool. */
+function results(message: unknown): Array<[string, string, boolean, string | null]> {
+  const out: Array<[string, string, boolean, string | null]> = [];
   // An AI SDK `tool` message holds parts with their own ids, read below.
   const parts = blocks(get(message, "content")) ?? [];
   const aiSdkParts = parts.some((b) => {
     const type = get(b, "type");
     return typeof type === "string" && type.startsWith("tool-");
   });
-  if (get(message, "role") === "tool" && !aiSdkParts) out.push([idOf(get(message, "tool_call_id")), text(get(message, "content")), false]);
-  if (get(message, "type") === "function_call_output") out.push([idOf(get(message, "call_id")), text(get(message, "output")), false]);
-  for (const block of blocks(get(message, "content")) ?? []) {
+  if (get(message, "role") === "tool" && !aiSdkParts) out.push([idOf(get(message, "tool_call_id")), text(get(message, "content")), false, null]);
+  if (get(message, "type") === "function_call_output") out.push([idOf(get(message, "call_id")), text(get(message, "output")), false, null]);
+  for (const block of parts) {
     if (get(block, "type") === "tool_result") {
-      out.push([idOf(get(block, "tool_use_id")), text(get(block, "content")), pyTruthy(get(block, "is_error"))]);
+      out.push([idOf(get(block, "tool_use_id")), text(get(block, "content")), pyTruthy(get(block, "is_error")), null]);
     }
     if (get(block, "type") === "tool-result") {
       const [body, isError] = outputOf(get(block, "output"));
-      out.push([idOf(get(block, "toolCallId")), body, isError]);
+      const name = get(block, "toolName");
+      out.push([idOf(get(block, "toolCallId")), body, isError, typeof name === "string" && name !== "" ? name : null]);
     }
   }
   return out;
@@ -251,9 +253,11 @@ export function settled(item: unknown): LedgerEntry | null {
 
 /**
  * One entry per tool call of `messages`, in call order, paired with its result by id. A call with
- * no result is `status: "error", error: "no result"`; a result with no call is ignored; an empty
- * or repeated id pairs first-in, first-out. Status is `ok` for every result except an Anthropic
- * `tool_result` with `is_error`. A settled entry is appended at its position and never pairs.
+ * no result is `status: "error", error: "no result"`; a result with no call is ignored, except an AI
+ * SDK part, which names its tool and proves the tool ran: an approved tool runs before the request's
+ * first step, its call in an earlier request. An empty or repeated id pairs first-in, first-out. Status
+ * is `ok` for every result except an Anthropic `tool_result` with `is_error` and an AI SDK error
+ * output. A settled entry is appended at its position and never pairs.
  * Throws `TypeError` on an unsupported shape.
  */
 export function pair(messages: Iterable<unknown>): LedgerEntry[] {
@@ -273,9 +277,14 @@ export function pair(messages: Iterable<unknown>): LedgerEntry[] {
       if (queue) queue.push(entry);
       else open.set(callId, [entry]);
     }
-    for (const [callId, body, isError] of results(message)) {
+    for (const [callId, body, isError, name] of results(message)) {
       const entry = open.get(callId)?.shift();
-      if (entry === undefined) continue;
+      if (entry === undefined) {
+        if (name !== null) {
+          entries.push(new LedgerEntry({ tool: name, status: isError ? "error" : "ok", result: isError ? null : body, error: isError ? body : null, callId }));
+        }
+        continue;
+      }
       if (isError) {
         entry.error = body;
       } else {

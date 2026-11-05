@@ -27,7 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Passes `fixtures/llm` and matches Python on the 154 recorded probe outputs.
 - `Receipts` with `wrapTools`, which records each tool call as it runs, for the Vercel AI SDK's
   `generateText` and `streamText` or any record of tools with `execute`. `checkResult`,
-  `acheckResult`, `ledgerFromResult`, `finalReplyFromResult` and `knownToolsFrom` read a finished AI
+  `acheckResult`, `ledgerFromResult`, `finalReplyFromResult` and `toolOptions` read a finished AI
   SDK run, and the message readers now read AI SDK model messages. Nothing imports `ai`. Tested against
   the real `ai` 6 and 7 with their mock models.
 

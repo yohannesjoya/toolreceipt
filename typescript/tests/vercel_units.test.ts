@@ -1,7 +1,7 @@
 /** Result and model-message readers for the Vercel AI SDK, on shapes the real SDK does not produce on demand. */
 import { describe, expect, it } from "vitest";
 
-import { acheckResult, checkMessages, checkResult, finalReply, finalReplyFromResult, knownToolsFrom, ledgerFromMessages, ledgerFromResult } from "../src/index";
+import { Ledger, acheck, acheckResult, check, checkMessages, checkResult, finalReply, finalReplyFromResult, ledgerFromMessages, ledgerFromResult, toolOptions } from "../src/index";
 import { checkTurns } from "../src/turns";
 
 const callPart = (toolCallId: string, toolName: string, input: unknown = {}) => ({ type: "tool-call", toolCallId, toolName, input });
@@ -80,15 +80,96 @@ describe("checkResult", () => {
   });
 });
 
-describe("knownToolsFrom", () => {
-  it("lists names and descriptions, including tools with no execute", () => {
-    const specs = knownToolsFrom({ a: { description: "Do a" }, b: {}, c: { description: 7 } });
-    expect(specs.map((s) => [s.name, s.description])).toEqual([["a", "Do a"], ["b", ""], ["c", ""]]);
+describe("toolOptions", () => {
+  it("judges tools with execute, and only shows the others to the extractor", () => {
+    const execute = () => 1;
+    const options = toolOptions({ a: { description: "Do a", execute }, b: { execute }, c: { description: 7, execute }, d: { description: "Do d" } });
+    expect(options.knownTools.map((s) => [s.name, s.description])).toEqual([["a", "Do a"], ["b", ""], ["c", ""]]);
+    expect(options.unseenTools.map((s) => [s.name, s.description])).toEqual([["d", "Do d"]]);
   });
 
   it("rejects what is not a record", () => {
-    expect(() => knownToolsFrom([])).toThrow(TypeError);
-    expect(() => knownToolsFrom(null)).toThrow(TypeError);
+    expect(() => toolOptions([])).toThrow(TypeError);
+    expect(() => toolOptions(null)).toThrow(TypeError);
+  });
+});
+
+describe("unseenTools", () => {
+  const unseenTools = ["refund_order"];
+
+  it("leaves a claim naming only an unseen tool unmatched, and off the known list", () => {
+    const receipt = check("I've refunded your order.", new Ledger(), { unseenTools });
+    expect(receipt.verdict).toBe("clean");
+    expect(receipt.unmatched.length).toBe(1);
+    expect(receipt.knownTools).toEqual([]);
+  });
+
+  it("stops a judged sibling taking the blame", () => {
+    const knownTools = ["issue_refund"];
+    const reply = "I've refunded your order.";
+    expect(check(reply, new Ledger(), { knownTools }).verdict).toBe("fabricated");
+    expect(check(reply, new Ledger(), { knownTools, unseenTools }).verdict).toBe("clean");
+  });
+
+  it("judges the tool once the ledger holds it", () => {
+    const ledger = Ledger.fromDict([{ tool: "refund_order", status: "ok" }]);
+    const receipt = check("I've refunded your order.", ledger, { unseenTools });
+    expect(receipt.confirmed.map((c) => c.tool)).toEqual(["refund_order"]);
+  });
+
+  it("gives way to knownTools", () => {
+    const receipt = check("I've refunded your order.", new Ledger(), { knownTools: ["refund_order"], unseenTools });
+    expect(receipt.verdict).toBe("fabricated");
+  });
+
+  it("does not undo a confirmation by another candidate", () => {
+    const ledger = Ledger.fromDict([{ tool: "send_email", status: "ok" }]);
+    const receipt = check("I've sent the email.", ledger, { unseenTools: ["send_invoice_email"] });
+    expect(receipt.confirmed.map((c) => c.tool)).toEqual(["send_email"]);
+  });
+
+  it("works through acheck", async () => {
+    expect((await acheck("I've refunded your order.", new Ledger(), { knownTools: ["issue_refund"], unseenTools })).verdict).toBe("clean");
+  });
+});
+
+describe("a result whose list holds earlier work", () => {
+  const orphan = resultPart("a", "issue_refund", { type: "text", value: "refunded" });
+  const steps = [{ content: [{ type: "text", text: "I've refunded you." }] }];
+
+  it("reads a result with no call in the steps from responseMessages or response.messages", () => {
+    for (const result of [{ steps, responseMessages: [{ role: "tool", content: [orphan] }] }, { steps, response: { messages: [{ role: "tool", content: [orphan] }] } }]) {
+      expect(ledgerFromResult(result).entries.map((e) => [e.tool, e.status, e.result, e.callId])).toEqual([["issue_refund", "ok", "refunded", "a"]]);
+    }
+  });
+
+  it("does not count a call twice that the steps also hold", () => {
+    const content = [callPart("a", "issue_refund"), { type: "tool-result", toolCallId: "a", toolName: "issue_refund", output: "refunded" }];
+    expect(ledgerFromResult({ steps: [{ content }], responseMessages: [{ role: "tool", content: [orphan] }] }).length).toBe(1);
+  });
+
+  it("reads a denied one as an error", () => {
+    const denied = resultPart("a", "issue_refund", { type: "execution-denied" });
+    expect(ledgerFromResult({ steps, responseMessages: [{ role: "tool", content: [denied] }] }).entries[0]!.status).toBe("error");
+  });
+
+  it("makes its own entry in a message list, for AI SDK parts only", () => {
+    expect(ledgerFromMessages([{ role: "tool", content: [orphan] }]).entries.map((e) => e.tool)).toEqual(["issue_refund"]);
+    expect(ledgerFromMessages([{ role: "tool", tool_call_id: "a", content: "x" }]).length).toBe(0);
+  });
+});
+
+describe("errorText", () => {
+  it("stores a thrown plain object as JSON", () => {
+    const part = { type: "tool-error", toolCallId: "a", toolName: "one", error: { code: 503 } };
+    expect(ledgerFromResult({ steps: [{ content: [callPart("a", "one"), part] }] }).entries[0]!.error).toBe('{"code": 503}');
+  });
+
+  it("does not throw on a null-prototype cycle in a result", () => {
+    const cycle = Object.create(null) as Record<string, unknown>;
+    cycle["self"] = cycle;
+    const part = { type: "tool-result", toolCallId: "a", toolName: "one", output: cycle };
+    expect(ledgerFromResult({ steps: [{ content: [callPart("a", "one"), part] }] }).entries[0]!.status).toBe("ok");
   });
 });
 
@@ -118,7 +199,8 @@ describe("AI SDK model messages", () => {
 
   it("does not let a tool message of parts read as an OpenAI tool message", () => {
     const list = [assistant(callPart("", "t")), tool(resultPart("other", "t", { type: "text", value: "x" }))];
-    expect(ledgerFromMessages(list).entries[0]!.status).toBe("error");
+    const entries = ledgerFromMessages(list).entries;
+    expect(entries.map((e) => [e.status, e.callId])).toEqual([["error", ""], ["ok", "other"]]);
   });
 
   it("reads a provider tool result held in the assistant message", () => {
