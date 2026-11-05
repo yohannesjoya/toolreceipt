@@ -4,18 +4,14 @@ Catch LLM agents claiming actions they never took. This is the TypeScript port o
 [toolreceipt](https://github.com/yohannesjoya/toolreceipt) Python package: same lexicon, same
 JSON fixtures, same receipts.
 
-**Status:** not yet on npm. `check`, `diff`, the rule extractor, the argument check, message lists,
-per-turn receipts and the LLM extractor pass every shared fixture with the Python runners'
-assertions, and every recorded Python receipt matches. `Receipts` and the Vercel AI SDK readers are
-tested against the real `ai` 6 and 7.
+**Status:** `check`, `diff`, the rule extractor, the argument check, message lists, per-turn receipts and
+the LLM extractor pass every shared fixture with the Python runners' assertions, and every recorded Python
+receipt matches. `Receipts` and the Vercel AI SDK readers are tested against the real `ai` 6 and 7.
 
-## Install (from source, until the first npm release)
+## Install
 
 ```bash
-git clone https://github.com/yohannesjoya/toolreceipt
-cd toolreceipt/typescript
-npm ci
-npm run build
+npm install toolreceipt
 ```
 
 Zero runtime dependencies. ESM and CJS, type declarations included, Node 18+.
@@ -258,6 +254,7 @@ and `src/decimal.ts`. The accepted divergences, none reachable by a current fixt
 ```bash
 npm ci
 npm run check   # typecheck, lint, tests, build
+npm run smoke   # install the packed tarball and run it as a consumer
 ```
 
 ## License

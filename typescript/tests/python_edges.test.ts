@@ -27,6 +27,50 @@ describe("package shape", () => {
   });
 });
 
+describe("release", () => {
+  const pkg = JSON.parse(readFileSync(join(ROOT, "typescript", "package.json"), "utf8")) as {
+    repository: { url: string };
+    dependencies?: Record<string, string>;
+    scripts: Record<string, string>;
+  };
+
+  it("names the repository in npm's normalised form", () => {
+    expect(pkg.repository.url).toBe("git+https://github.com/yohannesjoya/toolreceipt.git");
+  });
+
+  it("cannot hand-publish an unbuilt or untested package", () => {
+    expect(pkg.scripts["prepublishOnly"]).toBe("npm run check && npm run smoke");
+  });
+
+  it("has no runtime dependency", () => {
+    expect(pkg.dependencies).toBeUndefined();
+  });
+
+  it("publishes from a tag the Python release does not match", () => {
+    const workflow = readFileSync(join(ROOT, ".github", "workflows", "release-npm.yml"), "utf8");
+    expect(workflow).toContain('tags: ["ts-v*"]');
+    expect(workflow).toContain("git merge-base --is-ancestor");
+    expect(readFileSync(join(ROOT, ".github", "workflows", "release.yml"), "utf8")).toContain('tags: ["v*"]');
+  });
+});
+
+describe("release jobs", () => {
+  const workflow = readFileSync(join(ROOT, ".github", "workflows", "release-npm.yml"), "utf8");
+  const [build, publish] = workflow.split(/^ {2}# Publishes[^\n]*$/m) as [string, string];
+
+  it("keeps the publish credential away from dependency code", () => {
+    expect(build).not.toContain("id-token");
+    expect(publish).toContain("id-token: write");
+    expect(publish).not.toContain("npm ci");
+    expect(publish).not.toContain("actions/checkout");
+  });
+
+  it("pins what runs beside the credential", () => {
+    for (const line of publish.split("\n").filter((l) => l.includes("uses: "))) expect(line).toMatch(/@[0-9a-f]{40} /);
+    expect(publish).toMatch(/npm install -g npm@\d+\.\d+\.\d+/);
+  });
+});
+
 describe("README quickstart", () => {
   it("prints what the README says", () => {
     const ledger = Ledger.fromDict([{ tool: "issue_refund", status: "ok", args: { amount: 32 } }]);

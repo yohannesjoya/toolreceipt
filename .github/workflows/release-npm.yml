@@ -1,0 +1,57 @@
+name: release-npm
+
+on:
+  push:
+    tags: ["ts-v*"]
+
+jobs:
+  # Runs every dependency, so it gets no publish credential.
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: typescript
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Tagged commit is on main
+        run: git merge-base --is-ancestor "$GITHUB_SHA" origin/main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Tag matches the package version
+        run: test "ts-v$(node -p "require('./package.json').version")" = "$GITHUB_REF_NAME"
+      - name: Package files are in sync
+        working-directory: .
+        run: python3 scripts/sync_readme.py --check
+      - run: npm ci
+      - run: npm run check
+      - run: npm run smoke
+      - run: npm pack --pack-destination ..
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: tarball
+          path: toolreceipt-*.tgz
+          if-no-files-found: error
+
+  # Publishes the tested tarball, and runs no code from the repository or its dependencies.
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: npm
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: tarball
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22"
+          registry-url: "https://registry.npmjs.org"
+      # Trusted publishing needs npm 11.5.1 or newer.
+      - run: npm install -g npm@11.21.2
+      - run: npm publish ./toolreceipt-*.tgz

@@ -271,8 +271,6 @@ JavaScript server is common, and there that reads another request's ledger: a wr
 receipt holding someone else's arguments and results. After a second `wrapTools`, `check` with no source
 throws. Sequential reuse pays one argument.
 
-an honest reply.
-
 ## A newline joins text blocks unless they are one split sentence
 
 Two text blocks can be two paragraphs or one sentence split at a citation. A newline starts a new clause,
