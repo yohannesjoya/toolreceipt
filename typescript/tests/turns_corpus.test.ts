@@ -33,6 +33,7 @@ const key = (claims: Claim[]) => claims.map((c) => [c.tool, c.reason, c.text]);
 describe("turns corpus", () => {
   it("counts", () => {
     expect(CORPUS.length).toBe(16 + 19 + 6);
+    expect(CORPUS.filter((r) => r[5]).length).toBe(16 + 10 + 5);
   });
 
   it.each(CORPUS)("%s", (_id, user, reply, ledger, tools, honest) => {

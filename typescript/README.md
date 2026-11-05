@@ -102,9 +102,10 @@ order, so a TypeScript receipt serialises to the same JSON as a Python one. Type
 
 The repository's `fixtures/` directory is the contract. The TypeScript suite runs
 `fixtures/extractor`, `fixtures/diff`, `fixtures/check`, `fixtures/heldout`,
-`fixtures/descriptions`, `fixtures/messages` and `fixtures/turns` with the same assertions as the Python tests, the demo corpus gates,
-and `fixtures/recorded/parity.json`: the Python package's `extract`, `diff` and `check` output
-for every case, which the TypeScript output must deep-equal. `lexicon.json` is edited in
+`fixtures/descriptions`, `fixtures/messages` and `fixtures/turns` with the same assertions as the
+Python tests, the demo corpus gates, and `fixtures/recorded/parity.json`: the Python package's
+`extract`, `diff`, `check`, `messages` and `turns` output for every case, which the TypeScript
+output must match as JSON text. `lexicon.json` is edited in
 `python/` only and copied here by `scripts/sync_readme.py`.
 
 Python string and number semantics (its whitespace class, Unicode word boundaries, code-point
@@ -125,7 +126,13 @@ and `src/decimal.ts`. The accepted divergences, none reachable by a current fixt
   raises `KeyError`.
 - `acheck` awaits any `aextract` function.
 - `NaN` or `Infinity` in a tool call's `arguments` string is read by Python's `json.loads`; here
-  the string lands in `{ input: ... }`.
+  the string lands in `{ input: ... }`, and `1e400` reads as `null`.
+- A class instance as `args`, `input` or `result` is read by its properties, where Python stores
+  its `str()`. A `Date` stores its ISO string, a `Set` a list, and a bigint result a quoted string.
+- A call id that is an object prints as JSON, where Python prints its `repr()`.
+- A very deep `arguments` string or a `type` that is a list or object gives a receipt here, where
+  Python raises a raw error.
+- The LangChain error names no adapter, because this package has none yet.
 
 ## Not yet ported
 

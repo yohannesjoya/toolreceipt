@@ -8,7 +8,7 @@
 
 import { typeName } from "./claims";
 import { Ledger, LedgerEntry, NO_RESULT, coerceArgs } from "./ledger";
-import { cpCompare, isMapping, pyDumps, pyStrip, pyTruthy } from "./pystr";
+import { cpCompare, isMapping, pyDumps, pyStr, pyStrip, pyTruthy } from "./pystr";
 import type { Receipt } from "./receipt";
 import { type CheckOptions, acheck, check } from "./receipts";
 import type { Json } from "./types";
@@ -31,8 +31,10 @@ export function get(obj: unknown, key: string): unknown {
   return value === undefined ? null : value;
 }
 
+/** Python `repr()` for the values these error messages show. */
 function repr(value: unknown): string {
-  return typeof value === "string" ? `'${value}'` : typeName(value);
+  if (typeof value !== "string") return pyStr(value);
+  return value.includes("'") && !value.includes('"') ? `"${value}"` : `'${value}'`;
 }
 
 function blocks(content: unknown): unknown[] | null {
@@ -100,8 +102,7 @@ function parseArgs(args: unknown): Record<string, Json> {
 }
 
 function idOf(value: unknown): string {
-   
-  return pyTruthy(value) ? String(value) : "";
+  return pyTruthy(value) ? pyStr(value) : "";
 }
 
 /** `[call id, tool name, args]` for every tool call the message carries: Chat Completions
@@ -201,12 +202,11 @@ export function settled(item: unknown): LedgerEntry | null {
   const callId = get(message, "call_id");
   return new LedgerEntry({
     tool,
-    status: status,
+    status,
     args: coerceArgs(get(message, "args")),
     result: asText(get(message, "result")),
     error,
-    // eslint-disable-next-line @typescript-eslint/no-base-to-string
-    callId: callId === null ? null : String(callId),
+    callId: callId === null ? null : pyStr(callId),
     parentRunId: get(message, "parent_run_id") as string | null,
     startedAt: timestamp(message, "started_at"),
     endedAt: timestamp(message, "ended_at"),
@@ -286,6 +286,6 @@ export function checkMessages(messages: readonly unknown[], options: MessageOpti
 }
 
 /** `checkMessages` for async code; see `acheck`. */
-export function acheckMessages(messages: readonly unknown[], options: MessageOptions = {}): Promise<Receipt> {
+export async function acheckMessages(messages: readonly unknown[], options: MessageOptions = {}): Promise<Receipt> {
   return acheck(finalReply(messages), ledgerFromMessages(messages), options);
 }

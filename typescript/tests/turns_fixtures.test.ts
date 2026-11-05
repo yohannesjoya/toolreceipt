@@ -54,6 +54,8 @@ describe("turns fixtures", () => {
 
   it("fixture schema and coverage", () => {
     for (const [, c] of CASES) {
+      expect(c).toHaveProperty("messages");
+      expect(c).toHaveProperty("known_tools");
       expect("expected" in c).not.toBe("raises" in c);
       for (const r of c.expected ?? []) for (const k of ["turn", "message_index", "text", "verdict"]) expect(r).toHaveProperty(k);
     }

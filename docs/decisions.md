@@ -225,8 +225,8 @@ JavaScript and CPython differ on strings, regular expressions, numbers or JSON g
 code-point lengths and ordering, `repr(float)`, `json.dumps` defaults) or
 `typescript/src/decimal.ts` (`Decimal` arithmetic), so the deliberate divergences from idiomatic
 JavaScript are in one place. The port is accepted when every shared fixture passes with the
-Python runners' assertions and every recorded `extract`, `diff` and `check` output in
-`fixtures/recorded/parity.json` deep-equals; a difference is a bug in the port, never a
+Python runners' assertions and every recorded `extract`, `diff`, `check`, `messages` and `turns`
+output in `fixtures/recorded/parity.json` matches as JSON text; a difference is a bug in the port, never a
 special case. The accepted divergences from Python, none reachable by a current fixture:
 Unicode version skew between the CPython build and Node's ICU; `isdigit()` restricted to `Nd`
 (a run of superscript digits after a reference number); a JavaScript number is a Python `int`
@@ -240,4 +240,9 @@ given as a list of pairs, which Python's `dict()` reads; errors name the JavaScr
 fallbacks of `normalizeToolSpecs` and `coerceArgs` use `String()`; `acheck` awaits any
 `aextract` function, where Python ignores a synchronous one; `json.loads` reads `NaN` and
 `Infinity` in a tool call's `arguments` string while `JSON.parse` does not, so that string lands in
-`{ input: ... }`.
+`{ input: ... }`, and `1e400` reads as `null`; a class instance as `args`, `input` or `result` is
+read by its properties where Python stores its `str()`, a `Date` stores its ISO string, a `Set` a
+list and a bigint result a quoted string; a call id that is an object prints as JSON where Python
+prints its `repr()`; a very deep `arguments` string or a `type` that is a list or object gives a
+receipt where Python raises a raw error; the LangChain error names no adapter, since the package
+has none yet.

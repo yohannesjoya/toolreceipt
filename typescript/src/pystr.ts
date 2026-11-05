@@ -143,6 +143,15 @@ export function isMapping(value: unknown): value is Record<string, unknown> | Ma
   return proto === Object.prototype || proto === null;
 }
 
+/** Python `str(value)` for the values a call id can hold; other shapes print as JSON. */
+export function pyStr(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (value === null || value === undefined) return "None";
+  if (typeof value === "boolean") return value ? "True" : "False";
+  if (typeof value === "number") return pyRepr(value);
+  return pyDumps(value);
+}
+
 /** Python truthiness: empty lists and mappings are false as well. */
 export function pyTruthy(value: unknown): boolean {
   if (Array.isArray(value)) return value.length > 0;
@@ -288,18 +297,26 @@ function dumpString(s: string): string {
   return out + '"';
 }
 
-/** Python `json.dumps(value)` with default arguments. Non-JSON values go through `String()`. */
+/**
+ * Python `json.dumps(value)` with default arguments. A `Map` reads as an object and a `Set` as a
+ * list, an object with `toJSON` (a `Date`) as that value, a bigint or symbol as its string.
+ */
 export function pyDumps(value: unknown): string {
   if (value === null || value === undefined) return "null";
   if (typeof value === "boolean") return value ? "true" : "false";
-  if (typeof value === "number") return pyRepr(value);
+  if (typeof value === "number") {
+    if (Number.isNaN(value)) return "NaN"; // json.dumps spells these unlike repr()
+    if (!Number.isFinite(value)) return value > 0 ? "Infinity" : "-Infinity";
+    return pyRepr(value);
+  }
   if (typeof value === "string") return dumpString(value);
   if (Array.isArray(value)) return `[${value.map((v) => pyDumps(v)).join(", ")}]`;
+  if (value instanceof Set) return pyDumps([...value]);
   if (typeof value === "object") {
-    const parts = Object.entries(value as Record<string, unknown>).map(
-      ([k, v]) => `${dumpString(k)}: ${pyDumps(v)}`,
-    );
-    return `{${parts.join(", ")}}`;
+    const toJSON = (value as { toJSON?: unknown }).toJSON;
+    if (typeof toJSON === "function") return pyDumps((toJSON as () => unknown).call(value)); // a Date
+    const entries: Array<[unknown, unknown]> = value instanceof Map ? [...value.entries()] : Object.entries(value);
+    return `{${entries.map(([k, v]) => `${dumpString(String(k))}: ${pyDumps(v)}`).join(", ")}}`;
   }
   if (typeof value === "bigint" || typeof value === "symbol") return dumpString(value.toString());
   return dumpString("[function]");

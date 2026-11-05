@@ -138,13 +138,19 @@ export class Ledger implements Iterable<LedgerEntry> {
  * Return a JSON-safe object; non-object input is wrapped as `{ input: ... }`.
  *
  * Never throws: input JSON cannot hold (a cycle, a getter that throws) is kept as
- * `{ input: String(args) }`. A bigint is rendered through `String()` (Python's `default=str`).
+ * `{ input: String(args) }`. A bigint is rendered through `String()` (Python's `default=str`); a
+ * `Map` reads as an object and a `Set` as a list.
  */
 export function coerceArgs(args: unknown): Record<string, Json> {
   if (args === null || args === undefined) return {};
   let coerced: unknown;
   try {
-    const text = JSON.stringify(args, (_key, value: unknown) => (typeof value === "bigint" ? String(value) : value));
+    const text = JSON.stringify(args, (_key, value: unknown) => {
+      if (typeof value === "bigint") return String(value);
+      if (value instanceof Map) return Object.fromEntries(value as Map<string, unknown>);
+      if (value instanceof Set) return [...(value as Set<unknown>)];
+      return value;
+    });
     if (text === undefined) return {};
     coerced = JSON.parse(text);
   } catch {

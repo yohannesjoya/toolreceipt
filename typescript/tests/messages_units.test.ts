@@ -1,9 +1,9 @@
 /** Ports python/tests/test_messages_units.py. test_top_level_exports is replaced by the root import below. */
 import { describe, expect, it } from "vitest";
 
-import { acheckMessages, checkMessages, finalReply, ledgerFromMessages, normalizeToolSpecs } from "../src/index";
+import { acheckMessages, checkMessages, checkTurns, finalReply, ledgerFromMessages, normalizeToolSpecs } from "../src/index";
 import { type ToolLike } from "../src/claims";
-import { LedgerEntry, Ledger, NO_RESULT } from "../src/ledger";
+import { LedgerEntry, Ledger, NO_RESULT, coerceArgs } from "../src/ledger";
 import { isTurn, pair, runMessages, settled } from "../src/messages";
 import { loadCases } from "./helpers";
 
@@ -155,5 +155,99 @@ describe("messages units", () => {
     expect(isTurn({ role: "assistant", content: "  \n" })).toBe(false);
     expect(isTurn({ role: "user", content: "Hi" })).toBe(false);
     expect(isTurn({ tool: "lookup_order" })).toBe(false);
+  });
+});
+
+function deepMap(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(deepMap);
+  if (value !== null && typeof value === "object") {
+    return new Map(Object.entries(value).map(([k, v]) => [k, deepMap(v)]));
+  }
+  return value;
+}
+
+describe("Maps read like objects all the way down", () => {
+  type Listed = { messages: unknown[]; known_tools: ToolLike[]; raises?: unknown };
+
+  it.each(loadCases<Listed>("messages").filter(([, c]) => !("raises" in c)))("messages %s", (_stem, c) => {
+    const got = checkMessages(deepMap(c.messages) as unknown[], { knownTools: c.known_tools }).toDict();
+    expect(JSON.stringify(got)).toBe(JSON.stringify(checkMessages(c.messages, { knownTools: c.known_tools }).toDict()));
+  });
+
+  it.each(loadCases<Listed>("turns").filter(([, c]) => !("raises" in c)))("turns %s", (_stem, c) => {
+    const got = checkTurns(deepMap(c.messages) as unknown[], { knownTools: c.known_tools }).map((r) => r.toDict());
+    expect(JSON.stringify(got)).toBe(JSON.stringify(checkTurns(c.messages, { knownTools: c.known_tools }).map((r) => r.toDict())));
+  });
+
+  it("keeps an honest reply clean when the tool result is a Map", () => {
+    const result = new Map([["id", "450789469"], ["name", "#1001"]]);
+    const transcript = [
+      { role: "user", content: "Refund order 1001." },
+      { tool: "issue_refund", args: { order_id: "450789469" }, result },
+      { role: "assistant", content: "I've refunded order 1001." },
+    ];
+    const [r] = checkTurns(transcript, { knownTools: ["issue_refund"] });
+    expect(r!.verdict).toBe("clean");
+    expect([...r!.ledger][0]!.result).toBe('{"id": "450789469", "name": "#1001"}');
+  });
+
+  it("judges Map arguments", () => {
+    const messages = [
+      { role: "user", content: "Refund order 4821." },
+      { role: "assistant", content: [{ type: "tool_use", id: "t1", name: "issue_refund", input: new Map<string, unknown>([["order_id", "4821"], ["amount", 70]]) }] },
+      { role: "user", content: [{ type: "tool_result", tool_use_id: "t1", content: "ok" }] },
+      { role: "assistant", content: "I've refunded $64 for order 4821." },
+    ];
+    expect(checkMessages(messages, { knownTools: ["issue_refund"] }).verdict).toBe("fabricated");
+  });
+});
+
+describe("edges of the message reader", () => {
+  it("acheckMessages rejects on a bad shape, never throws synchronously", async () => {
+    const bad = [{ role: "function" }];
+    let promise: Promise<unknown> | undefined;
+    expect(() => {
+      promise = acheckMessages(bad);
+    }).not.toThrow();
+    await expect(promise).rejects.toThrow(TypeError);
+  });
+
+  it("stores non-JSON results without losing them", () => {
+    const stored = (result: unknown) => settled({ tool: "t", result })!.result;
+    expect(stored(NaN)).toBe("NaN"); // json.dumps(float("nan"))
+    expect(stored(Infinity)).toBe("Infinity");
+    expect(stored(-Infinity)).toBe("-Infinity");
+    expect(stored({ a: NaN })).toBe('{"a": NaN}');
+    expect(stored(new Date("2026-01-02T03:04:05.000Z"))).toBe('"2026-01-02T03:04:05.000Z"');
+    expect(stored({ when: new Date("2026-01-02T03:04:05.000Z") })).toBe('{"when": "2026-01-02T03:04:05.000Z"}');
+    expect(stored(new Set([1, 2]))).toBe("[1, 2]");
+    expect(stored(new Map([["a", new Map([["b", 1]])]]))).toBe('{"a": {"b": 1}}');
+  });
+
+  it("coerces Map and Set arguments", () => {
+    expect(coerceArgs(new Map([["a", new Set([1])]]))).toEqual({ a: [1] });
+  });
+
+  it.each([
+    [true, "True"],
+    [5, "5"],
+    [[1], "[1]"],
+  ])("renders call id %j as Python's str()", (id, text) => {
+    const [e] = pair([{ role: "assistant", tool_calls: [{ id, type: "function", function: { name: "t", arguments: "{}" } }] }]);
+    expect(e!.callId).toBe(text);
+    expect(settled({ tool: "t", call_id: id })!.callId).toBe(text);
+  });
+
+  it("does not pair call id [1] with result id 1, and object ids do not collide", () => {
+    const call = (id: unknown) => ({ id, type: "function", function: { name: "t", arguments: "{}" } });
+    expect(pair([{ role: "assistant", tool_calls: [call([1])] }, { role: "tool", tool_call_id: "1", content: "x" }])[0]!.status).toBe("error");
+    expect(pair([{ role: "assistant", tool_calls: [call({ a: 1 })] }, { role: "tool", tool_call_id: { b: 2 }, content: "x" }])[0]!.status).toBe("error");
+  });
+
+  it("names unsupported values as Python's repr does", () => {
+    const call = (type: unknown) => [{ role: "assistant", tool_calls: [{ type, function: { name: "t" } }] }];
+    expect(() => pair(call(5))).toThrow("tool calls of type 5 are");
+    expect(() => pair(call("mcp"))).toThrow("tool calls of type 'mcp' are");
+    expect(() => settled({ tool: "t", status: "it's" })).toThrow(`got "it's" in`);
   });
 });

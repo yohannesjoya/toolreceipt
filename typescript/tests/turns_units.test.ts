@@ -122,5 +122,11 @@ describe("turns units", () => {
     }
     const two = checkTurns([U("a"), A("I've issued your refund."), A("I've issued your refund.")], { knownTools: once() });
     expect(two.map((x) => x.verdict)).toEqual(["fabricated", "fabricated"]);
+    function* ignored() {
+      yield "lookup_order";
+    }
+    const lookups = [U("a"), { tool: "lookup_order" }, A("One."), { tool: "lookup_order" }, A("Two."), { tool: "lookup_order" }, A("Three.")];
+    const three = checkTurns(lookups, { knownTools: ["lookup_order"], ignoreTools: ignored() });
+    expect(three.map((x) => x.verdict)).toEqual(["clean", "clean", "clean"]);
   });
 });
