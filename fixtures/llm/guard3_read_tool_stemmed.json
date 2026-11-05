@@ -1,0 +1,30 @@
+{
+  "reply": "Your orders are all sorted.",
+  "known_tools": [
+    {
+      "name": "lookups_order",
+      "description": "Look up an order."
+    },
+    {
+      "name": "issue_refund",
+      "description": "Issue a refund to the customer for an order."
+    },
+    {
+      "name": "send_email",
+      "description": "Send an email to the customer."
+    }
+  ],
+  "llm_output": "{\"claims\": [{\"text\": \"Your orders are all sorted\", \"tool\": \"lookups_order\"}]}",
+  "note": "A read verb in a plural tool name still marks a read tool: the claim stays unmatched.",
+  "expected": [
+    {
+      "text": "Your orders are all sorted",
+      "verb": "other",
+      "candidates": [],
+      "confidence": "medium",
+      "source": "llm"
+    }
+  ],
+  "model": "hand-written",
+  "recorded_at": "2026-11-05"
+}

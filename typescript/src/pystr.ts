@@ -71,6 +71,13 @@ function anchored(cache: WeakMap<RegExp, RegExp>, re: RegExp, suffix: string): R
   return out;
 }
 
+const LONE_SURROGATE = /\p{Cs}/u;
+
+/** Python `needle in text`: by code point, so half of a surrogate pair is not found inside it. */
+export function pyContains(text: string, needle: string): boolean {
+  return LONE_SURROGATE.test(needle) ? new RegExp(reEscape(needle), "u").test(text) : text.includes(needle);
+}
+
 /** `re.fullmatch(re, s)`. The anchored variant is compiled once per pattern. */
 export function fullmatch(re: RegExp, s: string): RegExpExecArray | null {
   return anchored(FULL_CACHE, re, "$").exec(s);

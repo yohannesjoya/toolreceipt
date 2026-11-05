@@ -1,0 +1,28 @@
+{
+  "reply": "\ud83d\ude00 sent the refund",
+  "known_tools": [
+    {
+      "name": "issue_refund",
+      "description": "Issue a refund to the customer for an order."
+    },
+    {
+      "name": "send_email",
+      "description": "Send an email to the customer."
+    }
+  ],
+  "llm_output": "{\"claims\": [{\"text\": \"\\ude00 sent the refund\", \"tool\": \"issue_refund\"}]}",
+  "note": "Half of a surrogate pair is not a span of the reply: strings compare by code point.",
+  "expected": [
+    {
+      "text": "\ud83d\ude00 sent the refund",
+      "verb": "send",
+      "candidates": [
+        "send_email"
+      ],
+      "confidence": "medium",
+      "source": "rules"
+    }
+  ],
+  "model": "hand-written",
+  "recorded_at": "2026-11-05"
+}

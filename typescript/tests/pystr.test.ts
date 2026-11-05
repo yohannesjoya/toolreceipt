@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   PY_SPACE_CHARS, cpCompare, cpFirst, cpLast, cpLength, cpSlice, fullmatch, isAlnum, isAlpha,
-  isDigit, matchAt0, pyDumps, pyInt, pyLstrip, pyRegex, pyRepr, pyRstrip, pySplit, pySplitlines,
+  isDigit, matchAt0, pyContains, pyDumps, pyInt, pyLstrip, pyRegex, pyRepr, pyRstrip, pySplit, pySplitlines,
   pyStrip, reEscape,
 } from "../src/pystr";
 
@@ -20,6 +20,17 @@ describe("PY_SPACE", () => {
     expect(pyRegex("\\s").test("\ufeff")).toBe(false); // JS \s includes U+FEFF, Python does not
     expect(pyRegex("\\s").test("\x85")).toBe(true);    // Python includes NEL, JS does not
     expect(pyRegex("\\S").test("\x85")).toBe(false);
+  });
+});
+
+describe("pyContains", () => {
+  it("compares by code point", () => {
+    expect(pyContains("\u{1F600}", "\ude00")).toBe(false); // "\ude00" in "😀" is False
+    expect(pyContains("\u{1F600}", "\ud83d")).toBe(false);
+    expect(pyContains("a\ude00b", "\ude00")).toBe(true); // a real lone surrogate
+    expect(pyContains("a\u{1F600}b", "\u{1F600}b")).toBe(true);
+    expect(pyContains("a.c", "a.c")).toBe(true);
+    expect(pyContains("abc", "a.c")).toBe(false);
   });
 });
 

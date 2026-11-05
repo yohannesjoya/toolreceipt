@@ -22,6 +22,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `checkMessages`, `acheckMessages`, `ledgerFromMessages`, `finalReply`, `checkTurns`,
   `acheckTurns` and `TurnReceipt`: OpenAI Chat Completions, OpenAI Responses, Anthropic and plain
   transcript lists, passing `fixtures/messages` and `fixtures/turns` with whole-receipt parity.
+- `LLMExtractor`, `buildPrompt`, `parseOutput`, `messageText` and `PROMPT_VERSION`: rules first, any
+  model through `complete` or `acomplete`, the same guards and merge, the same prompt byte for byte.
+  Passes `fixtures/llm` and matches Python on the 154 recorded probe outputs.
 
 ## Python
 
@@ -31,7 +34,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Fixtures: `fixtures/demo/tools.json` (the demo's tool specs) and
   `fixtures/recorded/parity.json` (the Python package's extract, diff and check output for
-  every shared case), both written by `scripts/record_parity.py` and pinned by
+  every shared case) and `fixtures/recorded/parity_llm.json` (the LLM path), all written by
+  `scripts/record_parity.py` and pinned by
   `python/tests/test_recorded_parity_current.py`. `scripts/sync_readme.py` also copies the
   lexicon and LICENSE into `typescript/`.
 

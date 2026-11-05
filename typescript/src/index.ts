@@ -8,6 +8,8 @@ export { Ledger, LedgerEntry, NO_RESULT, coerceArgs, truncate } from "./ledger";
 export type { LedgerEntryInit, Status } from "./ledger";
 export { loadLexicon } from "./lexicon";
 export type { Family, Lexicon } from "./lexicon";
+export { LLMExtractor, PROMPT_VERSION, buildPrompt, messageText, parseOutput } from "./llm";
+export type { LLMExtractorOptions, OnError } from "./llm";
 export { acheckMessages, checkMessages, finalReply, ledgerFromMessages } from "./messages";
 export type { MessageOptions } from "./messages";
 export { Receipt, renderSummary } from "./receipt";
