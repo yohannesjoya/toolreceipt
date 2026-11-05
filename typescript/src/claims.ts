@@ -31,7 +31,8 @@ export type ToolLike =
   | readonly [string, string]
   | Record<string, unknown>
   | Map<string, unknown>
-  | NamedTool;
+  | NamedTool
+  | { readonly type: string }; // SDK tool interfaces, which have no index signature
 
 export interface ClaimInit {
   text: string;
@@ -163,7 +164,7 @@ export interface ClaimExtractor {
 const TYPE_ERROR =
   "known_tools entries must be a name, a (name, description) pair, a ToolSpec, a dict or an object with a name attribute; got ";
 
-function typeName(value: unknown): string {
+export function typeName(value: unknown): string {
   if (value === null) return "null";
   if (typeof value === "object") {
     const ctor = (value as { constructor?: { name?: string } }).constructor;
