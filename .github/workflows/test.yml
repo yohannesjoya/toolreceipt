@@ -46,7 +46,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        node-version: ["20", "22"]
+        node-version: ["18", "20", "22"]
     defaults:
       run:
         working-directory: typescript
@@ -59,3 +59,4 @@ jobs:
           cache-dependency-path: typescript/package-lock.json
       - run: npm ci
       - run: npm run check
+      - run: npm run smoke

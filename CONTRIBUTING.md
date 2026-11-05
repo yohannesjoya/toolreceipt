@@ -19,7 +19,7 @@ CI runs the same three commands on Python 3.10 to 3.13. The core package (everyt
 ## Two languages, one fixture set
 
 The TypeScript package under `typescript/` ports the core and runs the same fixtures
-(`cd typescript && npm ci && npm run check`). A fixture you add or change must pass in both
+(`cd typescript && npm ci && npm run check && npm run smoke`). A fixture you add or change must pass in both
 suites. `python/toolreceipt/lexicon.json` is the only hand-edited lexicon; `scripts/sync_readme.py`
 copies it into `typescript/src/`, and `--check` fails in CI when the copy drifts. Adding or
 editing an extractor, diff, end-to-end, held-out, message-list, turn or LLM fixture, a probe recording
@@ -34,6 +34,17 @@ python/.venv/bin/python scripts/record_parity.py
 `python/tests/test_recorded_parity_current.py` names that command when the file is stale. A version
 bump alone does not need it. The TypeScript suite must stay green: the port follows Python, never
 the other way round.
+
+`typescript/` has its own version. To release it, bump `version` in `typescript/package.json` and
+`package-lock.json` and add the CHANGELOG entry in a pull request. After the merge, push the tag
+`ts-v<version>`. `.github/workflows/release-npm.yml` checks that the commit is on `main` and the tag equals
+the version, runs `npm run check` and `npm run smoke`, and publishes that tarball with npm trusted
+publishing, so no token is stored. Python releases use `v<version>`.
+
+The npm package's trusted publisher takes owner `yohannesjoya`, repository `toolreceipt`, workflow
+`release-npm.yml` and environment `npm`. npm expires a new configuration that has not published within
+2 days, so create it on the day of the first tagged release. Version 0.1.0 was published by hand, because
+that setup needs the package to exist: it has no `ts-v` tag, and `ts-v*` starts with the next version.
 
 ## Principle: precision over recall
 

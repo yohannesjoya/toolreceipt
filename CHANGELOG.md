@@ -7,11 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## TypeScript
 
-### [Unreleased]
+### [0.1.0] - 2026-11-05
+
+First npm release.
 
 #### Added
 
-- Core port under `typescript/` (not yet published): `check`, `acheck`, `diff`, `Ledger`,
+- Core port under `typescript/`: `check`, `acheck`, `diff`, `Ledger`,
   `LedgerEntry`, `Claim`, `ToolSpec`, `RuleExtractor`, `Receipt`, `renderSummary`,
   `normalizeToolSpecs`, `loadLexicon`, `coerceArgs`, `truncate`. Zero runtime dependencies,
   ESM and CJS, Node 18+. Reads the same `lexicon.json` and passes every fixture under
