@@ -53,6 +53,18 @@ describe("parseOutput", () => {
   });
 });
 
+describe("errors do not leak model output", () => {
+  it.each(['{"claims":[{"text":my card 4242-4242 refund}]}', '{"text": jane@example.com refund }'])("%s", (bad) => {
+    let message = "";
+    try {
+      parseOutput(bad);
+    } catch (exc) {
+      message = (exc as Error).message;
+    }
+    expect(message).toBe("unparsable JSON in model output");
+  });
+});
+
 describe("extract", () => {
   it("adds LLM claims with source", () => {
     const ex = new LLMExtractor({ complete: () => OUT });
@@ -173,11 +185,22 @@ describe("async", () => {
 
   it("the constructor needs one callable and a valid onError", () => {
     expect(() => new LLMExtractor({})).toThrow(/complete or acomplete/);
+    expect(() => new (LLMExtractor as unknown as new () => LLMExtractor)()).toThrow(/complete or acomplete/);
     expect(() => new LLMExtractor({ complete: () => "", onError: "nope" as never })).toThrow(/onError/);
   });
 
   it("an AbortError propagates under fallback and leaves lastError alone", async () => {
     const abort = Object.assign(new Error("aborted"), { name: "AbortError" });
+    const ex = new LLMExtractor({ acomplete: () => Promise.reject(abort) });
+    await expect(ex.aextract(REPLY, TOOLS)).rejects.toBe(abort);
+    expect(ex.lastError).toBeNull();
+  });
+
+  // openai 7.51 and @anthropic-ai/sdk 1.5 throw this class on abort, with name "Error".
+  it("an SDK's APIUserAbortError propagates under fallback", async () => {
+    class APIUserAbortError extends Error {}
+    const abort = new APIUserAbortError("Request was aborted.");
+    expect(abort.name).toBe("Error");
     const ex = new LLMExtractor({ acomplete: () => Promise.reject(abort) });
     await expect(ex.aextract(REPLY, TOOLS)).rejects.toBe(abort);
     expect(ex.lastError).toBeNull();

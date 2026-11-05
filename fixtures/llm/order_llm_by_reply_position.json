@@ -1,0 +1,37 @@
+{
+  "reply": "Your refund is on its way, and you'll find the confirmation in your inbox.",
+  "known_tools": [
+    {
+      "name": "issue_refund",
+      "description": "Issue a refund to the customer for an order."
+    },
+    {
+      "name": "send_email",
+      "description": "Send an email to the customer."
+    }
+  ],
+  "llm_output": "{\"claims\": [{\"text\": \"you'll find the confirmation in your inbox\", \"tool\": \"send_email\"}, {\"text\": \"Your refund is on its way\", \"tool\": \"issue_refund\"}]}",
+  "note": "The model lists the later span first; claims come back in reply order.",
+  "expected": [
+    {
+      "text": "Your refund is on its way",
+      "verb": "other",
+      "candidates": [
+        "issue_refund"
+      ],
+      "confidence": "medium",
+      "source": "llm"
+    },
+    {
+      "text": "you'll find the confirmation in your inbox",
+      "verb": "other",
+      "candidates": [
+        "send_email"
+      ],
+      "confidence": "medium",
+      "source": "llm"
+    }
+  ],
+  "model": "hand-written",
+  "recorded_at": "2026-11-05"
+}

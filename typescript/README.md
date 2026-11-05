@@ -4,7 +4,7 @@ Catch LLM agents claiming actions they never took. This is the TypeScript port o
 [toolreceipt](https://github.com/yohannesjoya/toolreceipt) Python package: same lexicon, same
 JSON fixtures, same receipts.
 
-**Status:** not yet on npm. `check`, `diff`, the rule extractor, the argument check, message lists
+**Status:** not yet on npm. `check`, `diff`, the rule extractor, the argument check, message lists,
 per-turn receipts and the LLM extractor pass every shared fixture with the Python runners'
 assertions, and every recorded Python receipt matches. Framework adapters follow.
 
@@ -112,8 +112,9 @@ The rules still run first and still decide `ok`: a claim only the LLM found land
 `receipt.suspected`, reported but not blocking, so two runs of the same reply block or pass the same
 way even though model output varies. Pass `llmBlocks: true` to let those claims make the verdict
 `fabricated`. On a provider error or unparsable output the extractor warns once, naming the error
-class, and falls back to the rules; `onError: "raise"` surfaces it instead. An `AbortError` always
-propagates. Every LLM claim must be a verbatim span of the reply and pass the same negation,
+class, and falls back to the rules; `onError: "raise"` surfaces it instead. Under `acheck`, a
+cancelled call always propagates: an `AbortError`, or the abort error of the OpenAI and Anthropic
+SDKs. Every LLM claim must be a verbatim span of the reply and pass the same negation,
 conditional, other-subject and state checks as the rules; those checks are English only.
 
 The model sees the reply text and the tool names and descriptions, never the ledger.
@@ -170,7 +171,9 @@ and `src/decimal.ts`. The accepted divergences, none reachable by a current fixt
   raises `KeyError`.
 - `acheck` awaits any `aextract` function.
 - `LLMExtractor` differs where JavaScript does: `fromChatModel` is async-only, `aextract` has no
-  thread, `acomplete` is not checked for being async, and model output holding `NaN` falls back.
+  thread, `acomplete` is not checked for being async, and model output holding `NaN` or `Infinity`
+  falls back. Model output nested 100,000 levels deep parses here, where Python falls back. A custom
+  `time_markers` or `llm_exclusions` entry must be a valid JavaScript regular expression.
 - `NaN` or `Infinity` in a tool call's `arguments` string is read by Python's `json.loads`; here
   the string lands in `{ input: ... }`, and `1e400` reads as `null`.
 - A class instance as `args`, `input` or `result` is read by its properties, where Python stores

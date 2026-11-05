@@ -246,7 +246,9 @@ list and a bigint result a quoted string; a call id that is an object prints as 
 prints its `repr()`; a very deep `arguments` string or a `type` that is a list or object gives a
 receipt where Python raises a raw error; the LangChain error names no adapter, since the package
 has none yet; `LLMExtractor.fromChatModel` is async-only because LangChain.js `invoke` returns a
-promise, `aextract` runs no thread, `acomplete` is not checked for being async, and model output
-holding `NaN` falls back because `JSON.parse` rejects it; Vercel AI SDK `tool-call` and `tool-result` blocks throw, where Python skips those
+promise, `aextract` runs no thread, `acomplete` is not checked for being async, model output holding
+`NaN` or `Infinity` falls back because `JSON.parse` rejects it, model output nested 100,000 levels
+deep parses where Python falls back, and a custom `time_markers` or `llm_exclusions` entry must be a
+valid JavaScript regular expression; Vercel AI SDK `tool-call` and `tool-result` blocks throw, where Python skips those
 unknown blocks, because a JavaScript caller is likely to pass them and an empty ledger would accuse
 an honest reply.

@@ -14,7 +14,7 @@ import {
   subjectKind, tokenizeToolName, typeName, verblessOtherSubject,
 } from "./claims";
 import { type Lexicon, defaultLexicon } from "./lexicon";
-import { cpCompare, cpLength, pyRegex, pySplit, pyStrip } from "./pystr";
+import { cpCompare, cpLength, pyContains, pyRegex, pySplit, pyStrip } from "./pystr";
 
 export const PROMPT_VERSION = 2;
 
@@ -38,7 +38,8 @@ export const PROMPT_V2 = [
   ">>>",
 ].join("\n");
 
-const FENCE = pyRegex("^```[a-zA-Z]*\\s*$|^```\\s*$", "gm");
+// Python's MULTILINE anchors fire at "\n" only; JavaScript's also fire at U+2028 and U+2029.
+const FENCE = pyRegex("(?<![^\\n])```[a-zA-Z]*\\s*(?![^\\n])", "g");
 const PLACEHOLDER = /\{(tools|reply)\}/g;
 
 export type OnError = "fallback" | "raise";
@@ -90,10 +91,10 @@ export function parseOutput(raw: string): Array<[string, string | null]> {
   const slice = firstObject(cleaned, start);
   let data: unknown;
   try {
-    if (slice === null) throw new SyntaxError("unterminated object");
-    data = JSON.parse(slice);
-  } catch (exc) {
-    throw new TypeError(`unparsable JSON in model output: ${(exc as Error).message}`);
+    data = JSON.parse(slice ?? "");
+  } catch {
+    // Not the engine's message: V8 quotes the output around the failure, and the output echoes the reply.
+    throw new TypeError("unparsable JSON in model output");
   }
   const claims = (data as { claims?: unknown }).claims;
   if (!Array.isArray(claims)) throw new TypeError('model output has no "claims" list');
@@ -128,6 +129,13 @@ export function messageText(message: unknown): string {
   throw new TypeError(`cannot read text from ${typeName(message)}`);
 }
 
+/** The caller cancelled: a platform `AbortError`, or the class the OpenAI and Anthropic SDKs throw,
+ * whose `name` is plain "Error". */
+function isAbort(error: unknown): boolean {
+  const e = error as { name?: unknown; constructor?: { name?: unknown } } | null | undefined;
+  return e?.name === "AbortError" || e?.constructor?.name === "APIUserAbortError";
+}
+
 function isThenable(value: unknown): value is PromiseLike<unknown> {
   return value !== null && typeof value === "object" && typeof (value as { then?: unknown }).then === "function";
 }
@@ -147,7 +155,7 @@ export class LLMExtractor implements ClaimExtractor {
   private readonly rules: RuleExtractor;
   private readonly logger: { warn(message: string): void };
 
-  constructor(options: LLMExtractorOptions) {
+  constructor(options: LLMExtractorOptions = {}) {
     const onError = options.onError ?? "fallback";
     if (onError !== "fallback" && onError !== "raise") throw new TypeError('onError must be "fallback" or "raise"');
     if (!options.complete && !options.acomplete) throw new TypeError("complete or acomplete is required");
@@ -173,18 +181,16 @@ export class LLMExtractor implements ClaimExtractor {
   extract(text: string, knownTools: readonly ToolSpec[]): Claim[] {
     if (!this.complete) throw new TypeError("this extractor is async-only; use acheck");
     const rules = this.rules.extract(text, knownTools);
-    let raw: string | null = null;
+    let raw: unknown = null;
     let error: unknown = null;
     try {
-      const out: unknown = this.complete(buildPrompt(text, knownTools));
-      if (isThenable(out)) {
-        void Promise.resolve(out).catch(() => undefined);
-        throw new WiringError("complete returned a promise; pass it as acomplete and use acheck");
-      }
-      raw = out as string;
+      raw = this.complete(buildPrompt(text, knownTools));
     } catch (exc) {
-      if (exc instanceof WiringError) throw new TypeError(exc.message);
       error = exc;
+    }
+    if (isThenable(raw)) {
+      void Promise.resolve(raw).catch(() => undefined);
+      throw new TypeError("complete returned a promise; pass it as acomplete and use acheck");
     }
     return this.finish(rules, text, knownTools, raw, error);
   }
@@ -197,14 +203,14 @@ export class LLMExtractor implements ClaimExtractor {
     try {
       raw = this.acomplete ? await this.acomplete(prompt) : await Promise.resolve(this.complete!(prompt));
     } catch (exc) {
-      if ((exc as { name?: unknown } | null)?.name === "AbortError") throw exc; // the caller cancelled
+      if (isAbort(exc)) throw exc; // the caller cancelled
       error = exc;
     }
     return this.finish(rules, text, knownTools, raw, error);
   }
 
   /** Parse, guard and merge one completed call; records `lastRaw` and `lastError`. */
-  private finish(rules: Claim[], text: string, knownTools: readonly ToolSpec[], raw: string | null, failure: unknown): Claim[] {
+  private finish(rules: Claim[], text: string, knownTools: readonly ToolSpec[], raw: unknown, failure: unknown): Claim[] {
     let error = failure;
     let pairs: Array<[string, string | null]> = [];
     if (error === null) {
@@ -214,7 +220,7 @@ export class LLMExtractor implements ClaimExtractor {
         error = exc;
       }
     }
-    this.lastRaw = raw;
+    this.lastRaw = raw as string | null;
     this.lastError = error;
     if (error !== null) {
       // A model client may throw anything; the caller gets it unchanged.
@@ -234,8 +240,6 @@ export class LLMExtractor implements ClaimExtractor {
   }
 }
 
-class WiringError extends Error {}
-
 // ---------------------------------------------------------------------------
 // Guards (PRD 02 §7.3): applied to every model claim, in order; the first failing one wins.
 // ---------------------------------------------------------------------------
@@ -246,7 +250,7 @@ export const MAX_SPAN_CHARS = 200;
 function guard(rawSpan: string, modelTool: string | null, reply: string, looseReply: string, names: Set<string>, lexicon: Lexicon): Claim | null {
   const span = pyStrip(rawSpan);
   const looseSpan = normalizeLoose(span);
-  if (looseSpan === "" || !looseReply.includes(looseSpan)) return null; // 1. not a verbatim span of the reply
+  if (looseSpan === "" || !pyContains(looseReply, looseSpan)) return null; // 1. not a verbatim span of the reply
   if (cpLength(looseSpan) > MAX_SPAN_CHARS) return null; // 6. a paragraph, not a claim
   let tool = modelTool;
   if (tool !== null && !names.has(tool)) tool = null; // 2. unknown tool: the claim survives as unmatched

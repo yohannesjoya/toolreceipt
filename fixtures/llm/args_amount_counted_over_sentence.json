@@ -1,0 +1,37 @@
+{
+  "reply": "Your refund of $64 is on its way, minus the $5 fee.",
+  "known_tools": [
+    {
+      "name": "issue_refund",
+      "description": "Issue a refund to the customer for an order."
+    },
+    {
+      "name": "send_email",
+      "description": "Send an email to the customer."
+    }
+  ],
+  "llm_output": "{\"claims\": [{\"text\": \"Your refund of $64 is on its way\", \"tool\": \"issue_refund\"}]}",
+  "note": "The clause holds one amount but the sentence two, so the amount is not judged.",
+  "expected": [
+    {
+      "text": "Your refund of $64 is on its way",
+      "verb": "other",
+      "candidates": [
+        "issue_refund"
+      ],
+      "confidence": "medium",
+      "source": "llm"
+    }
+  ],
+  "model": "hand-written",
+  "recorded_at": "2026-11-05",
+  "ledger": [
+    {
+      "tool": "issue_refund",
+      "status": "ok",
+      "args": {
+        "amount": 59
+      }
+    }
+  ]
+}
