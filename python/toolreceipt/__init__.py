@@ -8,7 +8,7 @@ from toolreceipt.receipt import Receipt, Verdict
 from toolreceipt.receipts import Receipts, acheck, check
 from toolreceipt.turns import TurnReceipt, acheck_turns, check_turns
 
-__version__ = "0.4.0"
+__version__ = "0.4.1"
 
 __all__ = [
     "Claim",
