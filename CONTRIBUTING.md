@@ -21,10 +21,18 @@ CI runs the same three commands on Python 3.10 to 3.13. The core package (everyt
 The TypeScript package under `typescript/` ports the core and runs the same fixtures
 (`cd typescript && npm ci && npm run check`). A fixture you add or change must pass in both
 suites. `python/toolreceipt/lexicon.json` is the only hand-edited lexicon; `scripts/sync_readme.py`
-copies it into `typescript/src/`, and `--check` fails in CI when the copy drifts. A Python
-behaviour change also regenerates `fixtures/recorded/parity.json` with
-`python/.venv/bin/python scripts/record_parity.py` and must keep the TypeScript suite green:
-the port follows Python, never the other way round.
+copies it into `typescript/src/`, and `--check` fails in CI when the copy drifts. Adding or
+editing an extractor, diff, end-to-end or held-out fixture or a demo replay, or changing Python
+behaviour, also regenerates `fixtures/recorded/parity.json`. Run this from the repository root,
+after `uv sync` in `python/`:
+
+```bash
+python/.venv/bin/python scripts/record_parity.py
+```
+
+`python/tests/test_recorded_parity_current.py` names that command when the file is stale. A version
+bump alone does not need it. The TypeScript suite must stay green: the port follows Python, never
+the other way round.
 
 ## Principle: precision over recall
 
@@ -296,7 +304,7 @@ runs without network access; `python/tests/helpers_graph.py` shows one built on 
 
 - Conventional commit prefixes (`feat:`, `fix:`, `docs:`, `test:`, `chore:`).
 - Tests, `ruff` and `mypy` pass.
-- User-visible changes get a line in `CHANGELOG.md` under `[Unreleased]`.
+- User-visible changes get a line in `CHANGELOG.md` under `[Unreleased]` of the language they touch.
 
 ## Reporting a problem
 

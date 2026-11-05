@@ -39,5 +39,7 @@ def test_parity_recording_is_current():
     recorded = _load(FIXTURES / "recorded" / "parity.json")
     tools = _load(FIXTURES / "demo" / "tools.json")
     current = _script().build(tools)
-    assert {k: v for k, v in recorded.items() if k != "recorded_at"} == current, RE_RECORD
-    assert recorded["recorded_at"]
+    # The stamps say when and from which version it was recorded; a version bump alone is not stale.
+    for key in ("extract", "diff", "check"):
+        assert recorded[key] == current[key], RE_RECORD
+    assert recorded["recorded_at"] and recorded["toolreceipt"]

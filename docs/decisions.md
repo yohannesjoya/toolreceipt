@@ -231,7 +231,11 @@ special case. The accepted divergences from Python, none reachable by a current 
 Unicode version skew between the CPython build and Node's ICU; `isdigit()` restricted to `Nd`
 (a run of superscript digits after a reference number); a JavaScript number is a Python `int`
 iff it is integer-valued, so a ledger value written `4821.0` is judged as a reference in
-TypeScript and not in Python, and echoes as `4821`; integers above 2^53 lose digits at
-`JSON.parse`; `TypeError` messages name the JavaScript type (`got number`) and the `str()`
+TypeScript and not in Python, which can turn a Python `clean` into `fabricated`, and echoes as
+`4821`; integers above 2^53 lose digits, at `JSON.parse` and as a `count` read from the reply
+text; an argument key that looks like an integer sorts first in a JavaScript object, so it
+echoes out of order; `coerceArgs` turns `NaN` into `null`; `LedgerEntry.fromDict` rejects `args`
+given as a list of pairs, which Python's `dict()` reads; errors name the JavaScript type
+(`got number`), `fromDict` throws `TypeError` where Python raises `KeyError`, and the `str()`
 fallbacks of `normalizeToolSpecs` and `coerceArgs` use `String()`; `acheck` awaits any
 `aextract` function, where Python ignores a synchronous one.
