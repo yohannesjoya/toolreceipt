@@ -14,8 +14,9 @@ export { acheckMessages, checkMessages, finalReply, ledgerFromMessages } from ".
 export type { MessageOptions } from "./messages";
 export { Receipt, renderSummary } from "./receipt";
 export type { ReceiptInit, Verdict } from "./receipt";
-export { acheck, check } from "./receipts";
-export type { CheckOptions } from "./receipts";
+export { Receipts, acheck, check } from "./receipts";
+export type { CheckOptions, ReceiptsOptions } from "./receipts";
 export { TurnReceipt, acheckTurns, checkTurns } from "./turns";
 export type { TurnReceiptInit } from "./turns";
 export type { Json } from "./types";
+export { acheckResult, checkResult, finalReplyFromResult, ledgerFromResult, toolOptions } from "./vercel";

@@ -19,7 +19,7 @@
   "publishConfig": { "access": "public" },
   "repository": { "type": "git", "url": "https://github.com/yohannesjoya/toolreceipt", "directory": "typescript" },
   "homepage": "https://github.com/yohannesjoya/toolreceipt",
-  "keywords": ["llm", "agents", "tool-calls", "hallucination", "receipt", "langgraph", "openai", "anthropic"],
+  "keywords": ["llm", "agents", "tool-calls", "hallucination", "receipt", "langgraph", "openai", "anthropic", "vercel-ai-sdk"],
   "scripts": {
     "build": "tsup",
     "test": "vitest run",
@@ -28,6 +28,8 @@
     "check": "npm run typecheck && npm run lint && npm run test && npm run build"
   },
   "devDependencies": {
+    "ai": "^7.0.163",
+    "ai6": "npm:ai@^6.0.323",
     "@types/node": "^22",
     "eslint": "^9",
     "tsup": "^8",

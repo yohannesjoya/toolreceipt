@@ -249,6 +249,24 @@ has none yet; `LLMExtractor.fromChatModel` is async-only because LangChain.js `i
 promise, `aextract` runs no thread, `acomplete` is not checked for being async, model output holding
 `NaN` or `Infinity` falls back because `JSON.parse` rejects it, model output nested 100,000 levels
 deep parses where Python falls back, and a custom `time_markers` or `llm_exclusions` entry must be a
-valid JavaScript regular expression; Vercel AI SDK `tool-call` and `tool-result` blocks throw, where Python skips those
+valid JavaScript regular expression; Vercel AI SDK model messages are read, where Python skips those
 unknown blocks, because a JavaScript caller is likely to pass them and an empty ledger would accuse
-an honest reply.
+an honest reply; `Receipts` captures by wrapping `execute` where Python injects a LangChain callback,
+and a thrown error is stored as `String(error)` where Python stores its `repr()`.
+
+## A tool with no `execute` is unseen, not known
+
+A provider's tool or a browser's tool runs where the wrapper cannot see it, and a browser tool's call
+can sit in an earlier request, where the run's steps cannot see it either. Naming it as a known tool
+would make an honest reply about it `fabricated`. Leaving it out is no better: the extractor then pins
+the claim on the nearest tool it can see, and accuses that. So `unseenTools` shows it to the extractor,
+and a claim naming it stays unmatched unless the ledger holds the tool or `knownTools` names it. A
+missed claim costs less than a false accusation. Wrapping rather than the SDK's callbacks keeps one code
+path across AI SDK 5, 6 and 7, and lists tools the run never called.
+
+## `Receipts` refuses to guess between runs
+
+Python's `check()` with no source reads the newest `config()` run. A module-level instance on a
+JavaScript server is common, and there that reads another request's ledger: a wrong verdict, and a
+receipt holding someone else's arguments and results. After a second `wrapTools`, `check` with no source
+throws. Sequential reuse pays one argument.

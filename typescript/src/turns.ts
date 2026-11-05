@@ -91,10 +91,11 @@ function* turnInputs(messages: readonly unknown[]): Generator<[number, number, s
 }
 
 function withSpecs(options: MessageOptions): CheckOptions {
-  // Both may be one-shot iterables, and every turn reads them.
+  // These may be one-shot iterables, and every turn reads them.
   return {
     ...options,
     knownTools: normalizeToolSpecs(options.knownTools ?? []),
+    unseenTools: normalizeToolSpecs(options.unseenTools ?? []),
     ignoreTools: [...(options.ignoreTools ?? [])],
   };
 }
