@@ -247,17 +247,6 @@ describe("edges of the message reader", () => {
     expect(pair(list)[0]!.status).toBe("ok");
   });
 
-  it("rejects Vercel AI SDK messages rather than reading an empty ledger", () => {
-    const call = { role: "assistant", content: [{ type: "tool-call", toolCallId: "c1", toolName: "t", input: {} }] };
-    const result = { role: "tool", content: [{ type: "tool-result", toolCallId: "c1", toolName: "t", output: { type: "text", value: "ok" } }] };
-    const reply = { role: "assistant", content: [{ type: "text", text: "I've refunded $64." }] };
-    for (const list of [[call, result, reply], [result, reply], [call]]) {
-      expect(() => checkMessages(list, { knownTools: ["t"] })).toThrow(/Vercel AI SDK/);
-      expect(() => checkTurns(list, { knownTools: ["t"] })).toThrow(TypeError);
-    }
-    expect(checkMessages([reply]).verdict).toBe("clean"); // plain text blocks stay readable
-  });
-
   it("rejects LangChain.js classes with no type property (@langchain/core before 1.0)", () => {
     class OldAIMessage {
       content = "I've refunded $64.";

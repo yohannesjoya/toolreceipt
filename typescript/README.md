@@ -48,11 +48,53 @@ import { checkMessages } from "toolreceipt";
 const receipt = checkMessages(messages, { knownTools: tools }); // tools: the list you sent to the API
 ```
 
-`checkMessages` reads OpenAI Chat Completions messages, OpenAI Responses items and Anthropic
-messages, as plain objects or SDK objects. Only the last turn counts. The final reply is the last
-assistant message, or `""` when the run ended on a tool call. A tool result is a success unless
-Anthropic's `is_error` says otherwise. Legacy `function_call`, custom and MCP tool calls, LangChain
-messages and Vercel AI SDK messages throw a `TypeError` instead of producing an empty ledger.
+`checkMessages` reads OpenAI Chat Completions messages, OpenAI Responses items, Anthropic messages
+and Vercel AI SDK model messages, as plain objects or SDK objects. Only the last turn counts. The
+final reply is the last assistant message, or `""` when the run ended on a tool call. A tool result
+is a success unless Anthropic's `is_error` or an AI SDK error output says otherwise. Legacy
+`function_call`, custom and MCP tool calls, LangChain messages and AI SDK 4 messages throw a
+`TypeError` instead of producing an empty ledger.
+
+## With the Vercel AI SDK
+
+Wrap the tools, run, check the reply. The package imports nothing from `ai`.
+
+```ts
+import { generateText } from "ai";
+import { Receipts } from "toolreceipt";
+
+const receipts = new Receipts();
+const result = await generateText({ model, prompt, tools: receipts.wrapTools(tools) });
+const receipt = receipts.check(result.text);
+```
+
+`wrapTools` records each call as it runs, and works the same under `streamText`. The tool's output and
+errors reach the SDK unchanged. Call it once per run. Tools it wrapped count as known, so a tool the
+run never called can be reported as `not_called`. Concurrent runs on one `Receipts` each pass their
+wrapped record back: `receipts.check(text, wrappedTools)`.
+
+A tool with no `execute`, such as a provider's web search or a tool the browser runs, is invisible to
+the wrapper. It passes through and stays unknown, so a reply about it is never accused. To judge those
+tools, or with a long-lived `ToolLoopAgent` that holds its tools for every request, read the finished
+run instead:
+
+```ts
+import { checkResult, knownToolsFrom } from "toolreceipt";
+
+const receipt = checkResult(result, { knownTools: knownToolsFrom(tools) });
+// streamText: checkResult({ steps: await result.steps }, ...)
+```
+
+Or read the messages. **Use `result.responseMessages` on AI SDK 7.** There, `result.response.messages`
+holds only the last step, so a run's earlier tool calls would be missing and an honest reply would read
+as `fabricated`. On AI SDK 5 and 6, use `result.response.messages`.
+
+```ts
+checkMessages(result.responseMessages, { knownTools: knownToolsFrom(tools) });
+```
+
+These read AI SDK 5, 6 and 7. A tool that returns `{ error: ... }` instead of throwing counts as
+having run. Tested against `ai` 6 and 7.
 
 ## Per-turn receipts
 
@@ -182,11 +224,14 @@ and `src/decimal.ts`. The accepted divergences, none reachable by a current fixt
 - A very deep `arguments` string or a `type` that is a list or object gives a receipt here, where
   Python raises a raw error.
 - The LangChain error names no adapter, because this package has none yet.
-- Vercel AI SDK `tool-call` and `tool-result` blocks throw. Python skips those unknown blocks.
+- Vercel AI SDK messages are read here. Python skips those unknown blocks.
+- `Receipts` wraps tools with `wrapTools`, where Python injects a LangChain callback with `config()`.
+  `check(reply, source)` takes a ledger or a wrapped record, where Python has `ledger=` and `config=`.
+- A thrown tool error is stored as `String(error)`, `Error: boom`, where Python stores its `repr()`.
 
 ## Not yet ported
 
-- `Receipts` and live adapters (LangGraph.js, Vercel AI SDK)
+- LangGraph.js adapter
 
 ## Development
 

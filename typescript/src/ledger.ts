@@ -1,6 +1,6 @@
 /** Ledger of tool calls actually performed during an agent run (port of ledger.py). */
 
-import { cpLength, cpSlice, isMapping, pyTruthy } from "./pystr";
+import { cpLength, cpSlice, isMapping, pyDumps, pyTruthy } from "./pystr";
 import type { Json } from "./types";
 
 export type Status = "ok" | "error";
@@ -173,4 +173,25 @@ export function truncate(text: string | null, limit: number): string | null {
   if (text === null || cpLength(text) <= limit) return text;
   if (limit <= 0) return "";
   return cpSlice(text, 0, limit - 1) + "…";
+}
+
+/** A result or error as the ledger stores it: a string or `null` as is, anything else as JSON. */
+export function asText(value: unknown): string | null {
+  if (value === null || value === undefined) return null;
+  if (typeof value === "string") return value;
+  try {
+    return pyDumps(value);
+  } catch {
+    // eslint-disable-next-line @typescript-eslint/no-base-to-string
+    return String(value);
+  }
+}
+
+/** A thrown value as `error` text. Never throws: what cannot print falls back to `NO_RESULT`. */
+export function errorText(error: unknown): string {
+  try {
+    return String(error) || NO_RESULT;
+  } catch {
+    return NO_RESULT;
+  }
 }

@@ -1,8 +1,9 @@
-/** `check()` and `acheck()`: the framework-free entry points (port of receipts.py). */
+/** `check()`, `acheck()` and the `Receipts` facade (port of receipts.py). */
 
+import { ToolCapture, wrapToolRecord } from "./capture";
 import { type Claim, type ClaimExtractor, RuleExtractor, type ToolLike, ToolSpec, normalizeToolSpecs } from "./claims";
 import { type DiffOptions, diff } from "./diff";
-import type { Ledger } from "./ledger";
+import { Ledger, LedgerEntry } from "./ledger";
 import { cpCompare } from "./pystr";
 import type { Receipt } from "./receipt";
 
@@ -68,4 +69,92 @@ export async function acheck(reply: string, ledger: Ledger, options: CheckOption
       ? await extractor.aextract(reply, toolSpecs)
       : extractor.extract(reply, toolSpecs);
   return finish(claims, ledger, toolSpecs, options);
+}
+
+export interface ReceiptsOptions extends CheckOptions {
+  /** Keep tool arguments and results in the ledger; `false` also turns off the argument check. */
+  captureResults?: boolean | undefined;
+  /** Longest result or error text kept, in code points. */
+  maxResultChars?: number | undefined;
+}
+
+/** One per agent: `wrapTools()` before the run, `check()` on the final reply. */
+export class Receipts {
+  private readonly options: CheckOptions;
+  private readonly known: ToolSpec[];
+  private readonly captureResults: boolean;
+  private readonly maxResultChars: number;
+  private readonly runs = new WeakMap<object, ToolCapture>();
+  private current: ToolCapture | null = null;
+
+  constructor(options: ReceiptsOptions = {}) {
+    this.known = normalizeToolSpecs(options.knownTools ?? []);
+    this.options = {
+      ignoreTools: new Set(options.ignoreTools ?? []),
+      extractor: options.extractor,
+      llmBlocks: options.llmBlocks,
+      checkArgs: options.checkArgs,
+    };
+    this.captureResults = options.captureResults ?? true;
+    this.maxResultChars = options.maxResultChars ?? 2000;
+  }
+
+  /**
+   * A copy of `tools` that records each call, for one run. The newest run is what `check()` reads
+   * by default; pass the returned record to `check()` to read a specific one, so one `Receipts`
+   * can serve concurrent runs. A long-lived agent holds its tools for every request: wrapping once
+   * would mix requests, so use `checkResult` there.
+   */
+  wrapTools<T extends object>(tools: T): T {
+    const capture = new ToolCapture(this.captureResults, this.maxResultChars);
+    const wrapped = wrapToolRecord(tools, capture);
+    this.runs.set(wrapped, capture);
+    this.current = capture;
+    return wrapped;
+  }
+
+  /** The newest run's ledger, or `null` before `wrapTools()`. */
+  get ledger(): Ledger | null {
+    return this.current === null ? null : this.current.ledger;
+  }
+
+  private captureFor(source: object | null | undefined): ToolCapture {
+    if (source === null || source === undefined) {
+      if (this.current === null) throw new TypeError("no ledger: call wrapTools() before the run or pass a ledger");
+      return this.current;
+    }
+    const capture = this.runs.get(source);
+    if (capture === undefined) throw new TypeError("source is not a Ledger or a record this instance's wrapTools() returned");
+    return capture;
+  }
+
+  private resolve(source: Ledger | object | null | undefined): [Ledger, CheckOptions] {
+    let ledger: Ledger;
+    let known = this.known;
+    if (source instanceof Ledger) {
+      ledger = source;
+    } else {
+      const capture = this.captureFor(source);
+      capture.flush();
+      ledger = capture.ledger;
+      known = mergeTools(known, [...capture.knownTools].map(([name, description]) => new ToolSpec(name, description)));
+    }
+    if (!this.captureResults) {
+      ledger = new Ledger(ledger.entries.map((e) => new LedgerEntry({ ...e, args: {}, result: null })));
+    }
+    return [ledger, { ...this.options, knownTools: known }];
+  }
+
+  /** Check `reply`. `source` is a `Ledger` or a record `wrapTools()` returned; with none, the
+   * newest run is read. */
+  check(reply: string, source?: Ledger | object | null): Receipt {
+    const [ledger, options] = this.resolve(source);
+    return check(reply, ledger, options);
+  }
+
+  /** `check()` for async code; see the module-level `acheck`. */
+  async acheck(reply: string, source?: Ledger | object | null): Promise<Receipt> {
+    const [ledger, options] = this.resolve(source);
+    return acheck(reply, ledger, options);
+  }
 }

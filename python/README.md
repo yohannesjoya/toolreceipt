@@ -407,8 +407,8 @@ Done in 0.2: LLM-backed extractor behind the existing `ClaimExtractor` protocol.
 message input; argument check for amounts and reference numbers. Done in 0.4: per-turn
 receipts over a whole conversation, and a plain transcript shape.
 
-- TypeScript port, sharing the JSON fixtures as the contract (in progress: core, messages, turns and LLM extractor on `main`)
-- Adapters: Mastra, CrewAI, Vercel AI SDK
+- TypeScript port, sharing the JSON fixtures as the contract (in progress: core, messages, turns, LLM extractor, `Receipts` and the Vercel AI SDK on `main`)
+- Adapters: Mastra, CrewAI
 - `check_turns` over a LangGraph result (a LangChain-to-message-list converter)
 
 ## Contributing

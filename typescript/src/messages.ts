@@ -1,14 +1,15 @@
 /**
  * Framework-free message input (port of messages.py): a ledger and a final reply from a message
- * list. Reads OpenAI Chat Completions messages, OpenAI Responses items and Anthropic messages as
- * plain objects, Maps or SDK class instances, by key, with no SDK imported. Only the last turn is
+ * list. Reads OpenAI Chat Completions messages, OpenAI Responses items, Anthropic messages and, in
+ * this port only, Vercel AI SDK model messages (5 and newer), as plain objects, Maps or SDK class
+ * instances, by key, with no SDK imported. Only the last turn is
  * read: the messages after the last `user` message. A plain transcript shape is read too:
  * role/content lines with settled ledger entries at the position where the tool settled.
  */
 
 import { typeName } from "./claims";
-import { Ledger, LedgerEntry, NO_RESULT, coerceArgs } from "./ledger";
-import { cpCompare, isMapping, pyDumps, pyQuote, pyStr, pyStrip, pyTruthy } from "./pystr";
+import { Ledger, LedgerEntry, NO_RESULT, asText, coerceArgs } from "./ledger";
+import { cpCompare, isMapping, pyQuote, pyStr, pyStrip, pyTruthy } from "./pystr";
 import type { Receipt } from "./receipt";
 import { type CheckOptions, acheck, check } from "./receipts";
 import type { Json } from "./types";
@@ -74,12 +75,14 @@ function rejectUnsupported(message: unknown): void {
   if (UNREAD_ITEM_TYPES.has(itemType as string)) {
     throw new TypeError(`${itemType as string} items are not supported yet; only function tool calls are read`);
   }
-  // Their tool calls sit in blocks this reader does not know, so skipping them would empty the
-  // ledger and turn an honest reply into `fabricated`.
+  // AI SDK 4 keeps `args` and `result` where 5 has `input` and `output`: reading on would lose the
+  // arguments and the result, so an honest reply could be judged on an empty call.
   for (const block of blocks(get(message, "content")) ?? []) {
     const blockType = get(block, "type");
-    if (blockType === "tool-call" || blockType === "tool-result") {
-      throw new TypeError(`Vercel AI SDK messages are not supported yet (a ${blockType} block); pass ${SUPPORTED}`);
+    const oldCall = blockType === "tool-call" && get(block, "input") === null && get(block, "args") !== null;
+    const oldResult = blockType === "tool-result" && get(block, "output") === null && get(block, "result") !== null;
+    if (oldCall || oldResult) {
+      throw new TypeError(`AI SDK 4 messages are not supported (a ${blockType} block with ${oldCall ? "args" : "result"}); AI SDK 5 and newer are read`);
     }
   }
   for (const call of blocks(get(message, "tool_calls")) ?? []) {
@@ -109,8 +112,8 @@ function idOf(value: unknown): string {
 }
 
 /** `[call id, tool name, args]` for every tool call the message carries: Chat Completions
- * `tool_calls`, a Responses `function_call` item, Anthropic `tool_use` blocks. A Responses item's
- * `id` is the item id, never the call id. */
+ * `tool_calls`, a Responses `function_call` item, Anthropic `tool_use` blocks, AI SDK `tool-call`
+ * parts. A Responses item's `id` is the item id, never the call id. */
 function calls(message: unknown): Array<[string, string, Record<string, Json>]> {
   const out: Array<[string, string, Record<string, Json>]> = [];
   for (const call of blocks(get(message, "tool_calls")) ?? []) {
@@ -127,19 +130,61 @@ function calls(message: unknown): Array<[string, string, Record<string, Json>]> 
     if (get(block, "type") === "tool_use" && typeof name === "string" && name !== "") {
       out.push([idOf(get(block, "id")), name, coerceArgs(get(block, "input"))]);
     }
+    const toolName = get(block, "toolName");
+    if (get(block, "type") === "tool-call" && typeof toolName === "string" && toolName !== "") {
+      out.push([idOf(get(block, "toolCallId")), toolName, coerceArgs(get(block, "input"))]);
+    }
   }
   return out;
 }
 
+/** A call the run has to settle itself: not one an AI SDK provider ran inside the same message. */
+function hasLocalCall(message: unknown): boolean {
+  const provider = (blocks(get(message, "content")) ?? []).filter(
+    (b) => get(b, "type") === "tool-call" && pyTruthy(get(b, "providerExecuted")),
+  );
+  return calls(message).length > provider.length;
+}
+
+/** `[text, isError]` of an AI SDK `tool-result` part's `output`. */
+function outputOf(output: unknown): [string, boolean] {
+  const type = get(output, "type");
+  const value = get(output, "value");
+  switch (type) {
+    case "text":
+    case "json":
+      return [asText(value) ?? "", false];
+    case "error-text":
+    case "error-json":
+      return [asText(value) ?? "", true];
+    case "execution-denied":
+      return [asText(get(output, "reason")) ?? "execution denied", true];
+    case "content":
+      return [text(value), false];
+    default:
+      return [asText(output) ?? "", false];
+  }
+}
+
 /** `[call id, text, isError]` for every tool result the message carries. Anthropic's `is_error`
- * is the only explicit failure flag. */
+ * and an AI SDK `output` of an error type are the only explicit failure flags. */
 function results(message: unknown): Array<[string, string, boolean]> {
   const out: Array<[string, string, boolean]> = [];
-  if (get(message, "role") === "tool") out.push([idOf(get(message, "tool_call_id")), text(get(message, "content")), false]);
+  // An AI SDK `tool` message holds parts with their own ids, read below.
+  const parts = blocks(get(message, "content")) ?? [];
+  const aiSdkParts = parts.some((b) => {
+    const type = get(b, "type");
+    return typeof type === "string" && type.startsWith("tool-");
+  });
+  if (get(message, "role") === "tool" && !aiSdkParts) out.push([idOf(get(message, "tool_call_id")), text(get(message, "content")), false]);
   if (get(message, "type") === "function_call_output") out.push([idOf(get(message, "call_id")), text(get(message, "output")), false]);
   for (const block of blocks(get(message, "content")) ?? []) {
     if (get(block, "type") === "tool_result") {
       out.push([idOf(get(block, "tool_use_id")), text(get(block, "content")), pyTruthy(get(block, "is_error"))]);
+    }
+    if (get(block, "type") === "tool-result") {
+      const [body, isError] = outputOf(get(block, "output"));
+      out.push([idOf(get(block, "toolCallId")), body, isError]);
     }
   }
   return out;
@@ -157,18 +202,6 @@ function shape(message: unknown): string {
     return `dict(keys: ${keys.sort(cpCompare).join(", ")})`;
   }
   return typeName(message);
-}
-
-/** A result or error as the ledger stores it: a string or `null` as is, anything else as JSON. */
-function asText(value: unknown): string | null {
-  if (value === null || value === undefined) return null;
-  if (typeof value === "string") return value;
-  try {
-    return pyDumps(value);
-  } catch {
-    // eslint-disable-next-line @typescript-eslint/no-base-to-string
-    return String(value);
-  }
 }
 
 /** A settled entry's timestamp: a number or `null`; anything else throws, because
@@ -273,7 +306,7 @@ export function ledgerFromMessages(messages: readonly unknown[]): Ledger {
  * or sits in it, else `""` (a run that ends on a tool call has no final reply). */
 export function finalReply(messages: readonly unknown[]): string {
   for (const message of runMessages(messages).reverse()) {
-    if (calls(message).length > 0 || settled(message) !== null) return "";
+    if (hasLocalCall(message) || settled(message) !== null) return "";
     if (get(message, "role") === "assistant") return text(get(message, "content"));
   }
   return "";
