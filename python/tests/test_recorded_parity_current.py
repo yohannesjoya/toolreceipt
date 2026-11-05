@@ -35,6 +35,11 @@ def test_demo_tools_fixture_is_current():
     assert _load(FIXTURES / "demo" / "tools.json") == expected, RE_RECORD
 
 
+def test_llm_parity_recording_is_current():
+    recorded = _load(FIXTURES / "recorded" / "parity_llm.json")
+    assert recorded == _script().build_llm(), RE_RECORD
+
+
 def test_parity_recording_is_current():
     recorded = _load(FIXTURES / "recorded" / "parity.json")
     tools = _load(FIXTURES / "demo" / "tools.json")

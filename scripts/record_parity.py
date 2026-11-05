@@ -3,7 +3,8 @@
 Writes ``fixtures/recorded/parity.json`` (``extract``, ``diff`` and ``check`` output for every
 case under ``fixtures/extractor``, ``fixtures/heldout``, ``fixtures/diff``, ``fixtures/check`` and
 the demo corpus, plus ``messages`` and ``turns`` output for ``fixtures/messages`` and
-``fixtures/turns``) and ``fixtures/demo/tools.json`` (the demo's tool specs, one list). Both files
+``fixtures/turns``), ``fixtures/recorded/parity_llm.json`` (the prompt, plus claims and receipts for
+every ``fixtures/llm`` case and every recorded probe output) and ``fixtures/demo/tools.json`` (the demo's tool specs, one list). Both files
 are generated only by this script; ``python/tests/test_recorded_parity_current.py`` fails when
 they are stale. Usage, from the repository root::
 
@@ -26,12 +27,14 @@ import toolreceipt  # noqa: E402
 from toolreceipt import Ledger, check  # noqa: E402
 from toolreceipt.claims import Claim, RuleExtractor, normalize_tool_specs  # noqa: E402
 from toolreceipt.diff import diff  # noqa: E402
+from toolreceipt.llm import PROMPT_V2, PROMPT_VERSION, LLMExtractor, build_prompt  # noqa: E402
 from toolreceipt.messages import check_messages, final_reply, ledger_from_messages  # noqa: E402
 from toolreceipt.turns import check_turns  # noqa: E402
 
 FIXTURES = ROOT / "fixtures"
 DEMO = ROOT / "demo"
 PARITY = FIXTURES / "recorded" / "parity.json"
+PARITY_LLM = FIXTURES / "recorded" / "parity_llm.json"
 DEMO_TOOLS = FIXTURES / "demo" / "tools.json"
 
 
@@ -130,6 +133,80 @@ def build(demo_tools: list[dict[str, str]] | None = None) -> dict[str, Any]:
     }
 
 
+def _replay(llm_output: str | None) -> LLMExtractor:
+    def complete(_prompt: str) -> str:
+        if llm_output is None:
+            raise RuntimeError("recorded call failed")
+        return llm_output
+
+    return LLMExtractor(complete=complete)
+
+
+def _llm_receipts(reply: str, ledger: Ledger, known: Any, output: str | None) -> dict[str, Any]:
+    def run(llm_blocks: bool) -> dict[str, Any]:
+        receipt = check(
+            reply, ledger, known_tools=known, extractor=_replay(output), llm_blocks=llm_blocks
+        )
+        return receipt.to_dict()
+
+    return {"default": run(False), "llm_blocks": run(True)}
+
+
+def build_llm() -> dict[str, Any]:
+    """The LLM recording: prompt, ``fixtures/llm`` and the recorded probe outputs."""
+    llm: list[dict[str, Any]] = []
+    for stem, case in _cases("llm"):
+        known = case["known_tools"]
+        names = [t["name"] for t in known]
+        ledgers = (
+            [case["ledger"]] if "ledger" in case
+            else [
+                [],
+                [{"tool": n, "status": "ok"} for n in names],
+                [{"tool": n, "status": "error", "error": "boom"} for n in names],
+            ]
+        )
+        claims = _replay(case["llm_output"]).extract(case["reply"], normalize_tool_specs(known))
+        llm.append({
+            "source": f"llm/{stem}",
+            "claims": [c.to_dict() for c in claims],
+            "receipts": [
+                _llm_receipts(case["reply"], Ledger.from_dict(ld), known, case["llm_output"])
+                for ld in ledgers
+            ],
+        })
+    probe: list[dict[str, Any]] = []
+    for name in ("dev", "heldout", "v01"):
+        for case in _load(FIXTURES / "probe" / f"{name}.recorded.json")["cases"]:
+            known, output = case["known_tools"], case["llm_output"]
+            claims = _replay(output).extract(case["reply"], normalize_tool_specs(known))
+            probe.append({
+                "source": f"probe/{name}#{case['id']}",
+                "claims": [c.to_dict() for c in claims],
+                **_llm_receipts(case["reply"], Ledger.from_dict(case["ledger"]), known, output),
+            })
+    tools = normalize_tool_specs([("send_email", "Send an email"), "issue_refund"])
+    return {
+        "prompt_version": PROMPT_VERSION,
+        "prompt": PROMPT_V2,
+        "built": build_prompt("Done {reply}", tools),
+        "llm": llm,
+        "probe": probe,
+    }
+
+
+def _dump_lines(data: dict[str, Any]) -> str:
+    """One key per line and one case per line, so a behaviour change gives a readable diff."""
+    parts: list[str] = []
+    for key, value in data.items():
+        if isinstance(value, list):
+            rows = ",\n".join(json.dumps(v, ensure_ascii=False) for v in value)
+            parts.append(f"{json.dumps(key)}: [\n{rows}\n]")
+        else:
+            parts.append(f"{json.dumps(key)}: {json.dumps(value, ensure_ascii=False)}")
+    return "{\n" + ",\n".join(parts) + "\n}\n"
+
+
 def _dump(data: Any) -> str:
     return json.dumps(data, indent=2, ensure_ascii=False) + "\n"
 
@@ -146,6 +223,10 @@ def main() -> int:
     }
     PARITY.parent.mkdir(parents=True, exist_ok=True)
     PARITY.write_text(_dump(recording), encoding="utf-8")
+    llm_recording = build_llm()
+    PARITY_LLM.write_text(_dump_lines(llm_recording), encoding="utf-8")
+    counts = f"llm {len(llm_recording['llm'])}, probe {len(llm_recording['probe'])}"
+    print(f"wrote {PARITY_LLM.relative_to(ROOT)} ({counts})")
     print(f"wrote {DEMO_TOOLS.relative_to(ROOT)} ({len(tools)} tools)")
     print(
         f"wrote {PARITY.relative_to(ROOT)} (extract {len(recording['extract'])}, "

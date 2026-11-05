@@ -51,7 +51,7 @@ const ONE_DIGIT = pyRegex("^\\d$");
 
 /** The clause the literals come from: the extractor's recorded clause, else the text. */
 function clauseText(claim: Claim): string {
-  const clause = claim.evidence().clause ?? claim.text;
+  const clause = claim.evidence().clause || claim.text;
   return dehyphen(normalizeLoose(clause));
 }
 

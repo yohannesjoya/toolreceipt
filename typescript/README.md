@@ -5,8 +5,8 @@ Catch LLM agents claiming actions they never took. This is the TypeScript port o
 JSON fixtures, same receipts.
 
 **Status:** not yet on npm. `check`, `diff`, the rule extractor, the argument check, message lists
-and per-turn receipts pass every shared fixture with the Python runners' assertions, and every
-recorded Python receipt matches. The LLM extractor and framework adapters follow.
+per-turn receipts and the LLM extractor pass every shared fixture with the Python runners'
+assertions, and every recorded Python receipt matches. Framework adapters follow.
 
 ## Install (from source, until the first npm release)
 
@@ -77,6 +77,47 @@ content lines with settled entries placed where the tool settled. Receipt *n* ch
 text against every tool call made before turn *n+1*. A `TurnReceipt` is a `Receipt` plus `turn`,
 `messageIndex` and `text`.
 
+## With an LLM extractor
+
+The default extractor is rules only: no key, no network, deterministic. It reads direct claims well
+("I've issued the refund") and misses outcome phrasing ("your refund is on its way"), synonyms
+outside its lexicon, status lines and other languages. Opt in to a model for those, through any
+client:
+
+```ts
+import OpenAI from "openai";
+import { LLMExtractor, acheckMessages } from "toolreceipt";
+
+const client = new OpenAI();
+const extractor = new LLMExtractor({
+  acomplete: async (prompt) => {
+    const res = await client.chat.completions.create({
+      model: "gpt-5",
+      messages: [{ role: "user", content: prompt }],
+    });
+    return res.choices[0]?.message.content ?? "";
+  },
+});
+
+const receipt = await acheckMessages(messages, { knownTools: tools, extractor });
+receipt.suspected; // claims only the LLM found, whose tool never ran
+```
+
+Use `acomplete` with the `acheck` functions, as JavaScript SDKs are async. `complete` takes a
+synchronous function for `check`, and `check` throws a `TypeError` if the extractor has only
+`acomplete`, or if `complete` returns a promise. `LLMExtractor.fromChatModel(model)` wraps a
+LangChain.js chat model and is async-only.
+
+The rules still run first and still decide `ok`: a claim only the LLM found lands in
+`receipt.suspected`, reported but not blocking, so two runs of the same reply block or pass the same
+way even though model output varies. Pass `llmBlocks: true` to let those claims make the verdict
+`fabricated`. On a provider error or unparsable output the extractor warns once, naming the error
+class, and falls back to the rules; `onError: "raise"` surfaces it instead. An `AbortError` always
+propagates. Every LLM claim must be a verbatim span of the reply and pass the same negation,
+conditional, other-subject and state checks as the rules; those checks are English only.
+
+The model sees the reply text and the tool names and descriptions, never the ledger.
+
 ## API
 
 | Export | What it is |
@@ -91,6 +132,7 @@ text against every tool call made before turn *n+1*. A `TurnReceipt` is a `Recei
 | `Claim` | One assertion in the reply: `text`, `verb`, `object`, `count`, `candidates`, `tool`, `confidence`, `reason`, `source`, `observed`. |
 | `Receipt` | `confirmed`, `claimedButNeverRan`, `unmatched`, `suspected`, `ranButUnreported`, `verdict`, `ok`, `summary`, `ledger`, `knownTools`. |
 | `RuleExtractor`, `ClaimExtractor` | The default deterministic extractor and the interface any extractor implements. |
+| `LLMExtractor`, `buildPrompt`, `parseOutput`, `messageText`, `PROMPT_VERSION` | The optional model-backed extractor and its pieces. |
 | `ToolSpec`, `normalizeToolSpecs` | A tool's `name` and `description`; accepts names, pairs, OpenAI-style tool dicts and tool objects. |
 | `renderSummary`, `loadLexicon`, `coerceArgs`, `truncate` | The summary line, a fresh copy of the bundled lexicon, and the ledger helpers. |
 
@@ -106,7 +148,8 @@ The repository's `fixtures/` directory is the contract. The TypeScript suite run
 `fixtures/descriptions`, `fixtures/messages` and `fixtures/turns` with the same assertions as the
 Python tests, the demo corpus gates, and `fixtures/recorded/parity.json`: the Python package's
 `extract`, `diff`, `check`, `messages` and `turns` output for every case, which the TypeScript
-output must match as JSON text. `lexicon.json` is edited in
+output must match as JSON text. `fixtures/recorded/parity_llm.json` does the same for the prompt, the
+`fixtures/llm` cases and the recorded probe outputs; no test calls a model. `lexicon.json` is edited in
 `python/` only and copied here by `scripts/sync_readme.py`.
 
 Python string and number semantics (its whitespace class, Unicode word boundaries, code-point
@@ -126,6 +169,8 @@ and `src/decimal.ts`. The accepted divergences, none reachable by a current fixt
 - Error messages name the JavaScript type, and `fromDict` throws `TypeError` where Python
   raises `KeyError`.
 - `acheck` awaits any `aextract` function.
+- `LLMExtractor` differs where JavaScript does: `fromChatModel` is async-only, `aextract` has no
+  thread, `acomplete` is not checked for being async, and model output holding `NaN` falls back.
 - `NaN` or `Infinity` in a tool call's `arguments` string is read by Python's `json.loads`; here
   the string lands in `{ input: ... }`, and `1e400` reads as `null`.
 - A class instance as `args`, `input` or `result` is read by its properties, where Python stores
@@ -138,7 +183,6 @@ and `src/decimal.ts`. The accepted divergences, none reachable by a current fixt
 
 ## Not yet ported
 
-- `LLMExtractor`
 - `Receipts` and live adapters (LangGraph.js, Vercel AI SDK)
 
 ## Development
