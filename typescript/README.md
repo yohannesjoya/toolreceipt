@@ -183,7 +183,7 @@ The model sees the reply text and the tool names and descriptions, never the led
 | `checkMessages`, `acheckMessages` | One receipt for the last run of a message list. |
 | `checkTurns`, `acheckTurns`, `TurnReceipt` | One receipt per assistant turn with text. |
 | `ledgerFromMessages`, `finalReply` | The two inputs `checkMessages` reads from a list. |
-| `Receipts` | One per agent: `wrapTools(tools)`, `ledger`, `check(reply, source?)`, `acheck(reply, source?)`. `source` is a `Ledger` or a record `wrapTools` returned. Options are `check`'s, plus `captureResults` (default `true`; `false` keeps arguments and results out of the ledger and turns off the argument check) and `maxResultChars` (default 2000). |
+| `Receipts` | One per agent: `wrapTools(tools)`, `ledger`, `check(reply, source?)`, `acheck(reply, source?)`. `source` is a `Ledger` or a record `wrapTools` returned. Options are `check`'s, plus `captureResults` (default `true`; `false` keeps arguments and results out of the ledger and turns off the argument check; an `Error`'s message is still stored, and any other thrown value is not) and `maxResultChars` (default 2000). |
 | `checkResult`, `acheckResult` | One receipt for a finished Vercel AI SDK run. |
 | `ledgerFromResult`, `finalReplyFromResult` | The two inputs `checkResult` reads from a run. |
 | `toolOptions(tools)` | `knownTools` and `unseenTools` from a Vercel AI SDK tools record. |

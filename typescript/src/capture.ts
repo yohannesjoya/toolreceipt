@@ -94,7 +94,10 @@ export class ToolCapture {
     const entry = this.close(call);
     if (entry === null) return;
     entry.status = "error";
-    entry.error = truncate(errorText(error), this.maxResultChars);
+    // With results off, a thrown object may hold what the caller asked to keep out. An `Error` keeps
+    // its message, as Python keeps its repr.
+    const text = this.captureResults || error instanceof Error ? errorText(error) : "non-Error thrown";
+    entry.error = truncate(text, this.maxResultChars);
   }
 
   /** Close every open call as `status: "error", error: "no result"`. */

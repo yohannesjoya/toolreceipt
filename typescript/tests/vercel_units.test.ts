@@ -128,6 +128,18 @@ describe("unseenTools", () => {
     expect(receipt.confirmed.map((c) => c.tool)).toEqual(["send_email"]);
   });
 
+  it("still reports a failed judged candidate, naming that tool", () => {
+    const ledger = Ledger.fromDict([{ tool: "send_email", status: "error", error: "smtp down" }]);
+    const receipt = check("I've sent the email.", ledger, { unseenTools: ["send_invoice_email"] });
+    expect(receipt.verdict).toBe("fabricated");
+    expect(receipt.claimedButNeverRan.map((c) => [c.tool, c.reason])).toEqual([["send_email", "tool_failed"]]);
+  });
+
+  it("does not accuse a judged candidate that never ran", () => {
+    const receipt = check("I've sent the email.", new Ledger(), { knownTools: ["send_email"], unseenTools: ["send_invoice_email"] });
+    expect(receipt.verdict).toBe("clean");
+  });
+
   it("works through acheck", async () => {
     expect((await acheck("I've refunded your order.", new Ledger(), { knownTools: ["issue_refund"], unseenTools })).verdict).toBe("clean");
   });

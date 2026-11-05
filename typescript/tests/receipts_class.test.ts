@@ -129,6 +129,17 @@ describe("wrapTools", () => {
     expect(receipts.ledger!.entries[0]!.error).toBe('{"code": 503}');
   });
 
+  it("does not serialise a thrown non-Error with captureResults off", async () => {
+    const receipts = new Receipts({ captureResults: false });
+    const thrown: unknown = { token: "secret" };
+    // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors
+    const wrapped = receipts.wrapTools({ t: { execute: () => Promise.reject(thrown) } });
+    await run(wrapped.t, {}, OPTIONS).catch(() => null);
+    const [entry] = receipts.ledger!.entries;
+    expect(entry!.status).toBe("error");
+    expect(entry!.error).toBe("non-Error thrown");
+  });
+
   it("records one entry per call, closed in the ledger with times in seconds", async () => {
     const receipts = new Receipts();
     const wrapped = receipts.wrapTools({ send_email: ok("sent") });

@@ -59,10 +59,13 @@ function finish(claims: Claim[], ledger: Ledger, judged: ToolSpec[], hidden: Set
     llmBlocks: options.llmBlocks,
     checkArgs: options.checkArgs,
   };
-  const ok = ledger.okTools();
+  // A candidate the ledger holds decides the claim. Otherwise an unseen candidate may have done the
+  // work, so the claim is not judged, even with a judged candidate that never ran.
+  const held = ledger.tools();
   const settled = hidden.size === 0 ? claims : claims.map((claim) => {
-    const unjudged = claim.candidates.some((c) => hidden.has(c)) && !claim.candidates.some((c) => ok.has(c));
-    return unjudged ? cloneClaim(claim, { candidates: [] }) : claim;
+    if (!claim.candidates.some((c) => hidden.has(c))) return claim;
+    const candidates = claim.candidates.some((c) => held.has(c)) ? claim.candidates.filter((c) => !hidden.has(c)) : [];
+    return cloneClaim(claim, { candidates });
   });
   return diff(settled, ledger, diffOptions);
 }
