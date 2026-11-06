@@ -19,7 +19,8 @@ npm install toolreceipt
 ```
 
 Zero runtime dependencies. ESM and CJS, type declarations included, Node 18+. LangChain.js itself needs
-Node 20+, so the adapter's real-package tests run on 20 and later.
+Node 20+, so the adapter's real-package tests run on 20 and later. The adapter needs `@langchain/core` 1.0 or
+later, and is tested on 1.3.5.
 
 ## Quickstart
 
@@ -240,7 +241,11 @@ The model sees the reply text and the tool names and descriptions, never the led
 | `checkMessages`, `acheckMessages` | One receipt for the last run of a message list. |
 | `checkTurns`, `acheckTurns`, `TurnReceipt` | One receipt per assistant turn with text. |
 | `ledgerFromMessages`, `finalReply` | The two inputs `checkMessages` reads from a list. |
-| `Receipts` | One per agent: `wrapTools(tools)`, `ledger`, `check(reply, source?)`, `acheck(reply, source?)`. `source` is a `Ledger` or a record `wrapTools` returned. Options are `check`'s, plus `captureResults` (default `true`; `false` keeps arguments and results out of the ledger and turns off the argument check; an `Error`'s message is still stored, and any other thrown value is not) and `maxResultChars` (default 2000). |
+| `Receipts` | One per agent: `wrapTools(tools)` or `config(base?)`, `ledger`, `check(reply, source?)`, `acheck(reply, source?)`. `source` is a `Ledger`, a record `wrapTools` returned or a config `config` returned. |
+| `ReceiptCallbackHandler` | The LangChain.js callback handler `config` adds: `ledger`, `knownTools`, `flush()`. |
+| `mergeConfig(base, handler)`, `ConfigWith` | Add a handler to a config; the type it returns. |
+| `toolSpecsFromInvocationParams(params)` | Bound tools from a chat model's `invocation_params`. |
+| `ledgerFromGraph`, `finalReplyFromGraph` | The two inputs `check` needs, from a finished LangGraph.js run. |
 | `checkResult`, `acheckResult` | One receipt for a finished Vercel AI SDK run. |
 | `ledgerFromResult`, `finalReplyFromResult` | The two inputs `checkResult` reads from a run. |
 | `toolOptions(tools)` | `knownTools` and `unseenTools` from a Vercel AI SDK tools record. |
@@ -304,8 +309,12 @@ and `src/decimal.ts`. The accepted divergences, none reachable by a current fixt
 - LangGraph.js adapter, on purpose or from how LangChain.js delivers events:
   - `ledgerFromGraph` and `finalReplyFromGraph` read only this turn and take a result or a list. Python's
     `ledger_from_messages` reads the whole thread, so an earlier turn's call can back a false claim.
-  - They and `checkMessages` throw on serialized messages, a missing `messages` list and non-LangChain items. Python
-    skips these, and an empty ledger misjudges the reply.
+  - They throw on serialized messages, a missing `messages` list and non-LangChain items, and `checkMessages` throws on
+    serialized messages. Python skips these, and an empty ledger misjudges the reply.
+  - `finalReplyFromGraph` joins text blocks as `checkMessages` does. Python's `final_reply` joins them with nothing, so
+    a negation in one block can swallow a claim in the next.
+  - A direct `tool.invoke(args, { runName })` with no tool call records the entry under `runName`, because LangChain.js
+    hands over no other name. With a tool call, the `ToolMessage` gives the real one.
   - An interrupted call records nothing until it finishes. Python records an `error` at each pause, then `ok`, with
     the same verdict.
   - A tool whose arguments fail its schema fires no event, so it has no entry and a known tool reads `not_called`.

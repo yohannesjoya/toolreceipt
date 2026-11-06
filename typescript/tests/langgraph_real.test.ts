@@ -337,6 +337,111 @@ describe.skipIf(nodeMajor < 20)("real LangChain.js", () => {
     });
   });
 
+  describe("review findings", () => {
+    const honest = "I've emailed you.";
+
+    const asToolEmail = async (fn: () => unknown = () => "sent") => {
+      const { RunnableLambda } = await import("@langchain/core/runnables");
+      return (RunnableLambda.from(fn) as any).asTool({ name: "send_email", description: "Send an email", schema: zod.z.object({}) });
+    };
+
+    it("records an asTool tool once, through ToolNode and createAgent", async () => {
+      const tool = await asToolEmail();
+      for (const build of [
+        () => graph([[{ name: "send_email", id: "c2" }], honest], [tool]),
+        () => agent([[{ name: "send_email", id: "c2" }], honest], [tool]),
+      ]) {
+        const receipts = new Receipts();
+        const config = receipts.config();
+        const result = await build().invoke(input(), config);
+        const receipt = receipts.check(finalReplyFromGraph(result), config);
+        expect(receipt.verdict).toBe("clean");
+        expect(receipt.ledger.entries.map((e) => [e.tool, e.status, e.callId, e.result])).toEqual([["send_email", "ok", "c2", "sent"]]);
+      }
+    });
+
+    it("records a failed asTool tool as a tool error", async () => {
+      const tool = await asToolEmail(() => { throw new Error("boom"); });
+      const receipts = new Receipts();
+      const config = receipts.config();
+      const result = await graph([[{ name: "send_email", id: "c2" }], honest], [tool]).invoke(input(), config);
+      const receipt = receipts.check(finalReplyFromGraph(result), config);
+      expect(receipt.verdict).toBe("fabricated");
+      expect(receipt.claimedButNeverRan[0]?.reason).toBe("tool_failed");
+    });
+
+    it("keeps an asTool tool's arguments, and pauses it at an interrupt", async () => {
+      const { RunnableLambda } = await import("@langchain/core/runnables");
+      const refundLike = (RunnableLambda.from(({ amount }: { amount: number }) => `refunded ${amount}`) as any).asTool({ name: "issue_refund", description: "Issue a refund", schema: zod.z.object({ amount: zod.z.number() }) });
+      const receipts = new Receipts();
+      const config = receipts.config();
+      const result = await graph([[refundCall], "I've refunded $32."], [refundLike]).invoke(input(), config);
+      expect(receipts.check(finalReplyFromGraph(result), config).verdict).toBe("clean");
+      expect(receipts.ledger?.entries[0]?.args).toEqual({ amount: 32 });
+
+      const paused = await asToolEmail(() => graphModule.interrupt("ok?") as unknown);
+      const app = graph([[{ name: "send_email", id: "c2" }], honest], [paused], undefined, { checkpointer: new graphModule.MemorySaver() });
+      const resumable = new Receipts();
+      const threaded = resumable.config({ configurable: { thread_id: "t" } });
+      await app.invoke(input(), threaded);
+      expect(resumable.ledger?.length).toBe(0);
+      await app.invoke(new graphModule.Command({ resume: "yes" }), threaded);
+      expect(resumable.ledger?.entries.map((e) => [e.tool, e.status])).toEqual([["send_email", "ok"]]);
+    });
+
+    it("records a real tool under withConfig once, invoked directly", async () => {
+      const handler = new ReceiptCallbackHandler(new Ledger());
+      await refund.withConfig({ tags: ["x"] }).invoke({ name: "issue_refund", args: { amount: 1 }, id: "d1", type: "tool_call" }, { callbacks: [handler] });
+      expect(handler.ledger.entries.map((e) => [e.tool, e.callId, e.status])).toEqual([["issue_refund", "d1", "ok"]]);
+    });
+
+    it("takes the tool's name from its ToolMessage when a call sets runName", async () => {
+      const { StateGraph, MessagesAnnotation, START, END } = graphModule;
+      const bound = model([[{ name: "send_email", id: "c2" }], honest]).bindTools([email]);
+      const app = new StateGraph(MessagesAnnotation)
+        .addNode("agent", async (state: any, config: any) => ({ messages: [await bound.invoke(state.messages, config)] }))
+        .addNode("tools", async (state: any, config: any) => ({
+          messages: await Promise.all(state.messages.at(-1).tool_calls.map((call: any) => email.invoke({ ...call, type: "tool_call" }, { ...config, runName: "tool-step" }))),
+        }))
+        .addEdge(START, "agent")
+        .addConditionalEdges("agent", (state: any) => (state.messages.at(-1).tool_calls?.length ? "tools" : END))
+        .addEdge("tools", "agent")
+        .compile();
+      const receipts = new Receipts();
+      const config = receipts.config();
+      const result = await app.invoke(input(), config);
+      const receipt = receipts.check(finalReplyFromGraph(result), config);
+      expect(receipt.verdict).toBe("clean");
+      expect(receipt.ledger.entries.map((e) => e.tool)).toEqual(["send_email"]);
+      expect(receipt.knownTools).not.toContain("tool-step");
+    });
+
+    it("keeps a negation from swallowing a separate text block's claim", () => {
+      const messages = [
+        new core.HumanMessage("x"),
+        new core.AIMessage({ content: [{ type: "text", text: "I have not looked yet " }, { type: "text", text: "\u2705 I've refunded your order." }] }),
+      ];
+      expect(finalReplyFromGraph(messages)).toBe("I have not looked yet \n\u2705 I've refunded your order.");
+      expect(check(finalReplyFromGraph(messages), ledgerFromGraph(messages), { knownTools: ["issue_refund"] }).verdict).toBe("fabricated");
+      const split = [new core.AIMessage({ content: [{ type: "text", text: "I have not " }, { type: "text", text: "refunded your order yet." }] })];
+      expect(finalReplyFromGraph(split)).toBe("I have not refunded your order yet.");
+    });
+
+    it("records a tool that hands a Command to its parent graph", async () => {
+      const { StateGraph, MessagesAnnotation, START, END, Command } = graphModule;
+      const handoff = toolsModule.tool((_: unknown, cfg: any) => new Command({ graph: Command.PARENT, goto: "after", update: { messages: [new core.ToolMessage({ content: "handed off", tool_call_id: cfg.toolCall.id })] } }), { name: "hand_off", description: "Hand off", schema: zod.z.object({}) });
+      const outer = new StateGraph(MessagesAnnotation)
+        .addNode("sub", graph([[{ name: "hand_off", id: "h1" }]], [handoff]), { ends: ["after"] })
+        .addNode("after", () => ({ messages: [new core.AIMessage("Done.")] }))
+        .addEdge(START, "sub")
+        .addEdge("after", END)
+        .compile();
+      const receipts = new Receipts();
+      await outer.invoke(input(), receipts.config());
+      expect(receipts.ledger?.entries.map((e) => [e.tool, e.status, e.callId])).toEqual([["hand_off", "ok", "h1"]]);
+    });
+  });
+
   describe("tools and messages", () => {
     it("falls back to the run id on a direct invoke", async () => {
       const handler = new ReceiptCallbackHandler(new Ledger());

@@ -244,15 +244,14 @@ fallbacks of `normalizeToolSpecs` and `coerceArgs` use `String()`; `acheck` awai
 read by its properties where Python stores its `str()`, a `Date` stores its ISO string, a `Set` a
 list and a bigint result a quoted string; a call id that is an object prints as JSON where Python
 prints its `repr()`; a very deep `arguments` string or a `type` that is a list or object gives a
-receipt where Python raises a raw error; the LangChain error names no adapter, since the package
-has none yet; `LLMExtractor.fromChatModel` is async-only because LangChain.js `invoke` returns a
+receipt where Python raises a raw error; `LLMExtractor.fromChatModel` is async-only because LangChain.js `invoke` returns a
 promise, `aextract` runs no thread, `acomplete` is not checked for being async, model output holding
 `NaN` or `Infinity` falls back because `JSON.parse` rejects it, model output nested 100,000 levels
 deep parses where Python falls back, and a custom `time_markers` or `llm_exclusions` entry must be a
 valid JavaScript regular expression; Vercel AI SDK model messages are read, where Python skips those
 unknown blocks, because a JavaScript caller is likely to pass them and an empty ledger would accuse
-an honest reply; `Receipts` captures by wrapping `execute` where Python injects a LangChain callback,
-and a thrown error is stored as `String(error)` where Python stores its `repr()`.
+an honest reply; `Receipts` also captures by wrapping `execute`, which Python does not need, and a
+thrown error is stored as `String(error)` where Python stores its `repr()`.
 
 ## A tool with no `execute` is unseen, not known
 
@@ -304,3 +303,9 @@ pause and then `ok`, and `ok` wins in `diff`.
 The handler sets `awaitHandlers = true`. LangChain.js runs handlers in the background by default, so
 `invoke` can resolve before a tool's end event, and `check` would then flush an open call to `no result` and
 read an honest reply as `fabricated`.
+
+The handler also reads chain events, because a tool from `asTool` is a runnable and fires no tool event.
+Without them, a tool that ran reads `fabricated`. It opens an entry only for a run that takes a tool call
+and bears the tool's name. The name comes from `runName`, since `serialized` has none, and a `ToolMessage`
+corrects it, because a caller can set `runName` as a trace label. `finalReplyFromGraph` joins text blocks as
+`checkMessages` does; Python's `final_reply` does not, and that is a follow-up.

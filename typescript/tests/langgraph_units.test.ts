@@ -219,6 +219,82 @@ describe("ReceiptCallbackHandler", () => {
   });
 });
 
+describe("ReceiptCallbackHandler chain events", () => {
+  const call = { name: "send_email", args: { to: "a" }, type: "tool_call", id: "c2" };
+  const chainStart = (h: ReceiptCallbackHandler, run: string, inputs: unknown, runName?: string) => {
+    h.handleChainStart({}, inputs, run, "parent", undefined, undefined, undefined, runName);
+  };
+
+  it("opens a call only for a tool call whose run bears its name", () => {
+    const handler = new ReceiptCallbackHandler(new Ledger());
+    chainStart(handler, "other", { messages: [] }, "agent");
+    chainStart(handler, "parse", call, "send_email:parse_input");
+    chainStart(handler, "named", { ...call, id: "c3" });
+    handler.flush();
+    expect(handler.ledger.length).toBe(0);
+    chainStart(handler, "run", call, "send_email");
+    handler.handleChainEnd({ output: "sent" }, "run");
+    const [entry] = handler.ledger.entries;
+    expect([entry?.tool, entry?.args, entry?.callId, entry?.result, entry?.parentRunId]).toEqual(["send_email", { to: "a" }, "c2", "sent", "parent"]);
+  });
+
+  it("ignores the end and error of a chain it did not open", () => {
+    const handler = new ReceiptCallbackHandler(new Ledger());
+    handler.handleChainEnd({ output: "x" }, "unknown");
+    handler.handleChainError(new Error("x"), "unknown");
+    expect(handler.ledger.length).toBe(0);
+  });
+
+  it("leaves a real tool's own event to record the call", () => {
+    const handler = new ReceiptCallbackHandler(new Ledger());
+    chainStart(handler, "binding", call, "send_email");
+    handler.handleToolStart({}, '{"to":"a"}', "tool", "binding", undefined, undefined, "send_email", "c2");
+    handler.handleToolEnd("sent", "tool");
+    handler.handleChainEnd({ output: "sent" }, "binding");
+    expect(handler.ledger.entries.map((e) => e.callId)).toEqual(["c2"]);
+  });
+
+  it("reads a failure and a ToolMessage, and removes a pause", () => {
+    const handler = new ReceiptCallbackHandler(new Ledger());
+    chainStart(handler, "a", { ...call, id: "a" }, "send_email");
+    handler.handleChainError(new Error("boom"), "a");
+    chainStart(handler, "b", { ...call, id: "b" }, "send_email");
+    handler.handleChainEnd(toolMessage("denied", "b", "error"), "b");
+    chainStart(handler, "c", { ...call, id: "c" }, "send_email");
+    handler.handleChainError(Object.assign(new Error("x"), { name: "GraphInterrupt" }), "c");
+    handler.flush();
+    expect(handler.ledger.entries.map((e) => [e.callId, e.status, e.error])).toEqual([["a", "error", "Error: boom"], ["b", "error", "denied"]]);
+  });
+
+  it("never throws on a broken payload", () => {
+    const handler = new ReceiptCallbackHandler(new Ledger());
+    const broken = new Proxy({}, { get() { throw new Error("broken"); } });
+    chainStart(handler, "x", broken, "send_email");
+    chainStart(handler, "run", call, "send_email");
+    handler.handleChainEnd(broken, "run");
+    expect(handler.ledger.entries.map((e) => [e.status, e.result])).toEqual([["ok", null]]);
+  });
+});
+
+describe("ReceiptCallbackHandler tool names", () => {
+  it("prefers the ToolMessage's name, and drops a run label from the known tools", () => {
+    const handler = new ReceiptCallbackHandler(new Ledger());
+    start(handler, "r1", "tool-step", "{}", "c1");
+    handler.handleToolEnd({ ...toolMessage("sent", "c1"), name: "send_email" }, "r1");
+    expect(handler.ledger.entries[0]?.tool).toBe("send_email");
+    expect([...handler.knownTools.keys()]).toEqual(["send_email"]);
+  });
+
+  it("keeps a known tool's description, and the call id when the message's is empty", () => {
+    const handler = new ReceiptCallbackHandler(new Ledger());
+    handler.handleChatModelStart({}, [], "m", undefined, { invocation_params: { tools: [{ name: "send_email", description: "Send" }] } });
+    start(handler, "r1", "send_email", "{}", "c1");
+    handler.handleToolEnd({ ...toolMessage("sent", ""), name: "send_email" }, "r1");
+    expect(handler.ledger.entries[0]?.callId).toBe("c1");
+    expect([...handler.knownTools]).toEqual([["send_email", "Send"]]);
+  });
+});
+
 describe("mergeConfig", () => {
   class Manager {
     handlers: unknown[] = [];
@@ -401,6 +477,11 @@ describe("finalReplyFromGraph", () => {
     const result = toolMessage("ok", "c1");
     expect(finalReplyFromGraph([human("x"), FINAL, CALLS, result])).toBe("");
     expect(finalReplyFromGraph([human("x"), CALLS, result, FINAL])).toBe(FINAL.content);
+  });
+
+  it("joins text blocks as checkMessages does", () => {
+    const blocks = [{ type: "text", text: "I have not looked yet " }, { type: "text", text: "\u2705 I've refunded your order." }];
+    expect(finalReplyFromGraph([{ type: "ai", content: blocks, text: blocks.map((b) => b.text).join("") }])).toBe("I have not looked yet \n\u2705 I've refunded your order.");
   });
 
   it("skips an empty AI message", () => {

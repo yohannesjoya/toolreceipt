@@ -1,26 +1,23 @@
 /**
- * LangGraph.js and LangChain.js: a callback handler for live runs, and a reader for finished ones
- * (port of langgraph.py). Everything is duck-typed, so no framework is imported and `dependencies` stays
- * empty. The differences from Python are in the README; each comes from how LangChain.js delivers events.
+ * LangGraph.js and LangChain.js: the callback handler for live runs (port of langgraph.py). Everything
+ * is duck-typed, so no framework is imported and `dependencies` stays empty. The differences from Python
+ * are in the README; each comes from how LangChain.js delivers events. `graph_messages.ts` reads finished runs.
  */
 
 import { ToolCapture } from "./capture";
 import { ToolSpec, typeName } from "./claims";
-import { Ledger, LedgerEntry, NO_RESULT, coerceArgs } from "./ledger";
+import type { Ledger, LedgerEntry } from "./ledger";
 import { messageText } from "./llm";
-import { SERIALIZED_LANGCHAIN, isSerializedLangChain } from "./messages";
-import { pyStrip } from "./pystr";
 
-const MESSAGE_TYPES = new Set(["ai", "human", "tool", "system", "remove", "generic", "developer", "function"]);
 /** Thrown by `interrupt()` and a drained graph. The tool did not fail: it paused, and reruns on resume. */
 const PAUSE_NAMES = new Set(["GraphInterrupt", "NodeInterrupt", "GraphDrained"]);
 
-function isObject(value: unknown): value is Record<string, unknown> {
+export function isObject(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object";
 }
 
 /** The message's `ai`, `tool` or other type, or `null`. Before @langchain/core 1.0 only `_getType()` has it. */
-function kindOf(message: unknown): string | null {
+export function kindOf(message: unknown): string | null {
   if (!isObject(message)) return null;
   if (typeof message._getType === "function") {
     const kind: unknown = (message._getType as () => unknown).call(message);
@@ -84,6 +81,16 @@ function parseInput(input: unknown): unknown {
   }
 }
 
+/** Chain events wrap a value that is not an object as `{ output }`. */
+function unwrapOutput(outputs: unknown): unknown {
+  try {
+    if (isObject(outputs) && Object.keys(outputs).length === 1 && "output" in outputs) return outputs.output;
+  } catch {
+    // Read on as it came: `handleToolEnd` copes with what it cannot read.
+  }
+  return outputs;
+}
+
 export interface ReceiptCallbackHandlerOptions {
   captureResults?: boolean | undefined;
   maxResultChars?: number | undefined;
@@ -101,6 +108,7 @@ export class ReceiptCallbackHandler {
   readonly ledger: Ledger;
   /** @internal */
   readonly capture: ToolCapture;
+  private readonly runnableCalls = new Map<string, string>();
 
   constructor(ledger: Ledger, options: ReceiptCallbackHandlerOptions = {}) {
     this.ledger = ledger;
@@ -137,18 +145,22 @@ export class ReceiptCallbackHandler {
       // Still open an entry below: a call is never missing from the ledger.
     }
     this.addKnown(name, description);
-    this.capture.start(runId, name, parseInput(input), typeof toolCallId === "string" && toolCallId !== "" ? toolCallId : runId, parentRunId ?? null);
+    const callId = typeof toolCallId === "string" && toolCallId !== "" ? toolCallId : runId;
+    // A real tool inside a binding fires both kinds of event: its own event records the call.
+    const runnable = this.runnableCalls.get(callId);
+    if (runnable !== undefined) this.capture.discard(runnable);
+    this.capture.start(runId, name, parseInput(input), callId, parentRunId ?? null);
   }
 
   handleToolEnd(output: unknown, runId: string): void {
     let read: unknown = null;
     let failed = false;
-    let callId: string | null = null;
     try {
-      const message = toolMessageFrom(output, this.capture.callId(runId));
+      const entry = this.capture.openEntry(runId);
+      const message = toolMessageFrom(output, entry?.callId ?? null);
       if (isToolMessage(message)) {
         failed = message.status === "error";
-        callId = message.tool_call_id as string;
+        if (entry !== undefined) this.correct(entry, message);
         read = messageText(message);
       } else {
         read = message;
@@ -157,13 +169,46 @@ export class ReceiptCallbackHandler {
       // The tool returned but its output cannot be read: it ran, with no result.
       read = null;
     }
-    if (failed) this.capture.report(runId, typeof read === "string" ? read : "", callId);
-    else this.capture.finish(runId, read, callId);
+    if (failed) this.capture.report(runId, typeof read === "string" ? read : "");
+    else this.capture.finish(runId, read);
+  }
+
+  /** A `ToolMessage` knows the call better than the start event: `runName` can be a caller's trace label. */
+  private correct(entry: LedgerEntry, message: Record<string, unknown>): void {
+    const { name, tool_call_id: callId } = message;
+    if (typeof callId === "string" && callId !== "") entry.callId = callId;
+    if (typeof name !== "string" || name === "" || name === entry.tool) return;
+    if (this.knownTools.get(entry.tool) === "") this.knownTools.delete(entry.tool);
+    entry.tool = name;
+    this.addKnown(name, "");
   }
 
   handleToolError(error: unknown, runId: string): void {
     if (isPause(error)) this.capture.discard(runId);
     else this.capture.fail(runId, error);
+  }
+
+  /** A tool from `asTool` is a runnable, so it fires chain events and no tool events. Its run takes a tool
+   * call as input and bears the tool's name; `name:parse_input` and the graph's own nodes do not. */
+  handleChainStart(_chain: unknown, inputs: unknown, runId: string, parentRunId?: string, _tags?: string[], _metadata?: Record<string, unknown>, _runType?: string, runName?: string): void {
+    try {
+      if (!isObject(inputs) || inputs.type !== "tool_call" || typeof inputs.name !== "string" || inputs.name !== runName) return;
+      const callId = typeof inputs.id === "string" && inputs.id !== "" ? inputs.id : runId;
+      this.addKnown(inputs.name, "");
+      this.capture.start(runId, inputs.name, inputs.args, callId, parentRunId ?? null);
+      this.runnableCalls.set(callId, runId);
+    } catch {
+      // A broken payload is not a tool call this handler can name.
+    }
+  }
+
+  handleChainEnd(outputs: unknown, runId: string): void {
+    if (this.capture.openEntry(runId) === undefined) return;
+    this.handleToolEnd(unwrapOutput(outputs), runId);
+  }
+
+  handleChainError(error: unknown, runId: string): void {
+    if (this.capture.openEntry(runId) !== undefined) this.handleToolError(error, runId);
   }
 
   /** Close every open call as `status: "error", error: "no result"`. */
@@ -172,12 +217,14 @@ export class ReceiptCallbackHandler {
   }
 }
 
-/** `T` with a callback handler added: a manager stays a manager, and anything else is a list. */
-export type ConfigWith<T> = Omit<T, "callbacks"> & {
-  callbacks: T extends { callbacks: readonly (infer H)[] } ? Array<H | ReceiptCallbackHandler>
-    : T extends { callbacks: infer M extends object } ? M
-    : ReceiptCallbackHandler[];
-};
+type Callbacks<T> = T extends { callbacks: readonly (infer H)[] } ? Array<H | ReceiptCallbackHandler>
+  : T extends { callbacks: infer M extends object } ? M
+  : T extends { callbacks?: infer C } ? (unknown extends C ? ReceiptCallbackHandler[] : Exclude<C, undefined> | ReceiptCallbackHandler[])
+  : ReceiptCallbackHandler[];
+
+/** `T` with a callback handler added: a manager stays a manager, and anything else is a list. An
+ * optional `callbacks`, as on `RunnableConfig`, may be either. */
+export type ConfigWith<T> = Omit<T, "callbacks"> & { callbacks: Callbacks<T> };
 
 /** A shallow copy of `base` with `handler` added. A manager is copied, so the caller's is not changed. */
 export function mergeConfig<T extends object = object>(base: T | null | undefined, handler: ReceiptCallbackHandler): ConfigWith<T> {
@@ -196,80 +243,4 @@ export function mergeConfig<T extends object = object>(base: T | null | undefine
     throw new TypeError(`config.callbacks must be a list of handlers or a CallbackManager, got ${typeName(callbacks)}`);
   }
   return merged as ConfigWith<T>;
-}
-
-/** The messages of this turn: those after the last human message. A checkpointed result holds the whole
- * thread, and an earlier turn's call would back a claim this turn never acted on. Anything unreadable
- * throws: an empty ledger would misjudge the reply. */
-function turnOf(source: unknown): unknown[] {
-  const messages: unknown = isObject(source) && !Array.isArray(source) ? source.messages : source;
-  if (!Array.isArray(messages)) {
-    throw new TypeError(`expected a list of LangChain messages or a result with a messages list, got ${typeName(source)}`);
-  }
-  let start = 0;
-  (messages as unknown[]).forEach((message, i) => {
-    if (isSerializedLangChain(message)) throw new TypeError(SERIALIZED_LANGCHAIN);
-    const kind = kindOf(message);
-    const readable = isObject(message) && (typeof message._getType === "function" || (MESSAGE_TYPES.has(kind as string) && "content" in message));
-    if (!readable) throw new TypeError(`expected a LangChain message, got ${typeName(message)}; for OpenAI, Anthropic and AI SDK messages use checkMessages`);
-    if (kind === "human") start = i + 1;
-  });
-  return (messages as unknown[]).slice(start);
-}
-
-function toolCallsOf(message: unknown): Array<Record<string, unknown>> {
-  const calls = (message as { tool_calls?: unknown }).tool_calls;
-  return Array.isArray(calls) ? (calls as unknown[]).filter(isObject) : [];
-}
-
-/**
- * A ledger from a finished run's messages: each tool call paired with its `ToolMessage`. A call with no
- * result is an error, `"no result"`. Takes a graph result or its `messages`, and reads this turn only.
- */
-export function ledgerFromGraph(source: unknown): Ledger {
-  const entries: LedgerEntry[] = [];
-  const open = new Map<string, LedgerEntry>();
-  for (const message of turnOf(source)) {
-    const kind = kindOf(message);
-    if (kind === "ai") {
-      for (const call of toolCallsOf(message)) {
-        const callId = typeof call.id === "string" && call.id !== "" ? call.id : null;
-        const entry = new LedgerEntry({ tool: typeof call.name === "string" ? call.name : "unknown", status: "error", args: coerceArgs(call.args), error: NO_RESULT, callId });
-        entries.push(entry);
-        if (callId !== null) open.set(callId, entry);
-      }
-    } else if (kind === "tool") {
-      const callId = (message as { tool_call_id?: unknown }).tool_call_id as string;
-      const matched = open.get(callId);
-      if (matched === undefined) continue;
-      open.delete(callId);
-      const text = messageText(message);
-      if ((message as { status?: unknown }).status === "error") {
-        matched.error = text;
-      } else {
-        matched.status = "ok";
-        matched.error = null;
-        matched.result = text;
-      }
-    }
-  }
-  return new Ledger(entries);
-}
-
-/**
- * The text of this turn's last AI message with text, or `""` when the run ends on a tool call: that
- * message carries `tool_calls`, or a call or a `ToolMessage` follows it. Takes a graph result or its
- * `messages`.
- */
-export function finalReplyFromGraph(source: unknown): string {
-  for (const message of turnOf(source).reverse()) {
-    const kind = kindOf(message);
-    if (kind === "tool") return "";
-    if (kind === "ai") {
-      if (toolCallsOf(message).length > 0) return "";
-      const text = messageText(message);
-      if (pyStrip(text) !== "") return text;
-    }
-  }
-  return "";
 }

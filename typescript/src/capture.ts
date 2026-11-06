@@ -83,9 +83,9 @@ export class ToolCapture {
     }));
   }
 
-  /** The id of an open call, or `null` when the key has none. */
-  callId(key: unknown): string | null {
-    return this.inFlight.get(key)?.callId ?? null;
+  /** The entry of an open call, for a reader that learns its real name or id before it closes. */
+  openEntry(key: unknown): LedgerEntry | undefined {
+    return this.inFlight.get(key);
   }
 
   private close(key: unknown): LedgerEntry | null {
@@ -97,18 +97,16 @@ export class ToolCapture {
     return entry;
   }
 
-  finish(key: unknown, output: unknown, callId: string | null = null): void {
+  finish(key: unknown, output: unknown): void {
     const entry = this.close(key);
     if (entry === null) return;
-    if (callId !== null) entry.callId = callId;
     if (this.captureResults) entry.result = truncate(asText(output), this.maxResultChars);
   }
 
   /** Close a call whose tool returned a failure. Its text is tool output, so results off keeps it out. */
-  report(key: unknown, text: string, callId: string | null = null): void {
+  report(key: unknown, text: string): void {
     const entry = this.close(key);
     if (entry === null) return;
-    if (callId !== null) entry.callId = callId;
     entry.status = "error";
     entry.error = this.captureResults ? truncate(text, this.maxResultChars) : "tool reported an error";
   }

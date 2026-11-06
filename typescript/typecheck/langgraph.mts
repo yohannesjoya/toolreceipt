@@ -22,6 +22,13 @@ export const managed: CallbackManager = receipts.config({ callbacks: new Callbac
 export const direct: RunnableConfig = { callbacks: [new ReceiptCallbackHandler(new Ledger())] };
 export const merged: RunnableConfig = mergeConfig({ tags: ["x"] }, new ReceiptCallbackHandler(new Ledger()));
 
+export function forwarded(base: RunnableConfig): RunnableConfig {
+  const merged = receipts.config(base);
+  // @ts-expect-error A forwarded config's `callbacks` may be a manager, so it cannot be indexed unchecked.
+  void merged.callbacks[0];
+  return merged;
+}
+
 export async function run(): Promise<string> {
   const result = await graph.invoke({ messages: [] }, config);
   await graph.invoke({ messages: [] }, threaded);
