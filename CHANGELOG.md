@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## TypeScript
 
+### [0.2.0] - 2026-11-06
+
+The package now has every public feature of the Python package.
+
+#### Added
+
+- LangGraph.js and LangChain.js adapter, with no new dependency: `Receipts.config()`, a config as
+  the `check` source, `ReceiptCallbackHandler`, `mergeConfig`, `toolSpecsFromInvocationParams`,
+  `ledgerFromGraph` and `finalReplyFromGraph`. Tested against the real `@langchain/core`,
+  `@langchain/langgraph`, `langchain`, `@langchain/openai` and `@langchain/anthropic`.
+
+#### Changed
+
+- `Receipts` error messages name `config()` beside `wrapTools()`, and the LangChain error from
+  `checkMessages` names `ledgerFromGraph`.
+
+#### Fixed
+
+- `checkMessages` and `checkTurns` no longer read serialized LangChain messages as an empty run, which
+  turned a false reply `clean`. They throw a `TypeError` naming `mapStoredMessagesToChatMessages`.
+- `scripts/smoke.mjs` no longer crashes under `npm publish --dry-run`.
+
 ### [0.1.0] - 2026-11-05
 
 First npm release.

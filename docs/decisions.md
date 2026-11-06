@@ -281,3 +281,26 @@ the join, and a next block that opens with a lowercase letter. Anything else kee
 the negation swallow a real claim. Three costs remain, because nothing in the text decides them. A split
 inside a word, or before a capital, digit or symbol, can read an honest reply as `fabricated`. A lowercase
 `"i've refunded it"` after an open negation joins, and that false claim is missed.
+
+## The LangGraph.js adapter is duck-typed and differs from Python where Python would misreport
+
+The adapter is exported from the package root and imports nothing from `@langchain/*`, so
+`dependencies` stays empty and nothing can fail at install, as with the Vercel AI SDK readers. The names
+carry `Graph` because the root already exports `ledgerFromMessages` and `finalReply` for other shapes.
+
+`ledgerFromGraph` and `finalReplyFromGraph` read only the messages after the last human message. A
+checkpointed result holds the whole thread, and reading it all lets a call from turn 1 back a false
+claim in turn 2. Python's `ledger_from_messages` reads the whole thread; changing it is a follow-up. The
+cost: a node that injects a `HumanMessage` mid-run cuts the ledger there.
+
+They also throw on serialized messages, on a result with no `messages` list and on items that are not
+LangChain messages, because an empty ledger misjudges the reply. `checkMessages` gains the serialized
+check, which closes a false `clean` in 0.1.0.
+
+An error with `is_bubble_up`, or named `GraphInterrupt`, `NodeInterrupt` or `GraphDrained`, removes the open
+call and records nothing. This is for ledger accuracy, not the verdict: Python records an `error` at each
+pause and then `ok`, and `ok` wins in `diff`.
+
+The handler sets `awaitHandlers = true`. LangChain.js runs handlers in the background by default, so
+`invoke` can resolve before a tool's end event, and `check` would then flush an open call to `no result` and
+read an honest reply as `fabricated`.
