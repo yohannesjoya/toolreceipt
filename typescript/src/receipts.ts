@@ -3,6 +3,7 @@
 import { ToolCapture, wrapToolRecord } from "./capture";
 import { type Claim, type ClaimExtractor, RuleExtractor, type ToolLike, ToolSpec, cloneClaim, normalizeToolSpecs } from "./claims";
 import { type DiffOptions, diff } from "./diff";
+import { type ConfigWith, ReceiptCallbackHandler, mergeConfig } from "./langgraph";
 import { Ledger, LedgerEntry } from "./ledger";
 import { cpCompare } from "./pystr";
 import type { Receipt } from "./receipt";
@@ -100,7 +101,7 @@ export interface ReceiptsOptions extends CheckOptions {
   maxResultChars?: number | undefined;
 }
 
-/** One per agent: `wrapTools()` before the run, `check()` on the final reply. */
+/** One per agent: `wrapTools()` or `config()` before the run, `check()` on the final reply. */
 export class Receipts {
   private readonly options: CheckOptions;
   private readonly known: ToolSpec[];
@@ -109,7 +110,7 @@ export class Receipts {
   private readonly maxResultChars: number;
   private readonly runs = new WeakMap<object, ToolCapture>();
   private current: ToolCapture | null = null;
-  private wrapCount = 0;
+  private runCount = 0;
 
   constructor(options: ReceiptsOptions = {}) {
     this.known = normalizeToolSpecs(options.knownTools ?? []);
@@ -134,24 +135,55 @@ export class Receipts {
     const wrapped = wrapToolRecord(tools, capture);
     this.runs.set(wrapped, capture);
     this.current = capture;
-    this.wrapCount++;
+    this.runCount++;
     return wrapped;
   }
 
-  /** The newest run's ledger, or `null` before `wrapTools()`. To read a run's receipt with more than
-   * one run, pass its record to `check()`. */
+  /**
+   * `base` with a new callback handler added, for one run of a LangGraph.js graph: pass it to `invoke`
+   * or `stream`. Reuse it for every `invoke` of that run, a resume included: a new one on resume has
+   * no record of the calls before the pause. After a second call, `check()` needs the config this
+   * returned, so one request can never read another's ledger.
+   */
+  config<T extends object = object>(base?: T | null): ConfigWith<T> {
+    const handler = new ReceiptCallbackHandler(new Ledger(), { captureResults: this.captureResults, maxResultChars: this.maxResultChars });
+    this.runs.set(handler, handler.capture);
+    this.current = handler.capture;
+    this.runCount++;
+    return mergeConfig(base, handler);
+  }
+
+  /** The newest run's ledger, or `null` before `wrapTools()` or `config()`. To read a run's receipt
+   * with more than one run, pass its record or config to `check()`. */
   get ledger(): Ledger | null {
     return this.current === null ? null : this.current.ledger;
   }
 
   private captureFor(source: object | null | undefined): ToolCapture {
     if (source === null || source === undefined) {
-      if (this.current === null) throw new TypeError("no ledger: call wrapTools() before the run or pass a ledger");
-      if (this.wrapCount > 1) throw new TypeError("wrapTools() was called more than once: pass the record it returned for this run");
+      if (this.current === null) throw new TypeError("no ledger: call wrapTools() or config() before the run, or pass a ledger");
+      if (this.runCount > 1) throw new TypeError("this instance has more than one run: pass the record wrapTools() or the config config() returned for this one");
       return this.current;
     }
-    const capture = this.runs.get(source);
-    if (capture === undefined) throw new TypeError("source is not a Ledger or a record this instance's wrapTools() returned");
+    return this.runs.get(source) ?? this.captureFromConfig(source);
+  }
+
+  /** The run of the one receipt handler in `config.callbacks`, so a spread config still finds it. */
+  private captureFromConfig(config: object): ToolCapture {
+    const callbacks = (config as { callbacks?: unknown }).callbacks;
+    if (callbacks === null || typeof callbacks !== "object") {
+      throw new TypeError("source is not a Ledger, a record this instance's wrapTools() returned or a config its config() returned");
+    }
+    const manager = callbacks as { handlers?: unknown; inheritableHandlers?: unknown };
+    const all: unknown[] = Array.isArray(callbacks)
+      ? (callbacks as unknown[])
+      : [...(Array.isArray(manager.handlers) ? (manager.handlers as unknown[]) : []), ...(Array.isArray(manager.inheritableHandlers) ? (manager.inheritableHandlers as unknown[]) : [])];
+    const found = [...new Set(all)].filter((h): h is ReceiptCallbackHandler => h instanceof ReceiptCallbackHandler);
+    const [handler] = found;
+    if (handler === undefined) throw new TypeError("config holds no ReceiptCallbackHandler: pass the config returned by config()");
+    if (found.length > 1) throw new TypeError("config holds more than one ReceiptCallbackHandler");
+    const capture = this.runs.get(handler);
+    if (capture === undefined) throw new TypeError("config comes from another Receipts instance");
     return capture;
   }
 
@@ -174,8 +206,8 @@ export class Receipts {
     return [ledger, { ...this.options, knownTools: known, unseenTools: unseen }];
   }
 
-  /** Check `reply`. `source` is a `Ledger` or a record `wrapTools()` returned; with none, the one
-   * run is read. */
+  /** Check `reply`. `source` is a `Ledger`, a record `wrapTools()` returned or a config `config()`
+   * returned; with none, the one run is read. */
   check(reply: string, source?: Ledger | object | null): Receipt {
     const [ledger, options] = this.resolve(source);
     return check(reply, ledger, options);

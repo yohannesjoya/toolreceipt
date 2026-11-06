@@ -19,6 +19,7 @@ export type MessageOptions = CheckOptions;
 const SUPPORTED = "OpenAI Chat Completions messages, OpenAI Responses items, Anthropic messages or Vercel AI SDK model messages";
 const TEXT_TYPES = new Set(["text", "output_text", "input_text"]);
 const LANGCHAIN_TYPES = new Set(["ai", "human", "tool", "system"]);
+const STORED_TYPES = new Set([...LANGCHAIN_TYPES, "function", "generic", "developer", "chat"]);
 // Tool-call shapes this reader knows about but does not read yet: dropping them would empty the
 // ledger and make every honest claim `not_called`.
 const UNREAD_ITEM_TYPES = new Set([
@@ -79,7 +80,18 @@ function isUser(message: unknown): boolean {
   return pyStrip(text(content)) !== "";
 }
 
+/** True for what a LangChain message serializes to: `JSON.stringify` gives `lc` and `kwargs`, and
+ * `mapChatMessagesToStoredMessages` gives `type` and `data`. Neither holds its fields at the top level,
+ * so reading one would give an empty ledger, and a false claim would read `clean`. */
+export function isSerializedLangChain(message: unknown): boolean {
+  if (get(message, "lc") !== null && get(message, "kwargs") !== null) return true;
+  return STORED_TYPES.has(get(message, "type") as string) && get(message, "data") !== null;
+}
+
+export const SERIALIZED_LANGCHAIN = "serialized LangChain messages are not read; revive them with mapStoredMessagesToChatMessages";
+
 function rejectUnsupported(message: unknown): void {
+  if (isSerializedLangChain(message)) throw new TypeError(SERIALIZED_LANGCHAIN);
   const role = get(message, "role");
   if (role === "function" || get(message, "function_call") !== null) {
     throw new TypeError(`legacy OpenAI function_call messages are not supported; pass ${SUPPORTED}`);
@@ -87,7 +99,7 @@ function rejectUnsupported(message: unknown): void {
   const itemType = get(message, "type");
   // @langchain/core before 1.0 has `_getType()` and no `type` property.
   if ((role === null && LANGCHAIN_TYPES.has(itemType as string)) || typeof get(message, "_getType") === "function") {
-    throw new TypeError(`LangChain messages are not read here; toolreceipt reads ${SUPPORTED}`);
+    throw new TypeError(`LangChain messages are not read here; use ledgerFromGraph and finalReplyFromGraph, or pass ${SUPPORTED}`);
   }
   if (UNREAD_ITEM_TYPES.has(itemType as string)) {
     throw new TypeError(`${itemType as string} items are not supported yet; only function tool calls are read`);

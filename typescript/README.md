@@ -6,7 +6,11 @@ JSON fixtures, same receipts.
 
 **Status:** `check`, `diff`, the rule extractor, the argument check, message lists, per-turn receipts and
 the LLM extractor pass every shared fixture with the Python runners' assertions, and every recorded Python
-receipt matches. `Receipts` and the Vercel AI SDK readers are tested against the real `ai` 6 and 7.
+receipt matches. `Receipts` and the Vercel AI SDK readers are tested against the real `ai` 6 and 7, and the
+LangGraph.js adapter against the real `@langchain/core` and `@langchain/langgraph`.
+
+This package fully supports TypeScript: every public feature of the Python package has a counterpart
+([table](#python-to-typescript)), and the remaining differences are [listed](#same-fixtures-as-the-python-package).
 
 ## Install
 
@@ -14,7 +18,9 @@ receipt matches. `Receipts` and the Vercel AI SDK readers are tested against the
 npm install toolreceipt
 ```
 
-Zero runtime dependencies. ESM and CJS, type declarations included, Node 18+.
+Zero runtime dependencies. ESM and CJS, type declarations included, Node 18+. LangChain.js itself needs
+Node 20+, so the adapter's real-package tests run on 20 and later. The adapter needs `@langchain/core` 1.0 or
+later, and is tested on 1.3.5.
 
 ## Quickstart
 
@@ -105,6 +111,62 @@ await them: `await result.responseMessages`, or `(await result.response).message
 A tool that returns `{ error: ... }` instead of throwing counts as having run. These read AI SDK 5, 6
 and 7, and AI SDK 4 messages throw.
 
+## With LangGraph.js
+
+Pass a config to the run, check the reply. Your tools and graph stay unchanged, and the package imports
+nothing from `@langchain/*`. `createAgent`, a compiled `StateGraph`, `invoke` and `stream` all work.
+
+```ts
+import { Receipts, finalReplyFromGraph } from "toolreceipt";
+
+const receipts = new Receipts();
+const config = receipts.config(); // or receipts.config({ configurable: { thread_id } })
+const result = await graph.invoke({ messages: [{ role: "user", content: "Refund order 4821" }] }, config);
+const receipt = receipts.check(finalReplyFromGraph(result), config);
+
+receipt.verdict; // "fabricated"
+receipt.summary; // 1 claimed action never ran: send_email ("I have emailed you the confirmation").
+```
+
+Bound tools are discovered from the chat model's OpenAI or Anthropic tool list. A provider with another
+shape, such as Gemini's `functionDeclarations`, is skipped: pass `knownTools` to `new Receipts()` there, or a
+claim about a tool that was never called cannot be flagged.
+
+**Use one `config()` per user turn, and reuse it for every `invoke` of that turn, a resume included.**
+
+```ts
+const config = receipts.config({ configurable: { thread_id } });
+await graph.invoke(inputs, config);                                    // pauses at interrupt()
+const result = await graph.invoke(new Command({ resume: "yes" }), config);
+```
+
+A new config on resume has no record of the calls before the pause, so an honest reply reads `fabricated`.
+A resume in another process has no handler to reuse, so use the finished-run reader below. An interrupted
+tool's body restarts on resume, so anything it did before `interrupt()` can happen twice. The ledger records
+the call once, when it finishes.
+
+One `Receipts` can serve many runs: after a second `config()`, `check` needs that run's config. The config can
+be spread, as `{ ...config, configurable }`.
+
+### From a finished run
+
+```ts
+import { check, finalReplyFromGraph, ledgerFromGraph } from "toolreceipt";
+
+const receipt = check(finalReplyFromGraph(result), ledgerFromGraph(result), { knownTools: ["issue_refund", "send_email"] });
+```
+
+Both take a graph result or its `messages`, and read only what follows the last human message, so a false claim
+in turn 2 is not backed by a call from turn 1. A node that adds a `HumanMessage` mid-run cuts the ledger there.
+Other shapes throw rather than read as empty: serialized messages (revive them with
+`mapStoredMessagesToChatMessages`), a result with no `messages` list, and OpenAI or Anthropic messages (use
+`checkMessages`).
+
+Live records what ran; a finished run records what the messages say. They differ when no tool event fired:
+a tool's arguments failing its schema, an unknown tool name, middleware that returns a `ToolMessage` itself, or
+`createAgent`'s `toolStrategy`, whose `extract-*` call appears only in the messages. Structured output is not read:
+pass the text you want checked.
+
 ## Per-turn receipts
 
 To check every assistant turn of a recorded conversation, including one that ended without a final
@@ -179,7 +241,11 @@ The model sees the reply text and the tool names and descriptions, never the led
 | `checkMessages`, `acheckMessages` | One receipt for the last run of a message list. |
 | `checkTurns`, `acheckTurns`, `TurnReceipt` | One receipt per assistant turn with text. |
 | `ledgerFromMessages`, `finalReply` | The two inputs `checkMessages` reads from a list. |
-| `Receipts` | One per agent: `wrapTools(tools)`, `ledger`, `check(reply, source?)`, `acheck(reply, source?)`. `source` is a `Ledger` or a record `wrapTools` returned. Options are `check`'s, plus `captureResults` (default `true`; `false` keeps arguments and results out of the ledger and turns off the argument check; an `Error`'s message is still stored, and any other thrown value is not) and `maxResultChars` (default 2000). |
+| `Receipts` | One per agent: `wrapTools(tools)` or `config(base?)`, `ledger`, `check(reply, source?)`, `acheck(reply, source?)`. `source` is a `Ledger`, a record `wrapTools` returned or a config `config` returned. |
+| `ReceiptCallbackHandler` | The LangChain.js callback handler `config` adds: `ledger`, `knownTools`, `flush()`. |
+| `mergeConfig(base, handler)`, `ConfigWith` | Add a handler to a config; the type it returns. |
+| `toolSpecsFromInvocationParams(params)` | Bound tools from a chat model's `invocation_params`. |
+| `ledgerFromGraph`, `finalReplyFromGraph` | The two inputs `check` needs, from a finished LangGraph.js run. |
 | `checkResult`, `acheckResult` | One receipt for a finished Vercel AI SDK run. |
 | `ledgerFromResult`, `finalReplyFromResult` | The two inputs `checkResult` reads from a run. |
 | `toolOptions(tools)` | `knownTools` and `unseenTools` from a Vercel AI SDK tools record. |
@@ -236,18 +302,45 @@ and `src/decimal.ts`. The accepted divergences, none reachable by a current fixt
 - A call id that is an object prints as JSON, where Python prints its `repr()`.
 - A very deep `arguments` string or a `type` that is a list or object gives a receipt here, where
   Python raises a raw error.
-- The LangChain error names no adapter, because this package has none yet.
 - Vercel AI SDK messages are read here. Python skips those unknown blocks.
-- `Receipts` wraps tools with `wrapTools`, where Python injects a LangChain callback with `config()`.
-  `check(reply, source)` takes a ledger or a wrapped record, where Python has `ledger=` and `config=`.
-  After a second `wrapTools`, `check` with no source throws, where Python reads the newest run.
+- `Receipts` also has `wrapTools`, which Python does not need. `check(reply, source)` takes a ledger, a wrapped
+  record or a config, where Python has `ledger=` and `config=`. After a second `wrapTools` or `config`, `check`
+  with no source throws, where Python reads the newest run.
+- LangGraph.js adapter, on purpose or from how LangChain.js delivers events:
+  - `ledgerFromGraph` and `finalReplyFromGraph` read only this turn and take a result or a list. Python's
+    `ledger_from_messages` reads the whole thread, so an earlier turn's call can back a false claim.
+  - They throw on serialized messages, a missing `messages` list and non-LangChain items, and `checkMessages` throws on
+    serialized messages. Python skips these, and an empty ledger misjudges the reply.
+  - `finalReplyFromGraph` joins text blocks as `checkMessages` does. Python's `final_reply` joins them with nothing, so
+    a negation in one block can swallow a claim in the next.
+  - A direct `tool.invoke(args, { runName })` with no tool call records the entry under `runName`, because LangChain.js
+    hands over no other name. With a tool call, the `ToolMessage` gives the real one.
+  - An interrupted call records nothing until it finishes. Python records an `error` at each pause, then `ok`, with
+    the same verdict.
+  - A tool whose arguments fail its schema fires no event, so it has no entry and a known tool reads `not_called`.
+    Python records `tool_failed`.
+  - `ToolNode` catches tool errors by default, so Python's `handle_tool_errors=True` advice does not apply.
+  - With `captureResults: false`, a failed `ToolMessage` stores `"tool reported an error"`. Python keeps its text.
+  - An item with `_getType` or a listed `type` and `content` counts as a message, where Python needs the class.
 - `check` takes `unseenTools`, and an AI SDK tool result with no call makes its own entry. Python has
   neither, because neither arises on its paths.
 - A thrown tool error is stored as `String(error)`, `Error: boom`, where Python stores its `repr()`.
 
-## Not yet ported
+## Python to TypeScript
 
-- LangGraph.js adapter
+| Python | TypeScript |
+|---|---|
+| `check`, `acheck`, `diff` | same names |
+| `check_messages`, `acheck_messages` | `checkMessages`, `acheckMessages` |
+| `toolreceipt.messages.ledger_from_messages`, `final_reply` | `ledgerFromMessages`, `finalReply` |
+| `check_turns`, `acheck_turns`, `TurnReceipt` | `checkTurns`, `acheckTurns`, `TurnReceipt` |
+| `Ledger`, `LedgerEntry`, `Claim`, `ToolSpec`, `Receipt`, `RuleExtractor`, `ClaimExtractor` | same names |
+| `LLMExtractor`, `from_chat_model` | `LLMExtractor`, `fromChatModel` |
+| `Receipts`, `config()`, `check()`, `acheck()`, `ledger` | same names, plus `wrapTools()` |
+| `toolreceipt.langgraph.ReceiptCallbackHandler` | `ReceiptCallbackHandler` |
+| `merge_config`, `tool_specs_from_invocation_params` | `mergeConfig`, `toolSpecsFromInvocationParams` |
+| `toolreceipt.langgraph.ledger_from_messages`, `final_reply` | `ledgerFromGraph`, `finalReplyFromGraph` |
+| none | `checkResult`, `acheckResult`, `ledgerFromResult`, `finalReplyFromResult`, `toolOptions` (Vercel AI SDK) |
 
 ## Development
 

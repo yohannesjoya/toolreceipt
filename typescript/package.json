@@ -1,6 +1,6 @@
 {
   "name": "toolreceipt",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Catch LLM agents claiming actions they never took. Ledger + claim extraction + receipt, same fixtures as the Python package.",
   "license": "MIT",
   "type": "module",
@@ -19,7 +19,7 @@
   "publishConfig": { "access": "public" },
   "repository": { "type": "git", "url": "git+https://github.com/yohannesjoya/toolreceipt.git", "directory": "typescript" },
   "homepage": "https://github.com/yohannesjoya/toolreceipt",
-  "keywords": ["llm", "agents", "tool-calls", "hallucination", "receipt", "openai", "anthropic", "vercel-ai-sdk"],
+  "keywords": ["llm", "agents", "tool-calls", "hallucination", "receipt", "openai", "anthropic", "vercel-ai-sdk", "langgraph", "langchain"],
   "scripts": {
     "build": "tsup",
     "smoke": "npm run build && node scripts/smoke.mjs",
@@ -27,16 +27,23 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
-    "check": "npm run typecheck && npm run lint && npm run test && npm run build"
+    "typecheck:consumer": "tsc -p tsconfig.consumer.json",
+    "check": "npm run typecheck && npm run lint && npm run test && npm run build && npm run typecheck:consumer"
   },
   "devDependencies": {
+    "@langchain/anthropic": "1.6.0",
+    "@langchain/core": "1.3.5",
+    "@langchain/langgraph": "1.7.1",
+    "@langchain/openai": "1.8.0",
     "ai": "^7.0.163",
     "ai6": "npm:ai@^6.0.323",
     "@types/node": "^22",
     "eslint": "^9",
+    "langchain": "1.6.2",
     "tsup": "^8",
     "typescript": "^5",
     "typescript-eslint": "^8",
-    "vitest": "^3"
+    "vitest": "^3",
+    "zod": "4.6.7"
   }
 }

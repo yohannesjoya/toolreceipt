@@ -10,7 +10,9 @@ import { fileURLToPath } from "node:url";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const dir = mkdtempSync(join(tmpdir(), "toolreceipt-smoke-"));
-const run = (cmd, args, cwd) => execFileSync(cmd, args, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "inherit"] });
+// `npm publish --dry-run` sets npm_config_dry_run, and the nested `npm pack` would then write no tarball.
+const env = Object.fromEntries(Object.entries(process.env).filter(([name]) => !name.toLowerCase().startsWith("npm_config_")));
+const run = (cmd, args, cwd) => execFileSync(cmd, args, { cwd, env, encoding: "utf8", stdio: ["ignore", "pipe", "inherit"] });
 
 const SUMMARY = '2 claimed actions never ran: issue_refund ("I\'ve refunded $64", ledger amount=32).';
 const BODY = `
@@ -21,8 +23,10 @@ const receipt = check("I've refunded $64 and emailed you the confirmation.", led
 console.log(receipt.summary);
 const wrapped = new Receipts().wrapTools({ send_email: { description: "Send an email", execute: () => "sent" } });
 console.log(typeof wrapped.send_email.execute);
+const config = new Receipts().config();
+console.log(config.callbacks.length);
 `;
-const EXPECTED = `${SUMMARY}\nfunction\n`;
+const EXPECTED = `${SUMMARY}\nfunction\n1\n`;
 
 try {
   run("npm", ["pack", "--pack-destination", dir], root);

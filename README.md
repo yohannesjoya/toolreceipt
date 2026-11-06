@@ -162,9 +162,9 @@ pip install "toolreceipt[langgraph]"
 The core (`pip install toolreceipt`) works with any framework through `check()`, see
 [Post-hoc usage](#post-hoc-usage). Python 3.10+.
 
-TypeScript: `npm install toolreceipt`. It has the core, message lists, per-turn receipts, the LLM
-extractor, `Receipts` and the Vercel AI SDK, and passes the same fixtures as the Python package.
-See [typescript/README.md](typescript/README.md).
+TypeScript: `npm install toolreceipt`. The package fully supports TypeScript: the core, message lists,
+per-turn receipts, the LLM extractor, `Receipts`, LangGraph.js and the Vercel AI SDK, passing the same
+fixtures as the Python package. See [typescript/README.md](typescript/README.md).
 
 ## Quickstart
 
@@ -407,7 +407,6 @@ Done in 0.2: LLM-backed extractor behind the existing `ClaimExtractor` protocol.
 message input; argument check for amounts and reference numbers. Done in 0.4: per-turn
 receipts over a whole conversation, and a plain transcript shape.
 
-- LangGraph.js adapter for the TypeScript package
 - Adapters: Mastra, CrewAI
 - `check_turns` over a LangGraph result (a LangChain-to-message-list converter)
 

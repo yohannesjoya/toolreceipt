@@ -1,7 +1,8 @@
 /**
- * Live ledger capture by wrapping tools' `execute`, for any record of `{ name: { execute } }`: the
- * Vercel AI SDK's `tools`, or your own. The counterpart of Python's LangGraph callback handler. No
- * framework is imported, and nothing here can throw into the agent's run.
+ * Live ledger capture: `ToolCapture` keeps one run's open calls, and `wrapToolRecord` feeds it by
+ * wrapping `execute` on any record of `{ name: { execute } }`, the Vercel AI SDK's `tools` or your own.
+ * `langgraph.ts` feeds it from LangChain.js callbacks. No framework is imported, and nothing here can
+ * throw into the agent's run.
  */
 
 import { Ledger, LedgerEntry, NO_RESULT, asText, coerceArgs, errorText, truncate } from "./ledger";
@@ -45,17 +46,18 @@ export function isThenable(value: unknown): value is PromiseLike<unknown> {
 
 /** One run: its ledger, the tools it can see, and the calls still open. */
 export class ToolCapture {
-  readonly ledger = new Ledger();
+  readonly ledger: Ledger;
   readonly knownTools = new Map<string, string>();
   readonly unseenTools = new Map<string, string>();
   private readonly captureResults: boolean;
   private readonly maxResultChars: number;
-  private readonly inFlight = new Map<number, LedgerEntry>();
+  private readonly inFlight = new Map<unknown, LedgerEntry>();
   private nextCall = 1;
 
-  constructor(captureResults: boolean, maxResultChars: number) {
+  constructor(captureResults: boolean, maxResultChars: number, ledger: Ledger = new Ledger()) {
     this.captureResults = captureResults;
     this.maxResultChars = maxResultChars;
+    this.ledger = ledger;
   }
 
   open(tool: string, input: unknown, options: unknown): number {
@@ -66,32 +68,56 @@ export class ToolCapture {
     } catch {
       // Keep the numbered id below: a call is never missing from the ledger.
     }
-    this.inFlight.set(call, new LedgerEntry({
-      tool,
-      args: this.captureResults ? coerceArgs(input) : {},
-      callId: typeof callId === "string" && callId !== "" ? callId : String(call),
-      startedAt: Date.now() / 1000,
-    }));
+    this.start(call, tool, input, typeof callId === "string" && callId !== "" ? callId : String(call));
     return call;
   }
 
-  private close(call: number): LedgerEntry | null {
-    const entry = this.inFlight.get(call);
+  /** Open a call under the caller's own key. */
+  start(key: unknown, tool: string, input: unknown, callId: string, parentRunId: string | null = null): void {
+    this.inFlight.set(key, new LedgerEntry({
+      tool,
+      args: this.captureResults ? coerceArgs(input) : {},
+      callId,
+      parentRunId,
+      startedAt: Date.now() / 1000,
+    }));
+  }
+
+  /** The entry of an open call, for a reader that learns its real name or id before it closes. */
+  openEntry(key: unknown): LedgerEntry | undefined {
+    return this.inFlight.get(key);
+  }
+
+  private close(key: unknown): LedgerEntry | null {
+    const entry = this.inFlight.get(key);
     if (entry === undefined) return null;
-    this.inFlight.delete(call);
+    this.inFlight.delete(key);
     entry.endedAt = Date.now() / 1000;
     this.ledger.append(entry);
     return entry;
   }
 
-  finish(call: number, output: unknown): void {
-    const entry = this.close(call);
-    if (entry === null || !this.captureResults) return;
-    entry.result = truncate(asText(output), this.maxResultChars);
+  finish(key: unknown, output: unknown): void {
+    const entry = this.close(key);
+    if (entry === null) return;
+    if (this.captureResults) entry.result = truncate(asText(output), this.maxResultChars);
   }
 
-  fail(call: number, error: unknown): void {
-    const entry = this.close(call);
+  /** Close a call whose tool returned a failure. Its text is tool output, so results off keeps it out. */
+  report(key: unknown, text: string): void {
+    const entry = this.close(key);
+    if (entry === null) return;
+    entry.status = "error";
+    entry.error = this.captureResults ? truncate(text, this.maxResultChars) : "tool reported an error";
+  }
+
+  /** Forget an open call with no ledger entry: it paused rather than ended. */
+  discard(key: unknown): void {
+    this.inFlight.delete(key);
+  }
+
+  fail(key: unknown, error: unknown): void {
+    const entry = this.close(key);
     if (entry === null) return;
     entry.status = "error";
     // With results off, a thrown object may hold what the caller asked to keep out. An `Error` keeps
@@ -102,8 +128,8 @@ export class ToolCapture {
 
   /** Close every open call as `status: "error", error: "no result"`. */
   flush(): void {
-    for (const call of [...this.inFlight.keys()]) {
-      const entry = this.close(call);
+    for (const key of [...this.inFlight.keys()]) {
+      const entry = this.close(key);
       if (entry !== null) {
         entry.status = "error";
         entry.error = NO_RESULT;
