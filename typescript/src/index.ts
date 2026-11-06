@@ -4,6 +4,8 @@ export { Claim, RuleExtractor, ToolSpec, normalizeToolSpecs } from "./claims";
 export type { ClaimEvidence, ClaimExtractor, ClaimInit, Confidence, NamedTool, Reason, Source, ToolLike } from "./claims";
 export { diff } from "./diff";
 export type { DiffOptions } from "./diff";
+export { ReceiptCallbackHandler, finalReplyFromGraph, ledgerFromGraph, mergeConfig, toolSpecsFromInvocationParams } from "./langgraph";
+export type { ConfigWith, ReceiptCallbackHandlerOptions } from "./langgraph";
 export { Ledger, LedgerEntry, NO_RESULT, coerceArgs, truncate } from "./ledger";
 export type { LedgerEntryInit, Status } from "./ledger";
 export { loadLexicon } from "./lexicon";
