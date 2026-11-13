@@ -12,10 +12,11 @@ from typing import Any
 from uuid import UUID
 
 from langchain_core.callbacks import BaseCallbackHandler, BaseCallbackManager
-from langchain_core.messages import AIMessage, BaseMessage, ToolMessage
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, ToolMessage
 
 from toolreceipt.claims import ToolSpec
 from toolreceipt.ledger import NO_RESULT, Ledger, LedgerEntry, coerce_args, truncate
+from toolreceipt.messages import SERIALIZED_LANGCHAIN, _is_serialized_langchain, _text
 
 __all__ = [
     "ReceiptCallbackHandler",
@@ -263,15 +264,50 @@ def merge_config(
     return merged
 
 
+def _this_turn(messages: Any) -> list[Any]:
+    """The messages after the last ``HumanMessage``. A checkpointed result holds the whole
+    thread, and an earlier turn's call would back a claim this turn never acted on.
+
+    Anything that is not a list of LangChain messages raises: skipping it would give an empty
+    ledger, and a false claim would read clean.
+    """
+    if not isinstance(messages, Sequence) or isinstance(messages, (str, bytes)):
+        raise TypeError(
+            "expected a list of LangChain messages or a result with a messages list, "
+            f"got {type(messages).__name__}"
+        )
+    start = 0
+    for i, message in enumerate(messages):
+        if _is_serialized_langchain(message):
+            raise ValueError(SERIALIZED_LANGCHAIN)
+        if not isinstance(message, BaseMessage):
+            raise TypeError(
+                f"expected a LangChain message, got {type(message).__name__}; for OpenAI, "
+                "Anthropic and transcript messages use toolreceipt.check_messages"
+            )
+        if isinstance(message, HumanMessage):
+            start = i + 1
+    return list(messages[start:])
+
+
+def _reply_text(message: AIMessage) -> str:
+    """The message's text, its blocks joined as ``toolreceipt.messages`` joins them.
+    ``AIMessage.text`` joins blocks with nothing, so a negation in one block could swallow
+    a claim in the next."""
+    content = message.content
+    return content if isinstance(content, str) else _text(content)
+
+
 def ledger_from_messages(messages: Sequence[Any]) -> Ledger:
     """Build a ledger post hoc by pairing ``AIMessage.tool_calls`` with ``ToolMessage`` results.
 
-    A tool call with no matching ``ToolMessage`` is recorded as ``status="error",
+    Only the messages after the last ``HumanMessage`` are read: the current turn. A tool
+    call with no matching ``ToolMessage`` is recorded as ``status="error",
     error="no result"``. Timestamps are ``None``.
     """
     entries: list[LedgerEntry] = []
     open_calls: dict[str, LedgerEntry] = {}
-    for message in messages:
+    for message in _this_turn(messages):
         if isinstance(message, AIMessage):
             for call in message.tool_calls:
                 call_id = call.get("id")
@@ -300,22 +336,21 @@ def ledger_from_messages(messages: Sequence[Any]) -> Ledger:
 
 
 def final_reply(result: Mapping[str, Any] | Sequence[Any]) -> str:
-    """Text of the last ``AIMessage`` with non-empty text, or ``""`` when the run ends on a
-    tool call: that message carries ``tool_calls``, or an ``AIMessage`` with ``tool_calls``
-    or a ``ToolMessage`` follows it (as ``toolreceipt.messages.final_reply``).
+    """Text of the current turn's last ``AIMessage`` with non-empty text, or ``""`` when the
+    run ends on a tool call: that message carries ``tool_calls``, or an ``AIMessage`` with
+    ``tool_calls`` or a ``ToolMessage`` follows it (as ``toolreceipt.messages.final_reply``).
+    Text blocks are joined as ``toolreceipt.messages`` joins them.
 
     Accepts a graph result dict with ``messages`` or a messages list.
     """
-    messages: Any = result.get("messages", []) if isinstance(result, Mapping) else result
-    if not isinstance(messages, Sequence):
-        return ""
-    for message in reversed(messages):
+    messages: Any = result.get("messages") if isinstance(result, Mapping) else result
+    for message in reversed(_this_turn(messages)):
         if isinstance(message, ToolMessage):
             return ""
         if isinstance(message, AIMessage):
             if message.tool_calls:
                 return ""
-            text = str(message.text)
+            text = _reply_text(message)
             if text.strip():
                 return text
     return ""

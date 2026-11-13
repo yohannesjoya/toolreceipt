@@ -289,12 +289,13 @@ carry `Graph` because the root already exports `ledgerFromMessages` and `finalRe
 
 `ledgerFromGraph` and `finalReplyFromGraph` read only the messages after the last human message. A
 checkpointed result holds the whole thread, and reading it all lets a call from turn 1 back a false
-claim in turn 2. Python's `ledger_from_messages` reads the whole thread; changing it is a follow-up. The
-cost: a node that injects a `HumanMessage` mid-run cuts the ledger there.
+claim in turn 2. Python's `ledger_from_messages` and `final_reply` do the same since 0.4.2. The cost: a
+node that injects a `HumanMessage` mid-run cuts the ledger there.
 
 They also throw on serialized messages, on a result with no `messages` list and on items that are not
 LangChain messages, because an empty ledger misjudges the reply. `checkMessages` gains the serialized
-check, which closes a false `clean` in 0.1.0.
+check, which closes a false `clean` in 0.1.0. Python gains all of these in 0.4.2, raising `ValueError`
+for serialized messages and `TypeError` for the rest.
 
 An error with `is_bubble_up`, or named `GraphInterrupt`, `NodeInterrupt` or `GraphDrained`, removes the open
 call and records nothing. This is for ledger accuracy, not the verdict: Python records an `error` at each
@@ -308,4 +309,4 @@ The handler also reads chain events, because a tool from `asTool` is a runnable 
 Without them, a tool that ran reads `fabricated`. It opens an entry only for a run that takes a tool call
 and bears the tool's name. The name comes from `runName`, since `serialized` has none, and a `ToolMessage`
 corrects it, because a caller can set `runName` as a trace label. `finalReplyFromGraph` joins text blocks as
-`checkMessages` does; Python's `final_reply` does not, and that is a follow-up.
+`checkMessages` does, and Python's `final_reply` does since 0.4.2.

@@ -62,6 +62,22 @@ First npm release.
 
 ## Python
 
+### [0.4.2] - 2026-11-13
+
+#### Fixed
+
+Three paths read a false claim as `clean`. The TypeScript package already behaves this way.
+
+- `toolreceipt.langgraph.ledger_from_messages` and `final_reply` read only the messages after
+  the last `HumanMessage`. A checkpointed LangGraph result holds the whole thread, so a tool
+  call from an earlier turn backed a claim the current turn never acted on.
+- `toolreceipt.langgraph.final_reply` joins text blocks as `check_messages` does. It joined
+  them with nothing, so a negation in one block could swallow a claim in the next.
+- `check_messages` and `check_turns` raise `ValueError` on serialized LangChain messages
+  (`dumpd`, `messages_to_dict`), which read as an empty run. `ledger_from_messages` and
+  `final_reply` raise the same `ValueError`, and a `TypeError` on anything else that is not a
+  list of LangChain messages, where they returned an empty ledger or `""`.
+
 ### [0.4.1] - 2026-11-05
 
 #### Fixed

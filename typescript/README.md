@@ -307,12 +307,9 @@ and `src/decimal.ts`. The accepted divergences, none reachable by a current fixt
   record or a config, where Python has `ledger=` and `config=`. After a second `wrapTools` or `config`, `check`
   with no source throws, where Python reads the newest run.
 - LangGraph.js adapter, on purpose or from how LangChain.js delivers events:
-  - `ledgerFromGraph` and `finalReplyFromGraph` read only this turn and take a result or a list. Python's
-    `ledger_from_messages` reads the whole thread, so an earlier turn's call can back a false claim.
-  - They throw on serialized messages, a missing `messages` list and non-LangChain items, and `checkMessages` throws on
-    serialized messages. Python skips these, and an empty ledger misjudges the reply.
-  - `finalReplyFromGraph` joins text blocks as `checkMessages` does. Python's `final_reply` joins them with nothing, so
-    a negation in one block can swallow a claim in the next.
+  - `ledgerFromGraph` takes a result or a list, where Python's `ledger_from_messages` takes a list. Both read only
+    this turn and throw on what they cannot read, as Python does since 0.4.2.
+  - A message is anything with `_getType`, or a listed `type` and `content`, where Python needs the class.
   - A direct `tool.invoke(args, { runName })` with no tool call records the entry under `runName`, because LangChain.js
     hands over no other name. With a tool call, the `ToolMessage` gives the real one.
   - An interrupted call records nothing until it finishes. Python records an `error` at each pause, then `ok`, with
@@ -321,7 +318,6 @@ and `src/decimal.ts`. The accepted divergences, none reachable by a current fixt
     Python records `tool_failed`.
   - `ToolNode` catches tool errors by default, so Python's `handle_tool_errors=True` advice does not apply.
   - With `captureResults: false`, a failed `ToolMessage` stores `"tool reported an error"`. Python keeps its text.
-  - An item with `_getType` or a listed `type` and `content` counts as a message, where Python needs the class.
 - `check` takes `unseenTools`, and an AI SDK tool result with no call makes its own entry. Python has
   neither, because neither arises on its paths.
 - A thrown tool error is stored as `String(error)`, `Error: boom`, where Python stores its `repr()`.
