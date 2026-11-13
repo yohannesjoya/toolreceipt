@@ -295,7 +295,10 @@ def _reply_text(message: AIMessage) -> str:
     ``AIMessage.text`` joins blocks with nothing, so a negation in one block could swallow
     a claim in the next."""
     content = message.content
-    return content if isinstance(content, str) else _text(content)
+    if isinstance(content, str):
+        return content
+    # LangChain allows plain strings beside blocks: read them as text blocks.
+    return _text([{"type": "text", "text": b} if isinstance(b, str) else b for b in content])
 
 
 def ledger_from_messages(messages: Sequence[Any]) -> Ledger:

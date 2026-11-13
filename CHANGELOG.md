@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## TypeScript
 
+### [0.2.1] - 2026-11-13
+
+#### Fixed
+
+- `finalReplyFromGraph` read plain strings in a content list as nothing, which LangChain allows
+  beside text blocks. `["I refunded you."]` read as an empty reply, so a false claim was
+  `clean`, and a negation in a string block was dropped, so an honest reply could read
+  `fabricated`. Plain strings are now read as text blocks.
+
 ### [0.2.0] - 2026-11-06
 
 The package now has every public feature of the Python package.
@@ -77,6 +86,8 @@ Three paths read a false claim as `clean`. The TypeScript package already behave
   (`dumpd`, `messages_to_dict`), which read as an empty run. `ledger_from_messages` and
   `final_reply` raise the same `ValueError`, and a `TypeError` on anything else that is not a
   list of LangChain messages, where they returned an empty ledger or `""`.
+- `toolreceipt.langgraph.final_reply` reads plain strings in a content list, which LangChain
+  allows beside text blocks, so neither a claim nor a negation in one is lost.
 
 ### [0.4.1] - 2026-11-05
 

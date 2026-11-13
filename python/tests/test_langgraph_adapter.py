@@ -307,3 +307,13 @@ def test_unreadable_input_raises_rather_than_read_empty():
             read("nope")
     with pytest.raises(TypeError, match="messages list"):
         final_reply({"state": []})
+
+
+def test_final_reply_reads_bare_strings_in_a_content_list():
+    # LangChain allows plain strings beside blocks; dropping them loses a claim or a negation.
+    bare = AIMessage(content=["I refunded you."])
+    assert final_reply([HumanMessage("x"), bare]) == "I refunded you."
+    mixed = AIMessage(content=["I have not ", {"type": "text", "text": "refunded you yet."}])
+    assert final_reply([HumanMessage("x"), mixed]) == "I have not refunded you yet."
+    reply = final_reply([HumanMessage("x"), mixed])
+    assert check(reply, Ledger(), known_tools=["issue_refund"]).verdict == "clean"

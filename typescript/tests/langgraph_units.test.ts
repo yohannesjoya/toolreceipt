@@ -484,6 +484,12 @@ describe("finalReplyFromGraph", () => {
     expect(finalReplyFromGraph([{ type: "ai", content: blocks, text: blocks.map((b) => b.text).join("") }])).toBe("I have not looked yet \n\u2705 I've refunded your order.");
   });
 
+  it("reads bare strings in a content list, so no claim or negation is lost", () => {
+    expect(finalReplyFromGraph([human("x"), { type: "ai", content: ["I refunded you."] }])).toBe("I refunded you.");
+    const mixed = { type: "ai", content: ["I have not ", { type: "text", text: "refunded you yet." }] };
+    expect(finalReplyFromGraph([human("x"), mixed])).toBe("I have not refunded you yet.");
+  });
+
   it("skips an empty AI message", () => {
     expect(finalReplyFromGraph([human("x"), FINAL, ai("  ")])).toBe(FINAL.content);
   });
