@@ -28,7 +28,7 @@ const REQUIRED = [
   "anthropic_text_and_tool_use_one_turn", "anthropic_claim_then_silence",
   "transcript_silence_mid_auth", "transcript_tool_error_no_recovery",
   "transcript_claim_then_silence", "transcript_settled_entry_defaults",
-  "transcript_bad_status_raises", "langchain_objects_rejected",
+  "transcript_bad_status_raises", "langchain_objects_rejected", "serialized_langchain_rejected",
   "transcript_settled_entries_out_of_time_order", "transcript_settled_entry_after_claim",
   "readme_transcript_example", "transcript_empty_tool_raises",
   "transcript_silence_mid_auth_no_entry", "transcript_settled_entry_structured_result",

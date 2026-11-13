@@ -301,16 +301,18 @@ def _reply_text(message: AIMessage) -> str:
     return _text([{"type": "text", "text": b} if isinstance(b, str) else b for b in content])
 
 
-def ledger_from_messages(messages: Sequence[Any]) -> Ledger:
+def ledger_from_messages(messages: Sequence[Any] | Mapping[str, Any]) -> Ledger:
     """Build a ledger post hoc by pairing ``AIMessage.tool_calls`` with ``ToolMessage`` results.
 
-    Only the messages after the last ``HumanMessage`` are read: the current turn. A tool
+    Accepts a messages list or a graph result dict with ``messages``. Only the messages
+    after the last ``HumanMessage`` are read: the current turn. A tool
     call with no matching ``ToolMessage`` is recorded as ``status="error",
     error="no result"``. Timestamps are ``None``.
     """
     entries: list[LedgerEntry] = []
     open_calls: dict[str, LedgerEntry] = {}
-    for message in _this_turn(messages):
+    items: Any = messages.get("messages") if isinstance(messages, Mapping) else messages
+    for message in _this_turn(items):
         if isinstance(message, AIMessage):
             for call in message.tool_calls:
                 call_id = call.get("id")

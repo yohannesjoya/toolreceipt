@@ -289,8 +289,10 @@ carry `Graph` because the root already exports `ledgerFromMessages` and `finalRe
 
 `ledgerFromGraph` and `finalReplyFromGraph` read only the messages after the last human message. A
 checkpointed result holds the whole thread, and reading it all lets a call from turn 1 back a false
-claim in turn 2. Python's `ledger_from_messages` and `final_reply` do the same since 0.4.2. The cost: a
-node that injects a `HumanMessage` mid-run cuts the ledger there.
+claim in turn 2. Python's `ledger_from_messages` and `final_reply` do the same since 0.4.2. The costs: an
+honest reply that reports an earlier turn's action ("Yes, I already refunded your order.") reads
+`not_called`, as it does in `check_messages`, and a node that injects a `HumanMessage` mid-run cuts the
+ledger there. A false `clean` is the worse error for this library, so the turn boundary stays.
 
 They also throw on serialized messages, on a result with no `messages` list and on items that are not
 LangChain messages, because an empty ledger misjudges the reply. `checkMessages` gains the serialized

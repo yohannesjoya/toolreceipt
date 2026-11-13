@@ -317,3 +317,24 @@ def test_final_reply_reads_bare_strings_in_a_content_list():
     assert final_reply([HumanMessage("x"), mixed]) == "I have not refunded you yet."
     reply = final_reply([HumanMessage("x"), mixed])
     assert check(reply, Ledger(), known_tools=["issue_refund"]).verdict == "clean"
+
+
+def test_ledger_from_messages_takes_a_graph_result():
+    msgs = [HumanMessage("x"), CALLS, ToolMessage(content="refunded", tool_call_id="c1"), FINAL]
+    by_result = [(e.tool, e.status) for e in ledger_from_messages({"messages": msgs})]
+    assert by_result == [(e.tool, e.status) for e in ledger_from_messages(msgs)]
+
+
+def test_honest_reply_about_an_earlier_turn_reads_not_called():
+    # The decided cost of reading one turn (docs/decisions.md): this turn did not run the refund.
+    thread = [
+        HumanMessage("refund me"),
+        AIMessage(content="", tool_calls=[{"name": "issue_refund", "args": {}, "id": "c1"}]),
+        ToolMessage(content="ok", tool_call_id="c1"),
+        AIMessage("Done."),
+        HumanMessage("did it go through?"),
+        AIMessage("Yes, I already refunded your order."),
+    ]
+    receipt = check(final_reply(thread), ledger_from_messages(thread), known_tools=["issue_refund"])
+    assert receipt.verdict == "fabricated"
+    assert receipt.claimed_but_never_ran[0].reason == "not_called"

@@ -1,0 +1,58 @@
+{
+  "messages": [
+    {
+      "lc": 1,
+      "type": "constructor",
+      "id": [
+        "langchain",
+        "schema",
+        "messages",
+        "HumanMessage"
+      ],
+      "kwargs": {
+        "content": "Refund order 4821.",
+        "type": "human"
+      }
+    },
+    {
+      "lc": 1,
+      "type": "constructor",
+      "id": [
+        "langchain",
+        "schema",
+        "messages",
+        "AIMessage"
+      ],
+      "kwargs": {
+        "content": "I've refunded order 4821.",
+        "type": "ai",
+        "tool_calls": [],
+        "invalid_tool_calls": []
+      }
+    }
+  ],
+  "known_tools": [
+    {
+      "type": "function",
+      "function": {
+        "name": "lookup_order",
+        "description": "Look up an order by its id."
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "issue_refund",
+        "description": "Issue a refund to the customer for an order."
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "send_email",
+        "description": "Send an email to the customer."
+      }
+    }
+  ],
+  "raises": "ValueError"
+}
