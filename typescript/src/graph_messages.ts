@@ -71,7 +71,10 @@ export function ledgerFromGraph(source: unknown): Ledger {
  * nothing, which lets a negation in one block swallow a claim in the next. */
 function replyText(message: unknown): string {
   const content = (message as { content?: unknown }).content;
-  return typeof content === "string" || Array.isArray(content) ? text(content) : messageText(message);
+  if (typeof content === "string") return content;
+  // LangChain allows plain strings beside blocks, and its own `.text` drops them: read them as text blocks.
+  if (Array.isArray(content)) return text((content as unknown[]).map((b) => (typeof b === "string" ? { type: "text", text: b } : b)));
+  return messageText(message);
 }
 
 /**

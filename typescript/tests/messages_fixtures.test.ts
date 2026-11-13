@@ -12,6 +12,7 @@ type Case = {
 };
 const CASES = loadCases<Case>("messages");
 const REQUIRED = [
+  "serialized_langchain_rejected", "stored_chat_message_rejected",
   "openai_refund_and_email_ok", "openai_missing_tool_result", "openai_never_called",
   "openai_no_final_reply", "openai_run_ends_on_call_after_text", "openai_multi_turn",
   "openai_bad_arguments_json", "openai_content_blocks", "openai_tool_content_blocks",

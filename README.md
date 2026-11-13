@@ -337,7 +337,12 @@ receipt = check(final_reply(result), ledger, known_tools=["issue_refund", "send_
 
 `ledger_from_messages` pairs each `AIMessage` tool call with its `ToolMessage`. A call with
 no result is recorded as an error. Timestamps are `None` on this path. Like the message-list
-one, this `final_reply` returns `""` when the run ends on a tool call.
+one, this `final_reply` returns `""` when the run ends on a tool call. Both take the result
+or its messages, and read only the messages after the last `HumanMessage`, so in a
+checkpointed thread a call from an earlier turn cannot back a claim in this one. A reply that
+reports an earlier turn's action ("I already refunded it") therefore reads `not_called`.
+Anything that is not a list of LangChain messages raises, including serialized messages:
+revive those with `langchain_core.load.load` or `messages_from_dict` first.
 
 Pass `known_tools`. A ledger only knows the tools that ran, so without `known_tools` a claim
 about a tool that was never called ("I emailed you" when `send_email` never ran) has nothing

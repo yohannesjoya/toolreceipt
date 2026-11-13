@@ -6,7 +6,7 @@ from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from langchain_core.tools import StructuredTool, ToolException, tool
 
 from tests.helpers_graph import build_fake_graph
-from toolreceipt import Receipts
+from toolreceipt import Receipts, check
 from toolreceipt.langgraph import (
     ReceiptCallbackHandler,
     final_reply,
@@ -255,3 +255,88 @@ class _BadMapping(dict):
 class _BadError(Exception):
     def __repr__(self):
         raise RuntimeError("cannot render")
+
+
+def test_ledger_and_final_reply_read_only_the_last_turn():
+    # A checkpointed result holds the whole thread: turn 1's refund must not back turn 2's claim.
+    thread = [
+        HumanMessage("refund me"),
+        AIMessage(content="", tool_calls=[{"name": "issue_refund", "args": {}, "id": "c1"}]),
+        ToolMessage(content="ok", tool_call_id="c1"),
+        AIMessage("Done."),
+        HumanMessage("again"),
+        AIMessage("I refunded you again."),
+    ]
+    assert len(ledger_from_messages(thread)) == 0
+    assert final_reply(thread) == "I refunded you again."
+    receipt = check(final_reply(thread), ledger_from_messages(thread), known_tools=["issue_refund"])
+    assert receipt.verdict == "fabricated"
+    # A resume adds no human message, so a paused run stays whole.
+    run = thread[:4]
+    assert [e.tool for e in ledger_from_messages(run)] == ["issue_refund"]
+
+
+def test_final_reply_joins_text_blocks_as_check_messages_does():
+    blocks = [
+        {"type": "text", "text": "I have not looked yet "},
+        {"type": "text", "text": "✅ I've refunded your order."},
+    ]
+    reply = final_reply([HumanMessage("x"), AIMessage(content=blocks)])
+    assert reply == "I have not looked yet \n✅ I've refunded your order."
+    assert check(reply, Ledger(), known_tools=["issue_refund"]).verdict == "fabricated"
+    split = [
+        {"type": "text", "text": "I have not "},
+        {"type": "text", "text": "refunded your order yet."},
+    ]
+    assert final_reply([AIMessage(content=split)]) == "I have not refunded your order yet."
+
+
+def test_unreadable_input_raises_rather_than_read_empty():
+    import pytest
+    from langchain_core.load import dumpd
+    from langchain_core.messages import messages_to_dict
+
+    message = AIMessage("I refunded you.")
+    for read in (ledger_from_messages, final_reply):
+        for shape in (dumpd(message), messages_to_dict([message])[0]):
+            with pytest.raises(ValueError, match="serialized LangChain messages"):
+                read([shape])
+        with pytest.raises(TypeError, match="check_messages"):
+            read([{"role": "assistant", "content": "I refunded you."}])
+        with pytest.raises(TypeError, match="messages list"):
+            read("nope")
+    with pytest.raises(TypeError, match="messages list"):
+        final_reply({"state": []})
+
+
+def test_final_reply_reads_bare_strings_in_a_content_list():
+    # LangChain allows plain strings beside blocks; dropping them loses a claim or a negation.
+    bare = AIMessage(content=["I refunded you."])
+    assert final_reply([HumanMessage("x"), bare]) == "I refunded you."
+    lone = final_reply([HumanMessage("x"), bare])
+    assert check(lone, Ledger(), known_tools=["issue_refund"]).verdict == "fabricated"
+    mixed = AIMessage(content=["I have not ", {"type": "text", "text": "refunded you yet."}])
+    assert final_reply([HumanMessage("x"), mixed]) == "I have not refunded you yet."
+    reply = final_reply([HumanMessage("x"), mixed])
+    assert check(reply, Ledger(), known_tools=["issue_refund"]).verdict == "clean"
+
+
+def test_ledger_from_messages_takes_a_graph_result():
+    msgs = [HumanMessage("x"), CALLS, ToolMessage(content="refunded", tool_call_id="c1"), FINAL]
+    by_result = [(e.tool, e.status) for e in ledger_from_messages({"messages": msgs})]
+    assert by_result == [(e.tool, e.status) for e in ledger_from_messages(msgs)]
+
+
+def test_honest_reply_about_an_earlier_turn_reads_not_called():
+    # The decided cost of reading one turn (docs/decisions.md): this turn did not run the refund.
+    thread = [
+        HumanMessage("refund me"),
+        AIMessage(content="", tool_calls=[{"name": "issue_refund", "args": {}, "id": "c1"}]),
+        ToolMessage(content="ok", tool_call_id="c1"),
+        AIMessage("Done."),
+        HumanMessage("did it go through?"),
+        AIMessage("Yes, I already refunded your order."),
+    ]
+    receipt = check(final_reply(thread), ledger_from_messages(thread), known_tools=["issue_refund"])
+    assert receipt.verdict == "fabricated"
+    assert receipt.claimed_but_never_ran[0].reason == "not_called"

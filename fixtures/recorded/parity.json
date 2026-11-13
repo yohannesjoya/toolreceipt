@@ -1,6 +1,6 @@
 {
-  "toolreceipt": "0.4.0",
-  "recorded_at": "2026-11-05",
+  "toolreceipt": "0.4.2",
+  "recorded_at": "2026-11-13",
   "extract": [
     {
       "source": "extractor/desc_email_customer",

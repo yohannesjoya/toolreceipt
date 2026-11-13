@@ -106,7 +106,25 @@ def _is_user(message: Any) -> bool:
     return bool(_text(content).strip())
 
 
+_STORED_TYPES = _LANGCHAIN_TYPES | {"function", "generic", "developer", "chat"}
+SERIALIZED_LANGCHAIN = (
+    "serialized LangChain messages are not read; revive them with "
+    "langchain_core.load.load or langchain_core.messages.messages_from_dict"
+)
+
+
+def _is_serialized_langchain(message: Any) -> bool:
+    """What a LangChain message serializes to: ``dumpd`` gives ``lc`` and ``kwargs``, and
+    ``messages_to_dict`` gives ``type`` and ``data``. Neither holds its fields at the top
+    level, so reading one would give an empty run, and a false claim would read clean."""
+    if _get(message, "lc") is not None and _get(message, "kwargs") is not None:
+        return True
+    return _get(message, "type") in _STORED_TYPES and _get(message, "data") is not None
+
+
 def _reject_unsupported(message: Any) -> None:
+    if _is_serialized_langchain(message):
+        raise ValueError(SERIALIZED_LANGCHAIN)
     role = _get(message, "role")
     if role == "function" or _get(message, "function_call") is not None:
         raise ValueError(

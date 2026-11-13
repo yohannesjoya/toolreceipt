@@ -194,3 +194,16 @@ def test_is_turn():
     assert not _is_turn({"role": "assistant", "content": "  \n"})
     assert not _is_turn({"role": "user", "content": "Hi"})
     assert not _is_turn({"tool": "lookup_order"})
+
+
+def test_serialized_langchain_messages_raise_rather_than_read_empty():
+    from langchain_core.load import dumpd
+    from langchain_core.messages import AIMessage, messages_to_dict
+
+    from toolreceipt import check_turns
+
+    message = AIMessage("I refunded you.")
+    for shape in (dumpd(message), messages_to_dict([message])[0]):
+        for read in (check_messages, check_turns):
+            with pytest.raises(ValueError, match="serialized LangChain messages"):
+                read([shape], known_tools=["issue_refund"])

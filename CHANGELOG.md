@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## TypeScript
 
+### [0.2.1] - 2026-11-13
+
+#### Fixed
+
+- `finalReplyFromGraph` read plain strings in a content list as nothing, which LangChain allows
+  beside text blocks. `["I refunded you."]` read as an empty reply, so a false claim was
+  `clean`, and a negation in a string block was dropped, so an honest reply could read
+  `fabricated`. Plain strings are now read as text blocks.
+
 ### [0.2.0] - 2026-11-06
 
 The package now has every public feature of the Python package.
@@ -61,6 +70,34 @@ First npm release.
   blocks, as in Python.
 
 ## Python
+
+### [0.4.2] - 2026-11-13
+
+#### Fixed
+
+Four paths read a false claim as `clean`. TypeScript behaves the same way from 0.2.1.
+
+Upgrading: on the LangGraph post-hoc path, a reply that reports an earlier turn's action ("Yes,
+I already refunded your order.") now reads `not_called`, because this turn's messages hold no
+such call. `check_messages` has read only the current turn since 0.3.1.
+
+- `toolreceipt.langgraph.ledger_from_messages` and `final_reply` read only the messages after
+  the last `HumanMessage`. A checkpointed LangGraph result holds the whole thread, so a tool
+  call from an earlier turn backed a claim the current turn never acted on.
+- `toolreceipt.langgraph.final_reply` joins text blocks as `check_messages` does. It joined
+  them with nothing, so a negation in one block could swallow a claim in the next.
+- `check_messages` and `check_turns` raise `ValueError` on `dumpd` output, which read as an
+  empty run, and on `messages_to_dict` output of every message type, where the `chat`,
+  `function`, `generic` and `developer` types read as an empty run. `ledger_from_messages` and
+  `final_reply` raise the same `ValueError`, and a `TypeError` on anything else that is not a
+  list of LangChain messages, where they returned an empty ledger or `""`.
+- `toolreceipt.langgraph.final_reply` reads plain strings in a content list, which LangChain
+  allows beside text blocks, so neither a claim nor a negation in one is lost.
+
+#### Changed
+
+- `toolreceipt.langgraph.ledger_from_messages` also takes a graph result dict with
+  `messages`, as `final_reply` does.
 
 ### [0.4.1] - 2026-11-05
 
