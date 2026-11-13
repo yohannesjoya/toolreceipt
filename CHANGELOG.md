@@ -75,7 +75,7 @@ First npm release.
 
 #### Fixed
 
-Three paths read a false claim as `clean`. The TypeScript package already behaves this way.
+Four paths read a false claim as `clean`. TypeScript behaves the same way from 0.2.1.
 
 Upgrading: on the LangGraph post-hoc path, a reply that reports an earlier turn's action ("Yes,
 I already refunded your order.") now reads `not_called`, because this turn's messages hold no
@@ -91,9 +91,13 @@ such call. `check_messages` has read only the current turn since 0.3.1.
   `function`, `generic` and `developer` types read as an empty run. `ledger_from_messages` and
   `final_reply` raise the same `ValueError`, and a `TypeError` on anything else that is not a
   list of LangChain messages, where they returned an empty ledger or `""`.
-  `ledger_from_messages` also takes a graph result, as `final_reply` does.
 - `toolreceipt.langgraph.final_reply` reads plain strings in a content list, which LangChain
   allows beside text blocks, so neither a claim nor a negation in one is lost.
+
+#### Changed
+
+- `toolreceipt.langgraph.ledger_from_messages` also takes a graph result dict with
+  `messages`, as `final_reply` does.
 
 ### [0.4.1] - 2026-11-05
 

@@ -313,6 +313,8 @@ def test_final_reply_reads_bare_strings_in_a_content_list():
     # LangChain allows plain strings beside blocks; dropping them loses a claim or a negation.
     bare = AIMessage(content=["I refunded you."])
     assert final_reply([HumanMessage("x"), bare]) == "I refunded you."
+    lone = final_reply([HumanMessage("x"), bare])
+    assert check(lone, Ledger(), known_tools=["issue_refund"]).verdict == "fabricated"
     mixed = AIMessage(content=["I have not ", {"type": "text", "text": "refunded you yet."}])
     assert final_reply([HumanMessage("x"), mixed]) == "I have not refunded you yet."
     reply = final_reply([HumanMessage("x"), mixed])

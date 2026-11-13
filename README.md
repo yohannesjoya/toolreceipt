@@ -340,9 +340,9 @@ no result is recorded as an error. Timestamps are `None` on this path. Like the 
 one, this `final_reply` returns `""` when the run ends on a tool call. Both take the result
 or its messages, and read only the messages after the last `HumanMessage`, so in a
 checkpointed thread a call from an earlier turn cannot back a claim in this one. A reply that
-reports an earlier turn's action ("I already refunded it") therefore reads `not_called`. Anything that is not a list of LangChain messages
-raises, including serialized messages: revive those with `langchain_core.load.load` or
-`messages_from_dict` first.
+reports an earlier turn's action ("I already refunded it") therefore reads `not_called`.
+Anything that is not a list of LangChain messages raises, including serialized messages:
+revive those with `langchain_core.load.load` or `messages_from_dict` first.
 
 Pass `known_tools`. A ledger only knows the tools that ran, so without `known_tools` a claim
 about a tool that was never called ("I emailed you" when `send_email` never ran) has nothing
