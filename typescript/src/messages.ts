@@ -70,8 +70,12 @@ export function text(content: unknown): string {
 /** A user message that starts a turn: one with text and no `tool_result` block. Anthropic returns
  * tool results inside user messages, and a tool's screenshot comes back as an image-only user
  * message; both continue the run. */
+/** Name of the user message `receiptGuard` adds. It continues the run. */
+export const NOTE_NAME = "toolreceipt";
+
 function isUser(message: unknown): boolean {
-  if (get(message, "role") !== "user") return false;
+  // A guard note (receiptGuard) continues the run.
+  if (get(message, "role") !== "user" || get(message, "name") === NOTE_NAME) return false;
   const content = get(message, "content");
   if (typeof content === "string") return pyStrip(content) !== "";
   const list = blocks(content);

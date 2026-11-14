@@ -1,6 +1,6 @@
 {
-  "toolreceipt": "0.4.2",
-  "recorded_at": "2026-11-13",
+  "toolreceipt": "0.5.0",
+  "recorded_at": "2026-11-14",
   "extract": [
     {
       "source": "extractor/desc_email_customer",
@@ -12256,6 +12256,69 @@
       }
     },
     {
+      "source": "messages/openai_guard_note_continues_run",
+      "ledger": [
+        {
+          "tool": "issue_refund",
+          "status": "ok",
+          "args": {
+            "amount": 32
+          },
+          "result": "refunded",
+          "error": null,
+          "call_id": "c1",
+          "parent_run_id": null,
+          "started_at": null,
+          "ended_at": null
+        }
+      ],
+      "final_reply": "I've refunded $32.",
+      "receipt": {
+        "confirmed": [
+          {
+            "text": "I've refunded $32",
+            "verb": "refund",
+            "object": "$32",
+            "count": null,
+            "candidates": [
+              "issue_refund"
+            ],
+            "tool": "issue_refund",
+            "confidence": "medium",
+            "reason": null,
+            "source": "rules",
+            "observed": null
+          }
+        ],
+        "claimed_but_never_ran": [],
+        "unmatched": [],
+        "suspected": [],
+        "ran_but_unreported": [],
+        "verdict": "clean",
+        "ok": true,
+        "summary": "All claims confirmed.",
+        "ledger": [
+          {
+            "tool": "issue_refund",
+            "status": "ok",
+            "args": {
+              "amount": 32
+            },
+            "result": "refunded",
+            "error": null,
+            "call_id": "c1",
+            "parent_run_id": null,
+            "started_at": null,
+            "ended_at": null
+          }
+        ],
+        "known_tools": [
+          "issue_refund",
+          "create_ticket"
+        ]
+      }
+    },
+    {
       "source": "messages/openai_image_only_user_continues_run",
       "ledger": [
         {
@@ -12490,6 +12553,41 @@
           "lookup_order",
           "issue_refund",
           "send_email"
+        ]
+      }
+    },
+    {
+      "source": "messages/openai_named_user_starts_turn",
+      "ledger": [],
+      "final_reply": "I've refunded $32.",
+      "receipt": {
+        "confirmed": [],
+        "claimed_but_never_ran": [
+          {
+            "text": "I've refunded $32",
+            "verb": "refund",
+            "object": "$32",
+            "count": null,
+            "candidates": [
+              "issue_refund"
+            ],
+            "tool": "issue_refund",
+            "confidence": "medium",
+            "reason": "not_called",
+            "source": "rules",
+            "observed": null
+          }
+        ],
+        "unmatched": [],
+        "suspected": [],
+        "ran_but_unreported": [],
+        "verdict": "fabricated",
+        "ok": false,
+        "summary": "1 claimed action never ran: issue_refund (\"I've refunded $32\").",
+        "ledger": [],
+        "known_tools": [
+          "issue_refund",
+          "create_ticket"
         ]
       }
     },

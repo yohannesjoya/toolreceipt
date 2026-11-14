@@ -14,7 +14,8 @@ uv run mypy
 ```
 
 CI runs the same three commands on Python 3.10 to 3.13. The core package (everything but
-`toolreceipt/langgraph.py`) imports only the standard library. Keep it that way.
+`toolreceipt/langgraph.py` and `toolreceipt/langchain.py`) imports only the standard library.
+Keep it that way.
 
 ## Two languages, one fixture set
 
