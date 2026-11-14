@@ -71,7 +71,8 @@ export function text(content: unknown): string {
  * tool results inside user messages, and a tool's screenshot comes back as an image-only user
  * message; both continue the run. */
 function isUser(message: unknown): boolean {
-  if (get(message, "role") !== "user") return false;
+  // A guard note (receiptGuard) continues the run.
+  if (get(message, "role") !== "user" || get(message, "name") === "toolreceipt") return false;
   const content = get(message, "content");
   if (typeof content === "string") return pyStrip(content) !== "";
   const list = blocks(content);

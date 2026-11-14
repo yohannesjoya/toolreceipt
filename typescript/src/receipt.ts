@@ -69,7 +69,7 @@ function plural(n: number, word: string): string {
 }
 
 /** `key=json` pairs of the contradicting ledger arguments, cut to 60 characters. */
-function formatObserved(observed: Record<string, Json>): string {
+export function formatObserved(observed: Record<string, Json>): string {
   const text = Object.entries(observed)
     .map(([k, v]) => `${k}=${pyDumps(v)}`)
     .join(", ");
