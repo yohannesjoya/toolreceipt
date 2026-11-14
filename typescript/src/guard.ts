@@ -6,8 +6,9 @@
 
 import type { Claim, ClaimExtractor, ToolLike } from "./claims";
 import { normalizeToolSpecs } from "./claims";
-import { NOTE_NAME, finalReplyFromGraph, ledgerFromGraph } from "./graph_messages";
+import { finalReplyFromGraph, ledgerFromGraph } from "./graph_messages";
 import { isObject, kindOf } from "./langgraph";
+import { NOTE_NAME } from "./messages";
 import { type Receipt, formatObserved } from "./receipt";
 import { acheck } from "./receipts";
 
@@ -98,7 +99,11 @@ export function receiptGuard(tools: Iterable<ToolLike>, options: ReceiptGuardOpt
     if (!receipt.ok && retries < maxRetries) {
       return { messages: [{ role: "user", name: NOTE_NAME, content: noteText(receipt) }], jumpTo: "model" };
     }
-    const outcome: GuardOutcome = { outcome: receipt.ok ? (retries > 0 ? "fixed" : "passed") : "unresolved", retries, receipt: receipt.toDict() };
+    // No ledger: the outcome rides on a message UIs render and checkpointers keep, so it carries no
+    // tool arguments or results. The messages hold them.
+    const { ledger: _ledger, ...stored } = receipt.toDict();
+    stored.ran_but_unreported = receipt.ranButUnreported.map((e) => ({ tool: e.tool, status: e.status, call_id: e.callId }));
+    const outcome: GuardOutcome = { outcome: receipt.ok ? (retries > 0 ? "fixed" : "passed") : "unresolved", retries, receipt: stored };
     return { messages: [withMetadata(last, { toolreceipt: outcome })] };
   }
 

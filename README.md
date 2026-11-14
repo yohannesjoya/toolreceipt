@@ -236,6 +236,14 @@ as it is, and blocking, logging or annotating it is up to you.
   with an `LLMExtractor` every final reply costs one extra model call.
 - `create_agent` re-raises a tool's exception by default; set `handle_tool_error` on the tool to
   record the failure as a tool message the guard can read.
+- To carry the outcome, the judged reply is emitted again with the same id: with
+  `stream_mode="updates"`, replace messages by id rather than appending them.
+- Check a guarded run afterwards with `ledger_from_messages` and `final_reply`, or with
+  `check_messages` over OpenAI-shaped logs, which keep the note's `name`. Anthropic-shaped
+  logs drop it, so there the note looks like a new turn and the corrected reply reads
+  `fabricated`.
+- The stored outcome holds the receipt without the ledger, so no tool results ride on the
+  reply. Tested on `langchain` 1.5.0.
 
 ## With an LLM extractor
 
@@ -438,6 +446,10 @@ kept.
 The receipt quotes the ledger when a claim contradicts it: an `args_mismatch` claim carries
 the disagreeing argument values in `observed` and in the summary line (`ledger amount=32`).
 With `capture_results=False` no argument is stored and nothing is quoted.
+
+The guard sends one thing to the agent's own model: its note, which holds claim text, tool names
+and, for a wrong amount, the logged argument; never a tool's result or error. The outcome it
+stores on the reply holds the receipt without the ledger: no tool arguments or results.
 
 ## Roadmap
 

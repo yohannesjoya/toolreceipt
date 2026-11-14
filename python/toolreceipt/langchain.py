@@ -9,9 +9,16 @@ import inspect
 from collections.abc import Collection, Iterable, Sequence
 from typing import Any
 
-from langchain.agents.middleware import AgentMiddleware, AgentState, hook_config
-from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
-from langgraph.runtime import Runtime
+try:
+    from langchain.agents.middleware import AgentMiddleware, AgentState, hook_config
+    from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
+    from langgraph.runtime import Runtime
+except ImportError as exc:  # pragma: no cover - exercised in a subprocess
+    from toolreceipt.receipts import _LANGGRAPH_DEPS, _MISSING_LANGGRAPH
+
+    if (exc.name or "").partition(".")[0] in _LANGGRAPH_DEPS:
+        raise ImportError(_MISSING_LANGGRAPH) from exc
+    raise
 
 from toolreceipt.claims import Claim, ClaimExtractor, ToolSpec, normalize_tool_specs
 from toolreceipt.langgraph import NOTE_NAME, final_reply, ledger_from_messages
@@ -68,6 +75,18 @@ def _note(receipt: Receipt) -> str:
     )
 
 
+def _stored(receipt: Receipt) -> dict[str, Any]:
+    """The receipt without its ledger. The outcome rides on a message that UIs render and
+    checkpointers keep, so it carries no tool arguments or results; the messages hold them."""
+    data = receipt.to_dict()
+    data.pop("ledger", None)
+    data["ran_but_unreported"] = [
+        {"tool": e["tool"], "status": e["status"], "call_id": e["call_id"]}
+        for e in data["ran_but_unreported"]
+    ]
+    return data
+
+
 class ReceiptGuard(AgentMiddleware):
     """Checks each final reply against this turn's tool calls. When the receipt is not ok,
     it adds a user message named ``toolreceipt`` and sends the agent back, at most
@@ -87,8 +106,8 @@ class ReceiptGuard(AgentMiddleware):
         check_args: bool = True,
     ) -> None:
         super().__init__()
-        if max_retries < 0:
-            raise ValueError(f"max_retries must be 0 or more, got {max_retries}")
+        if isinstance(max_retries, bool) or not isinstance(max_retries, int) or max_retries < 0:
+            raise ValueError(f"max_retries must be a whole number, 0 or more, got {max_retries!r}")
         # ``AgentMiddleware.tools`` registers extra tools with the agent, so keep this private.
         self._known: list[ToolSpec] = normalize_tool_specs(_spec(t) for t in tools)
         self._max_retries = max_retries
@@ -116,7 +135,7 @@ class ReceiptGuard(AgentMiddleware):
             outcome = "unresolved"
         metadata = {
             **last.response_metadata,
-            "toolreceipt": {"outcome": outcome, "retries": retries, "receipt": receipt.to_dict()},
+            "toolreceipt": {"outcome": outcome, "retries": retries, "receipt": _stored(receipt)},
         }
         # Same id, so the reducer replaces the reply in place.
         return {"messages": [last.model_copy(update={"response_metadata": metadata})]}

@@ -288,3 +288,38 @@ def test_guard_keeps_its_tool_list_private():
 def test_rejects_negative_retries():
     with pytest.raises(ValueError):
         ReceiptGuard(TOOLS, max_retries=-1)
+
+
+def test_stored_outcome_carries_no_tool_results():
+    @tool
+    def lookup_order(order_id: str) -> str:
+        """Look up an order by id."""
+        return "x" * 50_000 + " private-result-text"
+
+    result, _ = run([call("lookup_order", "c1", order_id="4821"), "Your order is on its way."],
+                    tools=[lookup_order])
+    out = outcome(result)
+    assert "ledger" not in out["receipt"]
+    assert "private-result-text" not in str(out)
+    assert len(str(out)) < 2_000
+
+
+def test_rejects_non_integer_retries():
+    for bad in (1.5, True, "1"):
+        with pytest.raises(ValueError):
+            ReceiptGuard(TOOLS, max_retries=bad)
+
+
+def test_missing_extra_names_the_extra():
+    import subprocess
+    import sys
+
+    code = (
+        "import sys; sys.modules['langchain'] = None\n"
+        "try:\n"
+        "    import toolreceipt.langchain\n"
+        "except ImportError as e:\n"
+        "    print(e)\n"
+    )
+    out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, check=True)
+    assert "toolreceipt[langgraph]" in out.stdout

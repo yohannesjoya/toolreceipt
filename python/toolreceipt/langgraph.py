@@ -16,7 +16,7 @@ from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, ToolMe
 
 from toolreceipt.claims import ToolSpec
 from toolreceipt.ledger import NO_RESULT, Ledger, LedgerEntry, coerce_args, truncate
-from toolreceipt.messages import SERIALIZED_LANGCHAIN, _is_serialized_langchain, _text
+from toolreceipt.messages import NOTE_NAME, SERIALIZED_LANGCHAIN, _is_serialized_langchain, _text
 
 __all__ = [
     "NOTE_NAME",
@@ -26,10 +26,6 @@ __all__ = [
     "merge_config",
     "tool_specs_from_invocation_params",
 ]
-
-
-#: Name of the user message ``toolreceipt.langchain.ReceiptGuard`` adds. It continues the run.
-NOTE_NAME = "toolreceipt"
 
 
 def tool_specs_from_invocation_params(params: Mapping[str, Any]) -> list[ToolSpec]:

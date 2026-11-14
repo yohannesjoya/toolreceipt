@@ -147,6 +147,16 @@ describe.skipIf(nodeMajor < 20)("receiptGuard on real LangChain.js", () => {
     expect(notes(result)).toEqual([]);
   });
 
+  it("stores an outcome with no tool results", async () => {
+    const big = (await import("@langchain/core/tools")).tool(() => "x".repeat(50_000) + " private-result-text", { name: "lookup_order", description: "Look up an order by id.", schema: zod.z.object({ order_id: zod.z.string() }) });
+    const { model } = scripted([call("lookup_order", "c1", { order_id: "4821" }), "Your order is on its way."]);
+    const agent = langchain.createAgent({ model, tools: [big], middleware: [receiptGuard([big])] });
+    const out = outcome(await agent.invoke(input()));
+    expect("ledger" in out.receipt).toBe(false);
+    expect(JSON.stringify(out)).not.toContain("private-result-text");
+    expect(JSON.stringify(out).length).toBeLessThan(2000);
+  });
+
   it("leaves a history that reads clean after the fact", async () => {
     const { result } = await run([call("issue_refund", "c1", { amount: 32 }), "I've refunded $32 and created a ticket for you.", "I've refunded $32. I have not created a ticket."]);
     expect(check(finalReplyFromGraph(result), ledgerFromGraph(result), { knownTools: tools }).verdict).toBe("clean");

@@ -4,11 +4,8 @@ import { typeName } from "./claims";
 import { isObject, kindOf } from "./langgraph";
 import { Ledger, LedgerEntry, NO_RESULT, coerceArgs } from "./ledger";
 import { messageText } from "./llm";
-import { SERIALIZED_LANGCHAIN, isSerializedLangChain, text } from "./messages";
+import { NOTE_NAME, SERIALIZED_LANGCHAIN, isSerializedLangChain, text } from "./messages";
 import { pyStrip } from "./pystr";
-
-/** Name of the user message `receiptGuard` adds. It continues the run. */
-export const NOTE_NAME = "toolreceipt";
 
 const MESSAGE_TYPES = new Set(["ai", "human", "tool", "system", "remove", "generic", "developer", "function"]);
 

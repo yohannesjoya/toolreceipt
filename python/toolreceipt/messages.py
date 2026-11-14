@@ -85,6 +85,10 @@ def _text(content: Any) -> str:
     return joined or ""
 
 
+#: Name of the user message ``toolreceipt.langchain.ReceiptGuard`` adds. It continues the run.
+NOTE_NAME = "toolreceipt"
+
+
 def _is_user(message: Any) -> bool:
     """A user message that starts a turn: one with text and no ``tool_result`` block.
 
@@ -93,7 +97,7 @@ def _is_user(message: Any) -> bool:
     the run, otherwise the turn's calls would drop out of the ledger and an honest reply
     would read as ``not_called``.
     """
-    if _get(message, "role") != "user" or _get(message, "name") == "toolreceipt":
+    if _get(message, "role") != "user" or _get(message, "name") == NOTE_NAME:
         # A guard note (toolreceipt.langchain.ReceiptGuard) continues the run.
         return False
     content = _get(message, "content")

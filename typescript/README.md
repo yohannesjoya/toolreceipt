@@ -183,10 +183,21 @@ result.messages.at(-1)?.response_metadata.toolreceipt as GuardOutcome; // { outc
 
 It behaves as Python's `ReceiptGuard`: one user message named `toolreceipt` lists each claim the tool
 calls do not back and sends the agent back, at most `maxRetries` times per turn (default 1). An honest
-reply passes through with no extra model call. The note never asks for a tool call and never carries a
-tool's result. Pass every tool the agent might claim, bound or not, for example
-`receiptGuard([...tools, ["send_email", "Send an email"]])`. The first reply and the note stay in the
-history, and streamed output shows the first reply before the guard runs.
+reply passes through with no extra model call. It never blocks or rewrites a reply: `unresolved`
+replies go through as they are, and what to do with them is up to you. The note never asks for a tool
+call and never carries a tool's result, and the stored outcome holds the receipt without the ledger.
+Pass every tool the agent might claim, bound or not, for example
+`receiptGuard([...tools, ["send_email", "Send an email"]])`.
+
+- The first reply and the note stay in the history, and streamed output shows the first reply before
+  the guard runs. The judged reply is emitted again with the same id to carry the outcome: replace
+  messages by id rather than appending them.
+- `responseFormat` structured answers are not checked, and with an `LLMExtractor` every final reply
+  costs one extra model call.
+- Check a guarded run afterwards with `ledgerFromGraph` and `finalReplyFromGraph`, or `checkMessages`
+  over OpenAI-shaped logs. Anthropic-shaped logs drop the note's `name`, so the corrected reply reads
+  `fabricated` there.
+- Tested on `langchain` 1.6.2.
 
 ## Per-turn receipts
 
