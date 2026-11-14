@@ -203,6 +203,40 @@ On Python 3.10, under `ainvoke` or `astream`, LangGraph does not pass the run co
 nodes implicitly. Call your model with the node's `config` argument there, or the tools it
 binds are not recorded as known.
 
+## Guard: let the agent fix the claim before it returns
+
+Built your agent with `langchain`'s `create_agent`? Add the guard and each final reply is checked
+before the agent returns it:
+
+```python
+from langchain.agents import create_agent
+from toolreceipt.langchain import ReceiptGuard
+
+agent = create_agent(model, tools=tools, middleware=[ReceiptGuard(tools)])
+result = agent.invoke({"messages": [("user", "Open a ticket and email me a confirmation")]})
+result["messages"][-1].response_metadata["toolreceipt"]
+# {"outcome": "fixed", "retries": 1, "receipt": {...}}
+```
+
+When a reply claims an action this turn's tool calls do not back ("A confirmation email has been
+sent", with no `send_email` call), the guard adds one user message named `toolreceipt` that lists
+each such claim, and sends the agent back to correct the reply. An honest reply passes through
+with no extra model call. `outcome` is `passed` (the first reply was ok), `fixed` (ok after a note)
+or `unresolved` (still not ok after `max_retries` notes, default 1); the reply then goes through
+as it is, and blocking, logging or annotating it is up to you.
+
+- The note never asks the model to call a tool, so an action that already ran is not repeated,
+  and it holds claim text, tool names and, for a wrong amount, the logged argument; never a tool's
+  result or error text.
+- Pass every tool the agent might claim, bound or not: `ReceiptGuard([*tools, ("send_email",
+  "Send an email")])` also catches a claim about email from an agent with no email tool.
+  LangChain tools, plain functions, names and `(name, description)` pairs all work.
+- The first reply and the note stay in the history; an app that streams model output shows the
+  first reply before the guard runs. `response_format` structured answers are not checked, and
+  with an `LLMExtractor` every final reply costs one extra model call.
+- `create_agent` re-raises a tool's exception by default; set `handle_tool_error` on the tool to
+  record the failure as a tool message the guard can read.
+
 ## With an LLM extractor
 
 The default extractor is rules only: no key, no network, deterministic. It reads direct
@@ -410,7 +444,8 @@ With `capture_results=False` no argument is stored and nothing is quoted.
 Done in 0.2: LLM-backed extractor behind the existing `ClaimExtractor` protocol. Done in
 0.3: async API; verbless tool names matched through their descriptions; framework-free
 message input; argument check for amounts and reference numbers. Done in 0.4: per-turn
-receipts over a whole conversation, and a plain transcript shape.
+receipts over a whole conversation, and a plain transcript shape. Done in 0.5: the guard, which
+lets a `create_agent` agent correct a false claim before it returns.
 
 - Adapters: Mastra, CrewAI
 - `check_turns` over a LangGraph result (a LangChain-to-message-list converter)

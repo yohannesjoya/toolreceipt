@@ -167,6 +167,27 @@ a tool's arguments failing its schema, an unknown tool name, middleware that ret
 `createAgent`'s `toolStrategy`, whose `extract-*` call appears only in the messages. Structured output is not read:
 pass the text you want checked.
 
+## Guard: let the agent fix the claim before it returns
+
+Built your agent with `createAgent`? Add the guard and each final reply is checked before the agent
+returns it. The guard is a plain middleware object; the package still imports nothing from `langchain`.
+
+```ts
+import { createAgent } from "langchain";
+import { receiptGuard, type GuardOutcome } from "toolreceipt";
+
+const agent = createAgent({ model, tools, middleware: [receiptGuard(tools)] });
+const result = await agent.invoke({ messages: [{ role: "user", content: "Open a ticket and email me a confirmation" }] });
+result.messages.at(-1)?.response_metadata.toolreceipt as GuardOutcome; // { outcome: "fixed", retries: 1, receipt }
+```
+
+It behaves as Python's `ReceiptGuard`: one user message named `toolreceipt` lists each claim the tool
+calls do not back and sends the agent back, at most `maxRetries` times per turn (default 1). An honest
+reply passes through with no extra model call. The note never asks for a tool call and never carries a
+tool's result. Pass every tool the agent might claim, bound or not, for example
+`receiptGuard([...tools, ["send_email", "Send an email"]])`. The first reply and the note stay in the
+history, and streamed output shows the first reply before the guard runs.
+
 ## Per-turn receipts
 
 To check every assistant turn of a recorded conversation, including one that ended without a final
@@ -242,6 +263,7 @@ The model sees the reply text and the tool names and descriptions, never the led
 | `checkTurns`, `acheckTurns`, `TurnReceipt` | One receipt per assistant turn with text. |
 | `ledgerFromMessages`, `finalReply` | The two inputs `checkMessages` reads from a list. |
 | `Receipts` | One per agent: `wrapTools(tools)` or `config(base?)`, `ledger`, `check(reply, source?)`, `acheck(reply, source?)`. `source` is a `Ledger`, a record `wrapTools` returned or a config `config` returned. |
+| `receiptGuard(tools, options?)`, `GuardOutcome`, `NOTE_NAME` | The `createAgent` middleware that sends a false claim back once; its outcome; the name of its note. |
 | `ReceiptCallbackHandler` | The LangChain.js callback handler `config` adds: `ledger`, `knownTools`, `flush()`. |
 | `mergeConfig(base, handler)`, `ConfigWith` | Add a handler to a config; the type it returns. |
 | `toolSpecsFromInvocationParams(params)` | Bound tools from a chat model's `invocation_params`. |
@@ -333,6 +355,7 @@ and `src/decimal.ts`. The accepted divergences, none reachable by a current fixt
 | `Ledger`, `LedgerEntry`, `Claim`, `ToolSpec`, `Receipt`, `RuleExtractor`, `ClaimExtractor` | same names |
 | `LLMExtractor`, `from_chat_model` | `LLMExtractor`, `fromChatModel` |
 | `Receipts`, `config()`, `check()`, `acheck()`, `ledger` | same names, plus `wrapTools()` |
+| `toolreceipt.langchain.ReceiptGuard` | `receiptGuard` |
 | `toolreceipt.langgraph.ReceiptCallbackHandler` | `ReceiptCallbackHandler` |
 | `merge_config`, `tool_specs_from_invocation_params` | `mergeConfig`, `toolSpecsFromInvocationParams` |
 | `toolreceipt.langgraph.ledger_from_messages`, `final_reply` | `ledgerFromGraph`, `finalReplyFromGraph` |
