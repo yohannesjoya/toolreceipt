@@ -93,7 +93,8 @@ def _is_user(message: Any) -> bool:
     the run, otherwise the turn's calls would drop out of the ledger and an honest reply
     would read as ``not_called``.
     """
-    if _get(message, "role") != "user":
+    if _get(message, "role") != "user" or _get(message, "name") == "toolreceipt":
+        # A guard note (toolreceipt.langchain.ReceiptGuard) continues the run.
         return False
     content = _get(message, "content")
     if isinstance(content, str):

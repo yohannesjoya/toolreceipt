@@ -19,12 +19,17 @@ from toolreceipt.ledger import NO_RESULT, Ledger, LedgerEntry, coerce_args, trun
 from toolreceipt.messages import SERIALIZED_LANGCHAIN, _is_serialized_langchain, _text
 
 __all__ = [
+    "NOTE_NAME",
     "ReceiptCallbackHandler",
     "final_reply",
     "ledger_from_messages",
     "merge_config",
     "tool_specs_from_invocation_params",
 ]
+
+
+#: Name of the user message ``toolreceipt.langchain.ReceiptGuard`` adds. It continues the run.
+NOTE_NAME = "toolreceipt"
 
 
 def tool_specs_from_invocation_params(params: Mapping[str, Any]) -> list[ToolSpec]:
@@ -285,7 +290,7 @@ def _this_turn(messages: Any) -> list[Any]:
                 f"expected a LangChain message, got {type(message).__name__}; for OpenAI, "
                 "Anthropic and transcript messages use toolreceipt.check_messages"
             )
-        if isinstance(message, HumanMessage):
+        if isinstance(message, HumanMessage) and message.name != NOTE_NAME:
             start = i + 1
     return list(messages[start:])
 
