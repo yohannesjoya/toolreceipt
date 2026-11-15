@@ -93,7 +93,7 @@ def _stored(receipt: Receipt) -> dict[str, Any]:
         receipt.verdict,
         [replace(c, observed=None) for c in receipt.claimed_but_never_ran],
         receipt.ran_but_unreported,
-        receipt.suspected,
+        [replace(c, observed=None) for c in receipt.suspected],
         len(receipt.confirmed),
     )
     return data

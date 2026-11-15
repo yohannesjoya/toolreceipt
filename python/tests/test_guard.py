@@ -360,3 +360,17 @@ def test_ignore_tools_given_as_a_generator_holds_for_every_turn():
     second = agent.invoke({"messages": [HumanMessage("Find order 2.")]}, config)
     assert outcome(first)["receipt"]["ran_but_unreported"] == []
     assert outcome(second)["receipt"]["ran_but_unreported"] == []
+
+
+def test_stored_outcome_drops_arguments_from_llm_only_claims_too():
+    from toolreceipt import LLMExtractor
+
+    span = "$64 is back on your card"
+    extractor = LLMExtractor(
+        complete=lambda _: json.dumps({"claims": [{"text": span, "tool": "issue_refund"}]})
+    )
+    result, _ = run([call("issue_refund", "c1", amount=32), f"{span}."], extractor=extractor)
+    out = outcome(result)
+    assert out["receipt"]["suspected"], out
+    assert out["receipt"]["suspected"][0]["reason"] == "args_mismatch"
+    assert "32" not in json.dumps(out)

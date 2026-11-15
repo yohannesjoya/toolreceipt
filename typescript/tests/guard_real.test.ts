@@ -165,6 +165,16 @@ describe.skipIf(nodeMajor < 20)("receiptGuard on real LangChain.js", () => {
     expect(JSON.stringify(out)).not.toContain("32");
   });
 
+  it("drops arguments from LLM-only claims in the stored outcome", async () => {
+    const { LLMExtractor } = await import("../src/index");
+    const span = "$64 is back on your card";
+    const extractor = new LLMExtractor({ complete: () => JSON.stringify({ claims: [{ text: span, tool: "issue_refund" }] }) });
+    const { result } = await run([call("issue_refund", "c1", { amount: 32 }), `${span}.`], { extractor });
+    const out = outcome(result);
+    expect(out.receipt.suspected[0]?.reason).toBe("args_mismatch");
+    expect(JSON.stringify(out)).not.toContain("32");
+  });
+
   it("keeps ignoreTools given as a generator for every turn", async () => {
     const lookup = (await import("@langchain/core/tools")).tool(() => "found", { name: "lookup_order", description: "Look up an order.", schema: zod.z.object({ order_id: zod.z.string() }) });
     function* ignored() { yield "lookup_order"; }

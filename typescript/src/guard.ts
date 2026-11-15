@@ -66,7 +66,8 @@ function storedReceipt(receipt: Receipt): Record<string, Json> {
     for (const claim of stored[key] as Array<Record<string, Json>>) claim.observed = null;
   }
   const neverRan = receipt.claimedButNeverRan.map((c) => cloneClaim(c, { observed: null }));
-  stored.summary = renderSummary(receipt.verdict, neverRan, receipt.ranButUnreported, receipt.suspected, receipt.confirmed.length);
+  const suspected = receipt.suspected.map((c) => cloneClaim(c, { observed: null }));
+  stored.summary = renderSummary(receipt.verdict, neverRan, receipt.ranButUnreported, suspected, receipt.confirmed.length);
   return stored;
 }
 
