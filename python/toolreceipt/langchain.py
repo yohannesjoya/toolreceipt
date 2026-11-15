@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import inspect
 from collections.abc import Collection, Iterable, Sequence
+from dataclasses import replace
 from typing import Any
 
 try:
@@ -22,7 +23,7 @@ except ImportError as exc:  # pragma: no cover - exercised in a subprocess
 
 from toolreceipt.claims import Claim, ClaimExtractor, ToolSpec, normalize_tool_specs
 from toolreceipt.langgraph import NOTE_NAME, final_reply, ledger_from_messages
-from toolreceipt.receipt import Receipt, _format_observed
+from toolreceipt.receipt import Receipt, _format_observed, render_summary
 from toolreceipt.receipts import acheck, check
 
 __all__ = ["ReceiptGuard"]
@@ -76,14 +77,25 @@ def _note(receipt: Receipt) -> str:
 
 
 def _stored(receipt: Receipt) -> dict[str, Any]:
-    """The receipt without its ledger. The outcome rides on a message that UIs render and
-    checkpointers keep, so it carries no tool arguments or results; the messages hold them."""
+    """The receipt with no tool arguments or results: no ledger, unreported calls cut to their
+    tool, no ``observed`` values, and a summary without the ``ledger k=v`` part. The outcome
+    rides on a message that UIs render and checkpointers keep; the messages hold the rest."""
     data = receipt.to_dict()
     data.pop("ledger", None)
     data["ran_but_unreported"] = [
         {"tool": e["tool"], "status": e["status"], "call_id": e["call_id"]}
         for e in data["ran_but_unreported"]
     ]
+    for key in ("confirmed", "claimed_but_never_ran", "unmatched", "suspected"):
+        for claim in data[key]:
+            claim["observed"] = None
+    data["summary"] = render_summary(
+        receipt.verdict,
+        [replace(c, observed=None) for c in receipt.claimed_but_never_ran],
+        receipt.ran_but_unreported,
+        receipt.suspected,
+        len(receipt.confirmed),
+    )
     return data
 
 
@@ -113,7 +125,8 @@ class ReceiptGuard(AgentMiddleware):
         self._max_retries = max_retries
         self._options: dict[str, Any] = {
             "extractor": extractor,
-            "ignore_tools": ignore_tools,
+            # Copied once: a generator would be used up by the first check.
+            "ignore_tools": frozenset(ignore_tools),
             "llm_blocks": llm_blocks,
             "check_args": check_args,
         }

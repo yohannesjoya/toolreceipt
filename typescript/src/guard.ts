@@ -5,11 +5,12 @@
  */
 
 import type { Claim, ClaimExtractor, ToolLike } from "./claims";
-import { normalizeToolSpecs } from "./claims";
+import { cloneClaim, normalizeToolSpecs } from "./claims";
 import { finalReplyFromGraph, ledgerFromGraph } from "./graph_messages";
 import { isObject, kindOf } from "./langgraph";
 import { NOTE_NAME } from "./messages";
-import { type Receipt, formatObserved } from "./receipt";
+import { type Receipt, formatObserved, renderSummary } from "./receipt";
+import type { Json } from "./types";
 import { acheck } from "./receipts";
 
 export interface ReceiptGuardOptions {
@@ -25,7 +26,7 @@ export interface ReceiptGuardOptions {
 export interface GuardOutcome {
   outcome: "passed" | "fixed" | "unresolved";
   retries: number;
-  receipt: Record<string, unknown>;
+  receipt: Record<string, Json>;
 }
 
 type State = { messages: unknown[] };
@@ -53,6 +54,20 @@ function noteText(receipt: Receipt): string {
     "",
     "Rewrite the reply so it says only what the tool calls show. Do not call tools to fix this.",
   ].join("\n");
+}
+
+/** The receipt with no tool arguments or results: no ledger, unreported calls cut to their tool, no
+ * `observed` values, and a summary without the `ledger k=v` part. The outcome rides on a message UIs
+ * render and checkpointers keep; the messages hold the rest. */
+function storedReceipt(receipt: Receipt): Record<string, Json> {
+  const { ledger: _ledger, ...stored } = receipt.toDict();
+  stored.ran_but_unreported = receipt.ranButUnreported.map((e) => ({ tool: e.tool, status: e.status, call_id: e.callId }));
+  for (const key of ["confirmed", "claimed_but_never_ran", "unmatched", "suspected"]) {
+    for (const claim of stored[key] as Array<Record<string, Json>>) claim.observed = null;
+  }
+  const neverRan = receipt.claimedButNeverRan.map((c) => cloneClaim(c, { observed: null }));
+  stored.summary = renderSummary(receipt.verdict, neverRan, receipt.ranButUnreported, receipt.suspected, receipt.confirmed.length);
+  return stored;
 }
 
 function isNote(message: unknown): boolean {
@@ -87,7 +102,9 @@ export function receiptGuard(tools: Iterable<ToolLike>, options: ReceiptGuardOpt
   const maxRetries = options.maxRetries ?? 1;
   if (!Number.isInteger(maxRetries) || maxRetries < 0) throw new RangeError(`maxRetries must be a whole number, 0 or more, got ${String(maxRetries)}`);
   const knownTools = normalizeToolSpecs(tools);
-  const checkOptions = { knownTools, extractor: options.extractor, ignoreTools: options.ignoreTools, llmBlocks: options.llmBlocks, checkArgs: options.checkArgs };
+  // Copied once: a generator would be used up by the first check.
+  const ignoreTools = [...(options.ignoreTools ?? [])];
+  const checkOptions = { knownTools, extractor: options.extractor, ignoreTools, llmBlocks: options.llmBlocks, checkArgs: options.checkArgs };
 
   async function hook(state: State): Promise<Update | undefined> {
     const messages = state.messages;
@@ -99,10 +116,7 @@ export function receiptGuard(tools: Iterable<ToolLike>, options: ReceiptGuardOpt
     if (!receipt.ok && retries < maxRetries) {
       return { messages: [{ role: "user", name: NOTE_NAME, content: noteText(receipt) }], jumpTo: "model" };
     }
-    // No ledger: the outcome rides on a message UIs render and checkpointers keep, so it carries no
-    // tool arguments or results. The messages hold them.
-    const { ledger: _ledger, ...stored } = receipt.toDict();
-    stored.ran_but_unreported = receipt.ranButUnreported.map((e) => ({ tool: e.tool, status: e.status, call_id: e.callId }));
+    const stored = storedReceipt(receipt);
     const outcome: GuardOutcome = { outcome: receipt.ok ? (retries > 0 ? "fixed" : "passed") : "unresolved", retries, receipt: stored };
     return { messages: [withMetadata(last, { toolreceipt: outcome })] };
   }

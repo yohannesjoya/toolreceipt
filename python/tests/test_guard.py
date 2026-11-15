@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from typing import Any
 
 import pytest
@@ -296,8 +297,10 @@ def test_stored_outcome_carries_no_tool_results():
         """Look up an order by id."""
         return "x" * 50_000 + " private-result-text"
 
-    result, _ = run([call("lookup_order", "c1", order_id="4821"), "Your order is on its way."],
-                    tools=[lookup_order])
+    result, _ = run(
+        [call("lookup_order", "c1", order_id="4821"), "Your order is on its way."],
+        tools=[lookup_order],
+    )
     out = outcome(result)
     assert "ledger" not in out["receipt"]
     assert "private-result-text" not in str(out)
@@ -323,3 +326,37 @@ def test_missing_extra_names_the_extra():
     )
     out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, check=True)
     assert "toolreceipt[langgraph]" in out.stdout
+
+
+def test_stored_outcome_carries_no_tool_arguments():
+    result, _ = run([call("issue_refund", "c1", amount=32), "I've refunded $64."], max_retries=0)
+    out = outcome(result)
+    assert out["outcome"] == "unresolved"
+    assert out["receipt"]["claimed_but_never_ran"][0]["reason"] == "args_mismatch"
+    assert "32" not in json.dumps(out)
+
+
+def test_ignore_tools_given_as_a_generator_holds_for_every_turn():
+    @tool
+    def lookup_order(order_id: str) -> str:
+        """Look up an order by id."""
+        return "found"
+
+    model = Scripted(
+        steps=[
+            call("lookup_order", "a", order_id="1"),
+            "Here you go.",
+            call("lookup_order", "b", order_id="2"),
+            "Here you go again.",
+        ],
+        seen=[],
+    )
+    guard = ReceiptGuard([lookup_order], ignore_tools=(t for t in ["lookup_order"]))
+    agent = create_agent(
+        model=model, tools=[lookup_order], middleware=[guard], checkpointer=InMemorySaver()
+    )
+    config = {"configurable": {"thread_id": "g"}}
+    first = agent.invoke({"messages": [HumanMessage("Find order 1.")]}, config)
+    second = agent.invoke({"messages": [HumanMessage("Find order 2.")]}, config)
+    assert outcome(first)["receipt"]["ran_but_unreported"] == []
+    assert outcome(second)["receipt"]["ran_but_unreported"] == []

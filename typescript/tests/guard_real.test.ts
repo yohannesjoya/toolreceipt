@@ -157,6 +157,26 @@ describe.skipIf(nodeMajor < 20)("receiptGuard on real LangChain.js", () => {
     expect(JSON.stringify(out).length).toBeLessThan(2000);
   });
 
+  it("stores an outcome with no tool arguments", async () => {
+    const { result } = await run([call("issue_refund", "c1", { amount: 32 }), "I've refunded $64."], { maxRetries: 0 });
+    const out = outcome(result);
+    expect(out.outcome).toBe("unresolved");
+    expect(out.receipt.claimed_but_never_ran[0].reason).toBe("args_mismatch");
+    expect(JSON.stringify(out)).not.toContain("32");
+  });
+
+  it("keeps ignoreTools given as a generator for every turn", async () => {
+    const lookup = (await import("@langchain/core/tools")).tool(() => "found", { name: "lookup_order", description: "Look up an order.", schema: zod.z.object({ order_id: zod.z.string() }) });
+    function* ignored() { yield "lookup_order"; }
+    const { model } = scripted([call("lookup_order", "a", { order_id: "1" }), "Here you go.", call("lookup_order", "b", { order_id: "2" }), "Here you go again."]);
+    const agent = langchain.createAgent({ model, tools: [lookup], middleware: [receiptGuard([lookup], { ignoreTools: ignored() })], checkpointer: new graphModule.MemorySaver() });
+    const config = { configurable: { thread_id: "g" } };
+    const first = outcome(await agent.invoke(input("Find order 1."), config));
+    const second = outcome(await agent.invoke(input("Find order 2."), config));
+    expect(first.receipt.ran_but_unreported).toEqual([]);
+    expect(second.receipt.ran_but_unreported).toEqual([]);
+  });
+
   it("leaves a history that reads clean after the fact", async () => {
     const { result } = await run([call("issue_refund", "c1", { amount: 32 }), "I've refunded $32 and created a ticket for you.", "I've refunded $32. I have not created a ticket."]);
     expect(check(finalReplyFromGraph(result), ledgerFromGraph(result), { knownTools: tools }).verdict).toBe("clean");

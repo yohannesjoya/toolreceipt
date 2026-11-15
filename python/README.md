@@ -234,8 +234,10 @@ as it is, and blocking, logging or annotating it is up to you.
 - The first reply and the note stay in the history; an app that streams model output shows the
   first reply before the guard runs. `response_format` structured answers are not checked, and
   with an `LLMExtractor` every final reply costs one extra model call.
-- `create_agent` re-raises a tool's exception by default; set `handle_tool_error` on the tool to
-  record the failure as a tool message the guard can read.
+- `create_agent` re-raises a tool's exception by default. For the guard to see a failure, the
+  tool must raise `ToolException` with `handle_tool_error=True` set, or a middleware's
+  `wrap_tool_call` must turn the error into a tool message; `handle_tool_error` does not catch a
+  plain `RuntimeError`.
 - To carry the outcome, the judged reply is emitted again with the same id: with
   `stream_mode="updates"`, replace messages by id rather than appending them.
 - Check a guarded run afterwards with `ledger_from_messages` and `final_reply`, or with
