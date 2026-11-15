@@ -36,3 +36,15 @@ export async function run(): Promise<string> {
   ledgerFromGraph(result);
   return receipts.check(finalReplyFromGraph(result), config).verdict;
 }
+
+// The guard is accepted by createAgent's middleware list, with real tool objects as its tools.
+import { createAgent } from "langchain";
+import { tool } from "@langchain/core/tools";
+import { ChatOpenAI } from "@langchain/openai";
+import { z } from "zod";
+import { receiptGuard, type GuardOutcome } from "toolreceipt";
+const sendEmail = tool(() => "sent", { name: "send_email", description: "Send an email", schema: z.object({}) });
+export const guarded = createAgent({ model: new ChatOpenAI({ model: "gpt-4o-mini" }), tools: [sendEmail], middleware: [receiptGuard([sendEmail])] });
+export function readOutcome(message: { response_metadata: Record<string, unknown> }): GuardOutcome | undefined {
+  return message.response_metadata.toolreceipt as GuardOutcome | undefined;
+}

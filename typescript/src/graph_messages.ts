@@ -4,7 +4,7 @@ import { typeName } from "./claims";
 import { isObject, kindOf } from "./langgraph";
 import { Ledger, LedgerEntry, NO_RESULT, coerceArgs } from "./ledger";
 import { messageText } from "./llm";
-import { SERIALIZED_LANGCHAIN, isSerializedLangChain, text } from "./messages";
+import { NOTE_NAME, SERIALIZED_LANGCHAIN, isSerializedLangChain, text } from "./messages";
 import { pyStrip } from "./pystr";
 
 const MESSAGE_TYPES = new Set(["ai", "human", "tool", "system", "remove", "generic", "developer", "function"]);
@@ -23,7 +23,7 @@ function turnOf(source: unknown): unknown[] {
     const kind = kindOf(message);
     const readable = isObject(message) && (typeof message._getType === "function" || (MESSAGE_TYPES.has(kind as string) && "content" in message));
     if (!readable) throw new TypeError(`expected a LangChain message, got ${typeName(message)}; for OpenAI, Anthropic and AI SDK messages use checkMessages`);
-    if (kind === "human") start = i + 1;
+    if (kind === "human" && (message as { name?: unknown }).name !== NOTE_NAME) start = i + 1;
   });
   return (messages as unknown[]).slice(start);
 }

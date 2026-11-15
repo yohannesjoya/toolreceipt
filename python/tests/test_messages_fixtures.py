@@ -10,6 +10,7 @@ from toolreceipt.messages import check_messages, final_reply, ledger_from_messag
 CASES = load_cases("messages")
 REQUIRED = {
     "serialized_langchain_rejected", "stored_chat_message_rejected",
+    "openai_guard_note_continues_run", "openai_named_user_starts_turn",
     "openai_refund_and_email_ok", "openai_missing_tool_result", "openai_never_called",
     "openai_no_final_reply", "openai_run_ends_on_call_after_text", "openai_multi_turn",
     "openai_bad_arguments_json", "openai_content_blocks", "openai_tool_content_blocks",

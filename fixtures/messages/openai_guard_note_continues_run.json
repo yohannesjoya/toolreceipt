@@ -1,0 +1,69 @@
+{
+  "messages": [
+    {
+      "role": "user",
+      "content": "Refund my $32 order."
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "c1",
+          "type": "function",
+          "function": {
+            "name": "issue_refund",
+            "arguments": "{\"amount\": 32}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "c1",
+      "content": "refunded"
+    },
+    {
+      "role": "assistant",
+      "content": "I've refunded $32 and created a ticket for you."
+    },
+    {
+      "role": "user",
+      "name": "toolreceipt",
+      "content": "Your last reply says things the tool calls in this turn do not show:\n- \"created a ticket for you\": `create_ticket` was not called.\n\nRewrite the reply so it says only what the tool calls show. Do not call tools to fix this."
+    },
+    {
+      "role": "assistant",
+      "content": "I've refunded $32."
+    }
+  ],
+  "known_tools": [
+    {
+      "type": "function",
+      "function": {
+        "name": "issue_refund",
+        "description": "Issue a refund to the customer."
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "create_ticket",
+        "description": "Create a support ticket."
+      }
+    }
+  ],
+  "expected": {
+    "ledger": [
+      {
+        "tool": "issue_refund",
+        "status": "ok",
+        "args": {
+          "amount": 32
+        }
+      }
+    ],
+    "final_reply": "I've refunded $32.",
+    "verdict": "clean"
+  }
+}

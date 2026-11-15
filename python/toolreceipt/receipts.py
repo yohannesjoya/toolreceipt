@@ -23,7 +23,7 @@ from toolreceipt.receipt import Receipt
 
 ToolLike = str | ToolSpec | tuple[str, str] | Mapping[str, Any] | NamedTool
 
-_LANGGRAPH_DEPS = frozenset({"langchain_core", "langgraph"})
+_LANGGRAPH_DEPS = frozenset({"langchain", "langchain_core", "langgraph"})
 _MISSING_LANGGRAPH = 'toolreceipt[langgraph] is required: pip install "toolreceipt[langgraph]"'
 
 

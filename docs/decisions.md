@@ -312,3 +312,23 @@ Without them, a tool that ran reads `fabricated`. It opens an entry only for a r
 and bears the tool's name. The name comes from `runName`, since `serialized` has none, and a `ToolMessage`
 corrects it, because a caller can set `runName` as a trace label. `finalReplyFromGraph` joins text blocks as
 `checkMessages` does, and Python's `final_reply` does since 0.4.2.
+
+## The guard sends a note, not a rewrite, and never asks for a tool call
+
+`ReceiptGuard` / `receiptGuard` checks a `create_agent` final reply and, when the receipt is not
+ok, adds one user message named `toolreceipt` and sends the agent back, at most `max_retries`
+times per turn. It never rewrites, deletes or blocks the reply: a rewrite would put words in the
+agent's mouth, and blocking is the caller's decision, made from the outcome on the reply. The note
+lists each false claim by reason and tells the model to correct the reply, never to call a tool:
+for a wrong amount the call did run, so "call the tool" would repeat a refund. The note carries
+no tool result, so no tool output reaches the prompt a second time.
+
+The outcome lives in the judged reply's `response_metadata`, not in agent state: an undeclared
+state key is dropped in both languages, TypeScript can only declare one through zod, and an
+outcome on the message cannot go stale across turns. The readers treat the note as part of the
+run, or the post-hoc path would cut the turn at it and lose the calls before it.
+
+Claims that match no tool (`unmatched`) leave `ok` true, so the guard does not act on them. A note
+for them would reach honest replies about things no tool covers. Passing every tool the agent might
+claim, bound or not, catches the case that motivated the guard.
+

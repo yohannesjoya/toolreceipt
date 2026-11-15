@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "toolreceipt"
-version = "0.4.2"
+version = "0.5.0"
 description = "Catch LLM agents claiming actions they never took. Ledger + claim extraction + receipt for LangGraph."
 readme = "README.md"
 license = "MIT"
@@ -20,7 +20,7 @@ classifiers = [
 ]
 
 [project.optional-dependencies]
-langgraph = ["langchain-core>=1.0", "langgraph>=1.0"]
+langgraph = ["langchain-core>=1.0", "langgraph>=1.0", "langchain>=1.0"]
 
 [project.urls]
 Homepage = "https://github.com/yohannesjoya/toolreceipt"
@@ -28,7 +28,7 @@ Repository = "https://github.com/yohannesjoya/toolreceipt"
 Changelog = "https://github.com/yohannesjoya/toolreceipt/blob/main/CHANGELOG.md"
 
 [dependency-groups]
-dev = ["pytest>=8", "ruff>=0.6", "mypy>=1.10", "langchain-core>=1.0", "langgraph>=1.0"]
+dev = ["pytest>=8", "ruff>=0.6", "mypy>=1.10", "langchain-core>=1.0", "langgraph>=1.0", "langchain>=1.0"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["toolreceipt"]

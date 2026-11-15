@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## TypeScript
 
+### [0.3.0] - 2026-11-15
+
+#### Added
+
+- `receiptGuard(tools, options?)`, a `createAgent` middleware that checks each final reply and,
+  when it claims an action the tool calls do not back, sends the agent back once with a note
+  listing each claim. The judged reply carries a `GuardOutcome` in
+  `response_metadata.toolreceipt`. A plain object, so the package still imports nothing.
+- `NOTE_NAME`, the name of the guard's note.
+
+#### Changed
+
+- `ledgerFromGraph`, `finalReplyFromGraph` and `checkMessages` treat a user
+  message named `toolreceipt` as part of the run, not a new turn, so a guarded history
+  reads as one turn.
+
 ### [0.2.1] - 2026-11-13
 
 #### Fixed
@@ -70,6 +86,24 @@ First npm release.
   blocks, as in Python.
 
 ## Python
+
+### [0.5.0] - 2026-11-15
+
+#### Added
+
+- `toolreceipt.langchain.ReceiptGuard`, a `create_agent` middleware that checks each final
+  reply and, when it claims an action the tool calls do not back, sends the agent back once
+  with a note listing each claim. The note never asks for a tool call and carries no tool
+  result. The judged reply carries the outcome in `response_metadata["toolreceipt"]`.
+- `toolreceipt.messages.NOTE_NAME` (also exported from `toolreceipt.langgraph`), the name of
+  the guard's note.
+
+#### Changed
+
+- `ledger_from_messages`, `final_reply` and `check_messages` treat a user
+  message named `toolreceipt` as part of the run, not a new turn, so a guarded history reads
+  as one turn.
+- The `langgraph` extra also installs `langchain>=1.0`, which the guard imports.
 
 ### [0.4.2] - 2026-11-13
 
